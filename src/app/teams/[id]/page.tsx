@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { MatchList } from "@/components/match-display";
-import { TeamCrest } from "@/components/team-crest";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { CARD_LABELS, type CardType } from "@/lib/enums";
 import { formatDate } from "@/lib/dates";
@@ -73,7 +72,6 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
       />
 
       <div className="mb-8 flex flex-wrap items-center gap-4">
-        <TeamCrest team={team} label={team.shortName || team.name} size="lg" />
         <dl className="flex flex-wrap gap-4 text-sm">
           <div className="flex items-center gap-2">
             <span

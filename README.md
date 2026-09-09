@@ -47,7 +47,7 @@ Then walk the critical path:
 
 | Role                     | Can do                                                                                                                                                                                                                                                                                                                      |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Public** (anonymous)   | Standings for both divisions (**Premier League** and **Division 1**), match dates and fixture details, team pages, rules.                                                                                                                                                                                                   |
+| **Public** (anonymous)   | Standings for both divisions (**Premier League** and **First Division**), match dates and fixture details, team pages, rules.                                                                                                                                                                                               |
 | **Referee** (`msslrefs`) | Claim a match, read the pre-match **warning board**, input the score, input disciplinary actions.                                                                                                                                                                                                                           |
 | **Game Administrator**   | Create **and delete** a season, add **and delete** a team (with its two kit colours), choose which kit each side wears in a fixture, add a disciplinary result (which reaches the referee taking the game as a warning), **override a score**, plus divisions, venues, the schedule, report confirmation and the audit log. |
 
@@ -404,9 +404,11 @@ Ambiguous product decisions, resolved and recorded rather than escalated.
 9. **Disciplinary records are admin-writable, publicly readable.** Only
    `/admin/discipline` can add or rescind a sanction, but each team's card
    history is visible on its public team page.
-10. **Two divisions per season: Premier League and Division 1.** Nothing in the
-    schema enforces the number or the names; add more in `/admin/league` if the
-    league grows.
+10. **Two divisions per season: Premier League (8 teams) and First Division (7
+    teams).** Nothing in the schema enforces the number or the names; add more in
+    `/admin/league` if the league grows. Because First Division has an odd team
+    count, the seed's round-robin generator gives one team a **bye** each
+    matchweek rather than inventing a fixture.
 11. **Kit is stored as a choice, not a hex.** `Match.homeKit` / `Match.awayKit`
     hold `PRIMARY` or `ALTERNATE`; the colour is always resolved from the team
     record at read time. Re-colouring a team therefore never leaves a fixture

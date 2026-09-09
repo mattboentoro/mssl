@@ -1,5 +1,5 @@
 import { ActionForm, FieldError, SubmitButton } from "@/components/admin-forms";
-import { TeamCrest } from "@/components/team-crest";
+import { TeamColorBar } from "@/components/team-colors";
 import { Card, Field, inputClass } from "@/components/ui";
 import {
   activateSeasonAction,
@@ -201,7 +201,7 @@ export default async function AdminLeaguePage() {
               teams.map((team) => (
                 <div key={team.id} className="flex items-start justify-between gap-3 p-3 text-sm">
                   <span className="flex min-w-0 items-center gap-2">
-                    <TeamCrest team={team} label={team.shortName || team.name} size="sm" />
+                    <TeamColorBar team={team} size="sm" />
                     <span className="min-w-0">
                       <span className="block truncate">{team.name}</span>
                       <span className="text-muted block text-xs">{team.division.name}</span>

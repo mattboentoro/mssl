@@ -72,7 +72,7 @@ async function createFixture(): Promise<Fixture> {
   });
 
   const division = await prisma.division.create({
-    data: { seasonId: season.id, name: "Division 1", slug: "division-1" },
+    data: { seasonId: season.id, name: "First Division", slug: "first-division" },
   });
 
   const venue = await prisma.venue.create({

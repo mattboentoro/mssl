@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { ActionForm, FieldError, SubmitButton } from "@/components/admin-forms";
 import { MatchKitPicker } from "@/components/match-kit-picker";
-import { KitSwatch } from "@/components/team-crest";
+import { KitSwatch } from "@/components/team-colors";
 import { Card, EmptyState, Field, MatchStatusBadge, inputClass } from "@/components/ui";
 import { createMatchAction } from "@/app/admin/actions";
 import { formatDateTime, toDateTimeInputValue } from "@/lib/dates";

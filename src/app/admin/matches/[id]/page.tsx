@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { ActionForm, SubmitButton } from "@/components/admin-forms";
 import { AdminMatchForms } from "@/components/admin-match-forms";
 import { ActionButton } from "@/components/match-actions";
-import { KitSwatch } from "@/components/team-crest";
+import { KitSwatch } from "@/components/team-colors";
 import { Alert, Badge, Card, MatchStatusBadge } from "@/components/ui";
 import { deleteMatchAction } from "@/app/admin/actions";
 import { formatDateTime } from "@/lib/dates";

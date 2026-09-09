@@ -110,91 +110,112 @@ interface TeamSpec {
 
 const PREMIER_LEAGUE_TEAMS: TeamSpec[] = [
   {
-    name: "Redmond Rovers",
-    shortName: "ROV",
-    slug: "redmond-rovers",
-    colorPrimary: "#b91c1c",
-    colorAlternate: "#fef2f2",
-  },
-  {
-    name: "Studio B Strikers",
-    shortName: "STB",
-    slug: "studio-b-strikers",
-    colorPrimary: "#1d4ed8",
-    colorAlternate: "#fbbf24",
-  },
-  {
-    name: "Azure Athletic",
-    shortName: "AZA",
-    slug: "azure-athletic",
-    colorPrimary: "#0284c7",
-    colorAlternate: "#0c1b33",
-  },
-  {
-    name: "Bellevue United",
-    shortName: "BEL",
-    slug: "bellevue-united",
-    colorPrimary: "#4338ca",
-    colorAlternate: "#f8fafc",
-  },
-  {
-    name: "Commons FC",
-    shortName: "COM",
-    slug: "commons-fc",
-    colorPrimary: "#15803d",
+    name: "False 9-5",
+    shortName: "F95",
+    slug: "false-9-5",
+    colorPrimary: "#0f172a",
     colorAlternate: "#f1f5f9",
   },
   {
-    name: "Kernel Panic FC",
-    shortName: "KPA",
-    slug: "kernel-panic-fc",
-    colorPrimary: "#7c2d12",
-    colorAlternate: "#fed7aa",
+    name: "Seaturks",
+    shortName: "SEA",
+    slug: "seaturks",
+    colorPrimary: "#0d9488",
+    colorAlternate: "#f0fdfa",
+  },
+  {
+    name: "SMURF",
+    shortName: "SMU",
+    slug: "smurf",
+    colorPrimary: "#2563eb",
+    colorAlternate: "#eff6ff",
+  },
+  {
+    name: "FFC",
+    shortName: "FFC",
+    slug: "ffc",
+    colorPrimary: "#dc2626",
+    colorAlternate: "#fef2f2",
+  },
+  {
+    name: "SOS",
+    shortName: "SOS",
+    slug: "sos",
+    colorPrimary: "#ea580c",
+    colorAlternate: "#1c1917",
+  },
+  {
+    name: "Chargers",
+    shortName: "CHG",
+    slug: "chargers",
+    colorPrimary: "#facc15",
+    colorAlternate: "#1e3a8a",
+  },
+  {
+    name: "RCS United",
+    shortName: "RCS",
+    slug: "rcs-united",
+    colorPrimary: "#15803d",
+    colorAlternate: "#f0fdf4",
+  },
+  {
+    name: "Tequileros",
+    shortName: "TEQ",
+    slug: "tequileros",
+    colorPrimary: "#84cc16",
+    colorAlternate: "#1a2e05",
   },
 ];
 
-const DIVISION_ONE_TEAMS: TeamSpec[] = [
+const FIRST_DIVISION_TEAMS: TeamSpec[] = [
   {
-    name: "Building 92 Bulls",
-    shortName: "B92",
-    slug: "building-92-bulls",
-    colorPrimary: "#78350f",
-    colorAlternate: "#fef3c7",
+    name: "The POT",
+    shortName: "POT",
+    slug: "the-pot",
+    colorPrimary: "#7e22ce",
+    colorAlternate: "#faf5ff",
   },
   {
-    name: "Sammamish Spurs",
-    shortName: "SAM",
-    slug: "sammamish-spurs",
-    colorPrimary: "#0f766e",
-    colorAlternate: "#ffffff",
+    name: "Free Foulin",
+    shortName: "FRF",
+    slug: "free-foulin",
+    colorPrimary: "#be123c",
+    colorAlternate: "#fff1f2",
   },
   {
-    name: "Issaquah Ibis",
-    shortName: "ISS",
-    slug: "issaquah-ibis",
-    colorPrimary: "#be185d",
-    colorAlternate: "#1f2937",
+    name: "Dejong United",
+    shortName: "DJU",
+    slug: "dejong-united",
+    colorPrimary: "#f97316",
+    colorAlternate: "#0c0a09",
   },
   {
-    name: "Overlake Owls",
-    shortName: "OVL",
-    slug: "overlake-owls",
-    colorPrimary: "#4d7c0f",
-    colorAlternate: "#fafaf9",
+    name: "Arsenal",
+    shortName: "ARS",
+    slug: "arsenal",
+    colorPrimary: "#ef4444",
+    colorAlternate: "#1e293b",
   },
   {
-    name: "Puget Sound City",
-    shortName: "PSC",
-    slug: "puget-sound-city",
-    colorPrimary: "#0369a1",
-    colorAlternate: "#e0f2fe",
+    name: "Tap-in Merchants FC",
+    shortName: "TIM",
+    slug: "tap-in-merchants-fc",
+    colorPrimary: "#0ea5e9",
+    colorAlternate: "#082f49",
   },
   {
-    name: "Latency FC",
-    shortName: "LAT",
-    slug: "latency-fc",
-    colorPrimary: "#6d28d9",
-    colorAlternate: "#ede9fe",
+    name: "Red Star",
+    shortName: "RDS",
+    slug: "red-star",
+    colorPrimary: "#991b1b",
+    colorAlternate: "#fafafa",
+  },
+  {
+    name: "Atlettcopilot",
+    shortName: "ATC",
+    slug: "atlettcopilot",
+    colorPrimary: "#f8fafc",
+    colorAlternate: "#b91c1c",
   },
 ];
 
@@ -270,15 +291,24 @@ const REFEREES = [
   },
 ];
 
-/** Circle-method single round robin. Returns rounds of [home, away] index pairs. */
+/**
+ * Circle-method single round robin. Returns rounds of [home, away] index pairs.
+ * An odd team count gets a phantom opponent, so whoever draws it has a bye that
+ * matchweek and simply plays no fixture.
+ */
 function roundRobin(count: number): [number, number][][] {
+  const bye = count % 2 === 1 ? count : -1;
   const ids = [...Array(count).keys()];
+  if (bye >= 0) ids.push(bye);
+  const size = ids.length;
+
   const rounds: [number, number][][] = [];
-  for (let round = 0; round < count - 1; round += 1) {
+  for (let round = 0; round < size - 1; round += 1) {
     const pairs: [number, number][] = [];
-    for (let i = 0; i < count / 2; i += 1) {
+    for (let i = 0; i < size / 2; i += 1) {
       const home = ids[i];
-      const away = ids[count - 1 - i];
+      const away = ids[size - 1 - i];
+      if (home === bye || away === bye) continue;
       pairs.push(round % 2 === 0 ? [home, away] : [away, home]);
     }
     rounds.push(pairs);
@@ -349,7 +379,7 @@ async function seedSeason(options: {
 
   const divisionSpecs = [
     { name: "Premier League", slug: "premier-league", sortOrder: 1, teams: PREMIER_LEAGUE_TEAMS },
-    { name: "Division 1", slug: "division-1", sortOrder: 2, teams: DIVISION_ONE_TEAMS },
+    { name: "First Division", slug: "first-division", sortOrder: 2, teams: FIRST_DIVISION_TEAMS },
   ];
 
   for (const spec of divisionSpecs) {

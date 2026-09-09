@@ -42,7 +42,7 @@ model Season {
   discipline    DisciplinaryAction[]
 }
 
-/// A competitive tier inside a season, e.g. "Division 1".
+/// A competitive tier inside a season, e.g. "Premier League".
 model Division {
   id        String   @id @default(cuid())
   seasonId  String

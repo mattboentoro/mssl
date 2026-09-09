@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { TeamCrest } from "@/components/team-crest";
+import { TeamColorBar } from "@/components/team-colors";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { getSeasons, getTeamsBySeason, resolveSeason } from "@/lib/queries";
 
@@ -83,7 +83,7 @@ export default async function TeamsPage({
                   <Card key={team.id} as="li" className="hover:border-brand transition-colors">
                     <Link href={`/teams/${team.id}`} className="block p-4">
                       <div className="flex items-center gap-3">
-                        <TeamCrest team={team} label={team.shortName || team.name} size="lg" />
+                        <TeamColorBar team={team} size="lg" />
                         <div className="min-w-0">
                           <p className="truncate font-semibold">{team.name}</p>
                           <p className="text-muted text-xs">
