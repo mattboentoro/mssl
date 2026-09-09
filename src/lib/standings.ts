@@ -68,12 +68,7 @@ export interface StandingsRow {
 }
 
 export type Tiebreaker =
-  | "points"
-  | "goalDifference"
-  | "goalsFor"
-  | "headToHead"
-  | "disciplinaryPoints"
-  | "alphabetical";
+  "points" | "goalDifference" | "goalsFor" | "headToHead" | "disciplinaryPoints" | "alphabetical";
 
 export interface StandingsOptions {
   /** Count reports that are SUBMITTED but not yet admin-CONFIRMED. */

@@ -43,8 +43,7 @@ export interface ActorContext extends AuditActor {
   isAdmin?: boolean;
 }
 
-const isClosed = (status: string): boolean =>
-  CLOSED_MATCH_STATUSES.includes(status as MatchStatus);
+const isClosed = (status: string): boolean => CLOSED_MATCH_STATUSES.includes(status as MatchStatus);
 
 async function loadMatch(db: DbClient, matchId: string) {
   const match = await db.match.findUnique({ where: { id: matchId } });
@@ -169,11 +168,7 @@ export async function unassignReferee(
     );
   }
   if (match.status === "REPORT_SUBMITTED" || match.status === "CONFIRMED") {
-    throw new MatchError(
-      "A report has already been filed for this match.",
-      409,
-      "INVALID_STATE",
-    );
+    throw new MatchError("A report has already been filed for this match.", 409, "INVALID_STATE");
   }
 
   const updated = await db.match.updateMany({
@@ -377,21 +372,13 @@ export async function submitGameReport(
 
   const isOwner = match.refereeId === refereeId;
   if (!isOwner && !actor.isAdmin) {
-    throw new MatchError(
-      "Only the assigned referee can file this report.",
-      403,
-      "NOT_YOUR_MATCH",
-    );
+    throw new MatchError("Only the assigned referee can file this report.", 403, "NOT_YOUR_MATCH");
   }
   if (match.report) {
     throw new MatchError("A report has already been filed for this match.", 409, "REPORT_EXISTS");
   }
   if (match.status !== "LOCKED") {
-    throw new MatchError(
-      "Lock the match before submitting the game report.",
-      409,
-      "NOT_LOCKED",
-    );
+    throw new MatchError("Lock the match before submitting the game report.", 409, "NOT_LOCKED");
   }
 
   const events = input.events ?? [];

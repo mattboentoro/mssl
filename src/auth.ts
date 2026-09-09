@@ -155,8 +155,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.rolesCheckedAt = undefined; // force a fresh Graph check
       }
 
-      const stale =
-        !token.rolesCheckedAt || Date.now() - token.rolesCheckedAt > ROLE_CACHE_TTL_MS;
+      const stale = !token.rolesCheckedAt || Date.now() - token.rolesCheckedAt > ROLE_CACHE_TTL_MS;
 
       if (trigger === "update" || stale) {
         return resolveRoles(token);

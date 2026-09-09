@@ -21,17 +21,17 @@ export const MATCH_STATUSES = [
 export type MatchStatus = (typeof MATCH_STATUSES)[number];
 export const matchStatusSchema = z.enum(MATCH_STATUSES);
 
-export const MatchStatus = Object.fromEntries(
-  MATCH_STATUSES.map((s) => [s, s]),
-) as { [K in MatchStatus]: K };
+export const MatchStatus = Object.fromEntries(MATCH_STATUSES.map((s) => [s, s])) as {
+  [K in MatchStatus]: K;
+};
 
 export const GAME_REPORT_STATUSES = ["SUBMITTED", "CONFIRMED", "DISPUTED"] as const;
 export type GameReportStatus = (typeof GAME_REPORT_STATUSES)[number];
 export const gameReportStatusSchema = z.enum(GAME_REPORT_STATUSES);
 
-export const GameReportStatus = Object.fromEntries(
-  GAME_REPORT_STATUSES.map((s) => [s, s]),
-) as { [K in GameReportStatus]: K };
+export const GameReportStatus = Object.fromEntries(GAME_REPORT_STATUSES.map((s) => [s, s])) as {
+  [K in GameReportStatus]: K;
+};
 
 export const GAME_EVENT_TYPES = [
   "GOAL",
@@ -44,9 +44,9 @@ export const GAME_EVENT_TYPES = [
 export type GameEventType = (typeof GAME_EVENT_TYPES)[number];
 export const gameEventTypeSchema = z.enum(GAME_EVENT_TYPES);
 
-export const GameEventType = Object.fromEntries(
-  GAME_EVENT_TYPES.map((s) => [s, s]),
-) as { [K in GameEventType]: K };
+export const GameEventType = Object.fromEntries(GAME_EVENT_TYPES.map((s) => [s, s])) as {
+  [K in GameEventType]: K;
+};
 
 export const DOCUMENT_CATEGORIES = ["RULES", "FORMS", "POLICY", "OTHER"] as const;
 export type DocumentCategory = (typeof DOCUMENT_CATEGORIES)[number];

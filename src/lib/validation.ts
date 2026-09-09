@@ -1,10 +1,6 @@
 import { z } from "zod";
 
-import {
-  DOCUMENT_CATEGORIES,
-  GAME_EVENT_TYPES,
-  MATCH_STATUSES,
-} from "@/lib/enums";
+import { DOCUMENT_CATEGORIES, GAME_EVENT_TYPES, MATCH_STATUSES } from "@/lib/enums";
 
 /** Shared Zod schemas. Every API route and server action validates with these. */
 
@@ -123,7 +119,9 @@ export const adminAssignSchema = z.object({
 
 export const seasonSchema = z.object({
   name: trimmed(120).min(2),
-  slug: trimmed(120).min(2).regex(/^[a-z0-9-]+$/, "Lower-case letters, digits and dashes only."),
+  slug: trimmed(120)
+    .min(2)
+    .regex(/^[a-z0-9-]+$/, "Lower-case letters, digits and dashes only."),
   startsOn: z.string().min(4),
   endsOn: z.string().min(4),
   isActive: z.boolean().default(false),
@@ -132,19 +130,28 @@ export const seasonSchema = z.object({
 export const divisionSchema = z.object({
   seasonId: z.string().min(1),
   name: trimmed(120).min(2),
-  slug: trimmed(120).min(1).regex(/^[a-z0-9-]+$/),
+  slug: trimmed(120)
+    .min(1)
+    .regex(/^[a-z0-9-]+$/),
   sortOrder: z.number().int().min(0).max(99).default(0),
 });
 
 export const teamSchema = z.object({
   divisionId: z.string().min(1),
   name: trimmed(120).min(2),
-  slug: trimmed(120).min(1).regex(/^[a-z0-9-]+$/),
+  slug: trimmed(120)
+    .min(1)
+    .regex(/^[a-z0-9-]+$/),
   shortName: trimmed(24).min(1),
   colorPrimary: trimmed(9).default("#0f766e"),
   crestEmoji: trimmed(8).default("\u26BD"),
   captainName: optionalText(120).optional(),
-  contactEmail: z.string().email().optional().or(z.literal("")).transform((v) => v || undefined),
+  contactEmail: z
+    .string()
+    .email()
+    .optional()
+    .or(z.literal(""))
+    .transform((v) => v || undefined),
 });
 
 export const playerSchema = z.object({
@@ -153,13 +160,20 @@ export const playerSchema = z.object({
   lastName: trimmed(60).min(1),
   jerseyNumber: z.number().int().min(0).max(99).nullable().optional(),
   position: optionalText(40).optional(),
-  email: z.string().email().optional().or(z.literal("")).transform((v) => v || undefined),
+  email: z
+    .string()
+    .email()
+    .optional()
+    .or(z.literal(""))
+    .transform((v) => v || undefined),
   active: z.boolean().default(true),
 });
 
 export const venueSchema = z.object({
   name: trimmed(120).min(2),
-  slug: trimmed(120).min(1).regex(/^[a-z0-9-]+$/),
+  slug: trimmed(120)
+    .min(1)
+    .regex(/^[a-z0-9-]+$/),
   address: optionalText(240).optional(),
   city: optionalText(120).optional(),
   mapUrl: optionalText(500).optional(),
@@ -188,7 +202,9 @@ export const documentSchema = z.object({
 
 export const announcementSchema = z.object({
   title: trimmed(200).min(3),
-  slug: trimmed(200).min(3).regex(/^[a-z0-9-]+$/),
+  slug: trimmed(200)
+    .min(3)
+    .regex(/^[a-z0-9-]+$/),
   summary: trimmed(400).min(3),
   body: trimmed(20000).min(3),
   pinned: z.boolean().default(false),
