@@ -52,6 +52,13 @@ export const DOCUMENT_CATEGORIES = ["RULES", "FORMS", "POLICY", "OTHER"] as cons
 export type DocumentCategory = (typeof DOCUMENT_CATEGORIES)[number];
 export const documentCategorySchema = z.enum(DOCUMENT_CATEGORIES);
 
+export const DOCUMENT_CATEGORY_LABELS: Record<DocumentCategory, string> = {
+  RULES: "Rules & competition",
+  FORMS: "Forms",
+  POLICY: "Policies",
+  OTHER: "Other",
+};
+
 export const ROLES = ["public", "viewer", "referee", "admin"] as const;
 export type Role = (typeof ROLES)[number];
 

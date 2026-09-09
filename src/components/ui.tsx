@@ -141,7 +141,7 @@ export function MatchStatusBadge({ status }: { status: string }) {
 /* Buttons                                                                    */
 /* -------------------------------------------------------------------------- */
 
-type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   primary: "bg-brand text-brand-contrast hover:opacity-90",
@@ -214,10 +214,12 @@ export function Alert({
   tone = "danger",
   title,
   children,
+  className,
 }: {
   tone?: "danger" | "success" | "warning" | "accent" | "info";
   title?: string;
   children: ReactNode;
+  className?: string;
 }) {
   const tones = {
     danger: "border-danger/40 bg-danger/10 text-danger",
@@ -231,7 +233,7 @@ export function Alert({
   const role = tone === "danger" || tone === "warning" ? "alert" : undefined;
 
   return (
-    <div className={cn("rounded-lg border px-4 py-3 text-sm", tones[tone])} role={role}>
+    <div className={cn("rounded-lg border px-4 py-3 text-sm", tones[tone], className)} role={role}>
       {title ? <p className="font-semibold">{title}</p> : null}
       <div className={title ? "mt-1" : undefined}>{children}</div>
     </div>
