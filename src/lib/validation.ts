@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-import { CARD_TYPES, DOCUMENT_CATEGORIES, MATCH_STATUSES } from "@/lib/enums";
+import { CARD_TYPES, DOCUMENT_CATEGORIES, KIT_CHOICES, MATCH_STATUSES } from "@/lib/enums";
+import { normalizeHex } from "@/lib/kits";
 
 /** Shared Zod schemas. Every API route and server action validates with these. */
 
@@ -9,6 +10,15 @@ const optionalText = (max: number) =>
   trimmed(max)
     .optional()
     .transform((v) => (v && v.length > 0 ? v : undefined));
+
+/** A `#rgb` / `#rrggbb` kit colour, stored normalised to lower-case `#rrggbb`. */
+const hexColor = (fallback: string) =>
+  z
+    .string()
+    .trim()
+    .regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, "Use a hex colour such as #1d4ed8.")
+    .transform(normalizeHex)
+    .default(fallback);
 
 /** Minutes 0-130 covers 90 + stoppage + extra time, and 0 for pre-match cards. */
 export const minuteSchema = z
@@ -47,7 +57,11 @@ export const gameReportSchema = z
     cards: z.array(reportCardSchema).max(60).default([]),
   })
   .superRefine((value, ctx) => {
-    if (value.homeForfeit && value.awayForfeit && (value.homeScore !== 0 || value.awayScore !== 0)) {
+    if (
+      value.homeForfeit &&
+      value.awayForfeit &&
+      (value.homeScore !== 0 || value.awayScore !== 0)
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["homeScore"],
@@ -96,6 +110,8 @@ export const matchUpdateSchema = z.object({
   kickoffAt: z.string().datetime({ offset: true }).optional(),
   venueId: z.string().nullable().optional(),
   status: z.enum(MATCH_STATUSES).optional(),
+  homeKit: z.enum(KIT_CHOICES).optional(),
+  awayKit: z.enum(KIT_CHOICES).optional(),
   reason: optionalText(500).optional(),
 });
 
@@ -130,8 +146,8 @@ export const teamSchema = z.object({
     .min(1)
     .regex(/^[a-z0-9-]+$/),
   shortName: trimmed(24).min(1),
-  colorPrimary: trimmed(9).default("#0f766e"),
-  crestEmoji: trimmed(8).default("\u26BD"),
+  colorPrimary: hexColor("#0f766e"),
+  colorAlternate: hexColor("#ffffff"),
   captainName: optionalText(120).optional(),
   contactEmail: z
     .string()
@@ -139,6 +155,21 @@ export const teamSchema = z.object({
     .optional()
     .or(z.literal(""))
     .transform((v) => v || undefined),
+});
+
+/**
+ * Deleting a season or a team is irreversible, so the admin has to retype the
+ * name exactly. The comparison itself happens in the action, which knows the
+ * real name; this only guarantees something was typed.
+ */
+export const deleteSeasonSchema = z.object({
+  seasonId: z.string().min(1),
+  confirmName: trimmed(120).min(1, "Type the season name to confirm."),
+});
+
+export const deleteTeamSchema = z.object({
+  teamId: z.string().min(1),
+  confirmName: trimmed(120).min(1, "Type the team name to confirm."),
 });
 
 export const venueSchema = z.object({
@@ -160,6 +191,8 @@ export const matchCreateSchema = z.object({
   venueId: z.string().nullable().optional(),
   kickoffAt: z.string().min(4),
   matchweek: z.number().int().min(1).max(60),
+  homeKit: z.enum(KIT_CHOICES).default("PRIMARY"),
+  awayKit: z.enum(KIT_CHOICES).default("ALTERNATE"),
   notes: optionalText(500).optional(),
 });
 

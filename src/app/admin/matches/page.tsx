@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 import { ActionForm, FieldError, SubmitButton } from "@/components/admin-forms";
+import { MatchKitPicker } from "@/components/match-kit-picker";
+import { KitSwatch } from "@/components/team-crest";
 import { Card, EmptyState, Field, MatchStatusBadge, inputClass } from "@/components/ui";
 import { createMatchAction } from "@/app/admin/actions";
 import { formatDateTime, toDateTimeInputValue } from "@/lib/dates";
@@ -50,8 +52,8 @@ export default async function AdminMatchesPage({
       orderBy: [{ kickoffAt: "asc" }],
       take: 200,
       include: {
-        homeTeam: { select: { name: true } },
-        awayTeam: { select: { name: true } },
+        homeTeam: { select: { name: true, colorPrimary: true, colorAlternate: true } },
+        awayTeam: { select: { name: true, colorPrimary: true, colorAlternate: true } },
         division: { select: { name: true } },
         venue: { select: { name: true } },
         referee: { select: { name: true } },
@@ -156,9 +158,23 @@ export default async function AdminMatchesPage({
                     </td>
                     <td className="text-muted px-3 py-2">{match.matchweek}</td>
                     <td className="px-3 py-2">
-                      <span className="font-medium">{match.homeTeam.name}</span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <KitSwatch
+                          team={match.homeTeam}
+                          kit={match.homeKit}
+                          teamName={match.homeTeam.name}
+                        />
+                        <span className="font-medium">{match.homeTeam.name}</span>
+                      </span>
                       <span className="text-muted"> v </span>
-                      <span className="font-medium">{match.awayTeam.name}</span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <KitSwatch
+                          team={match.awayTeam}
+                          kit={match.awayKit}
+                          teamName={match.awayTeam.name}
+                        />
+                        <span className="font-medium">{match.awayTeam.name}</span>
+                      </span>
                       {match.venue ? (
                         <span className="text-muted block text-xs">{match.venue.name}</span>
                       ) : null}
@@ -219,26 +235,14 @@ export default async function AdminMatchesPage({
               />
               <FieldError name="matchweek" />
             </Field>
-            <Field label="Home team" htmlFor="new-home">
-              <select id="new-home" name="homeTeamId" className={inputClass} required>
-                {teams.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-              <FieldError name="homeTeamId" />
-            </Field>
-            <Field label="Away team" htmlFor="new-away">
-              <select id="new-away" name="awayTeamId" className={inputClass} required>
-                {teams.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-              <FieldError name="awayTeamId" />
-            </Field>
+            <MatchKitPicker
+              teams={teams.map((t) => ({
+                id: t.id,
+                name: t.name,
+                colorPrimary: t.colorPrimary,
+                colorAlternate: t.colorAlternate,
+              }))}
+            />
             <Field label="Kick-off" htmlFor="new-kickoff">
               <input
                 id="new-kickoff"

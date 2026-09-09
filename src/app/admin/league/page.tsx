@@ -1,4 +1,5 @@
 import { ActionForm, FieldError, SubmitButton } from "@/components/admin-forms";
+import { TeamCrest } from "@/components/team-crest";
 import { Card, Field, inputClass } from "@/components/ui";
 import {
   activateSeasonAction,
@@ -6,6 +7,8 @@ import {
   createSeasonAction,
   createTeamAction,
   createVenueAction,
+  deleteSeasonAction,
+  deleteTeamAction,
 } from "@/app/admin/actions";
 import { formatDate } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
@@ -42,7 +45,7 @@ export default async function AdminLeaguePage() {
         <div className="grid gap-4 lg:grid-cols-2">
           <Card className="divide-subtle divide-y">
             {seasons.map((season) => (
-              <div key={season.id} className="flex items-center justify-between gap-3 p-3">
+              <div key={season.id} className="flex items-start justify-between gap-3 p-3">
                 <div>
                   <p className="text-sm font-medium">
                     {season.name}
@@ -54,12 +57,38 @@ export default async function AdminLeaguePage() {
                     {formatDate(season.startsOn)} &ndash; {formatDate(season.endsOn)}
                   </p>
                 </div>
-                {!season.isActive ? (
-                  <ActionForm action={activateSeasonAction} resetOnSuccess={false}>
-                    <input type="hidden" name="seasonId" value={season.id} />
-                    <SubmitButton variant="ghost">Make active</SubmitButton>
-                  </ActionForm>
-                ) : null}
+                {season.isActive ? (
+                  <p className="text-muted max-w-40 text-right text-[11px]">
+                    Activate another season before this one can be deleted.
+                  </p>
+                ) : (
+                  <div className="flex flex-col items-end gap-2">
+                    <ActionForm action={activateSeasonAction} resetOnSuccess={false}>
+                      <input type="hidden" name="seasonId" value={season.id} />
+                      <SubmitButton variant="ghost">Make active</SubmitButton>
+                    </ActionForm>
+                    <ActionForm
+                      action={deleteSeasonAction}
+                      resetOnSuccess={false}
+                      className="flex flex-col items-end gap-1"
+                    >
+                      <input type="hidden" name="seasonId" value={season.id} />
+                      <input
+                        name="confirmName"
+                        aria-label={`Type ${season.name} to confirm deletion`}
+                        placeholder={`Type “${season.name}”`}
+                        className={`${inputClass} w-44 text-xs`}
+                        required
+                      />
+                      <SubmitButton
+                        variant="danger"
+                        confirm={`Delete ${season.name} and every division, team, fixture and report inside it? This cannot be undone.`}
+                      >
+                        Delete season
+                      </SubmitButton>
+                    </ActionForm>
+                  </div>
+                )}
               </div>
             ))}
           </Card>
@@ -170,14 +199,39 @@ export default async function AdminLeaguePage() {
               <p className="text-muted p-4 text-sm">No teams yet.</p>
             ) : (
               teams.map((team) => (
-                <div key={team.id} className="flex items-center justify-between p-3 text-sm">
-                  <span>
-                    {team.crestEmoji} {team.name}
-                    <span className="text-muted block text-xs">{team.division.name}</span>
+                <div key={team.id} className="flex items-start justify-between gap-3 p-3 text-sm">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <TeamCrest team={team} label={team.shortName || team.name} size="sm" />
+                    <span className="min-w-0">
+                      <span className="block truncate">{team.name}</span>
+                      <span className="text-muted block text-xs">{team.division.name}</span>
+                    </span>
                   </span>
-                  <a href={`/teams/${team.id}`} className="text-muted text-xs underline">
-                    View
-                  </a>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <a href={`/teams/${team.id}`} className="text-muted text-xs underline">
+                      View
+                    </a>
+                    <ActionForm
+                      action={deleteTeamAction}
+                      resetOnSuccess={false}
+                      className="flex flex-col items-end gap-1"
+                    >
+                      <input type="hidden" name="teamId" value={team.id} />
+                      <input
+                        name="confirmName"
+                        aria-label={`Type ${team.name} to confirm deletion`}
+                        placeholder={`Type “${team.name}”`}
+                        className={`${inputClass} w-40 text-xs`}
+                        required
+                      />
+                      <SubmitButton
+                        variant="danger"
+                        confirm={`Delete ${team.name} and its unplayed fixtures? This cannot be undone.`}
+                      >
+                        Delete team
+                      </SubmitButton>
+                    </ActionForm>
+                  </div>
                 </div>
               ))
             )}
@@ -202,14 +256,33 @@ export default async function AdminLeaguePage() {
                 <input id="team-short" name="shortName" maxLength={24} className={inputClass} />
                 <FieldError name="shortName" />
               </Field>
-              <Field label="Crest emoji" htmlFor="team-crest">
+              <Field
+                label="Primary colour"
+                htmlFor="team-color-primary"
+                hint="Home / first-choice kit."
+              >
                 <input
-                  id="team-crest"
-                  name="crestEmoji"
-                  maxLength={4}
-                  defaultValue={"\u26BD"}
-                  className={inputClass}
+                  id="team-color-primary"
+                  name="colorPrimary"
+                  type="color"
+                  defaultValue="#0f766e"
+                  className="border-subtle h-10 w-full cursor-pointer rounded-lg border bg-transparent p-1"
                 />
+                <FieldError name="colorPrimary" />
+              </Field>
+              <Field
+                label="Alternate colour"
+                htmlFor="team-color-alternate"
+                hint="Worn when the kits would clash."
+              >
+                <input
+                  id="team-color-alternate"
+                  name="colorAlternate"
+                  type="color"
+                  defaultValue="#ffffff"
+                  className="border-subtle h-10 w-full cursor-pointer rounded-lg border bg-transparent p-1"
+                />
+                <FieldError name="colorAlternate" />
               </Field>
               <Field label="Captain" htmlFor="team-captain">
                 <input id="team-captain" name="captainName" className={inputClass} />

@@ -45,6 +45,16 @@ export const CardType = Object.fromEntries(CARD_TYPES.map((s) => [s, s])) as {
   [K in CardType]: K;
 };
 
+/** Which of a team's two registered kits they wear for a given fixture. */
+export const KIT_CHOICES = ["PRIMARY", "ALTERNATE"] as const;
+export type KitChoice = (typeof KIT_CHOICES)[number];
+export const kitChoiceSchema = z.enum(KIT_CHOICES);
+
+export const KIT_LABELS: Record<KitChoice, string> = {
+  PRIMARY: "Primary kit",
+  ALTERNATE: "Alternate kit",
+};
+
 /** Who issued a disciplinary action. */
 export const DISCIPLINARY_SOURCES = ["REFEREE", "ADMIN"] as const;
 export type DisciplinarySource = (typeof DISCIPLINARY_SOURCES)[number];

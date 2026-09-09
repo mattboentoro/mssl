@@ -65,9 +65,7 @@ export function GameReportForm({
   }
 
   function updateCard(key: string, patch: Partial<CardDraft>) {
-    setCards((current) =>
-      current.map((card) => (card.key === key ? { ...card, ...patch } : card)),
-    );
+    setCards((current) => current.map((card) => (card.key === key ? { ...card, ...patch } : card)));
   }
 
   function removeCard(key: string) {

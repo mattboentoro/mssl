@@ -11,6 +11,8 @@ import { prisma } from "@/lib/prisma";
 import {
   announcementSchema,
   csvMatchRowSchema,
+  deleteSeasonSchema,
+  deleteTeamSchema,
   disciplinaryActionSchema,
   divisionSchema,
   documentSchema,
@@ -160,6 +162,57 @@ export async function activateSeasonAction(
   );
 }
 
+/**
+ * Delete a season and everything under it — divisions, teams, fixtures, game
+ * reports and disciplinary records all cascade.
+ *
+ * The active season is protected: make another season active first. The admin
+ * also has to retype the season name, because there is no undo.
+ */
+export async function deleteSeasonAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  return run(
+    deleteSeasonSchema,
+    { seasonId: str(form, "seasonId"), confirmName: str(form, "confirmName") },
+    async (data, actor) => {
+      const season = await prisma.season.findUnique({
+        where: { id: data.seasonId },
+        include: { _count: { select: { divisions: true, matches: true } } },
+      });
+      if (!season) throw new Error("That season no longer exists.");
+
+      if (season.isActive) {
+        throw new Error(
+          "The active season cannot be deleted. Make another season active first, then delete this one.",
+        );
+      }
+      if (data.confirmName.toLowerCase() !== season.name.toLowerCase()) {
+        throw new Error(`Type “${season.name}” exactly to confirm the deletion.`);
+      }
+
+      const reports = await prisma.gameReport.count({ where: { match: { seasonId: season.id } } });
+
+      await prisma.$transaction(async (tx) => {
+        await tx.season.delete({ where: { id: season.id } });
+        await writeAudit(tx, {
+          actor: actorFrom(actor),
+          action: "season.delete",
+          entity: "Season",
+          entityId: season.id,
+          metadata: {
+            name: season.name,
+            divisionsRemoved: season._count.divisions,
+            matchesRemoved: season._count.matches,
+            reportsRemoved: reports,
+          },
+        });
+      });
+
+      refreshAdmin();
+      return `Season “${season.name}” deleted (${season._count.matches} fixture(s), ${reports} report(s)).`;
+    },
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Divisions / teams / players / venues
 // ---------------------------------------------------------------------------
@@ -202,7 +255,7 @@ export async function createTeamAction(_prev: ActionState, form: FormData): Prom
       slug: str(form, "slug") || slugify(name),
       shortName: str(form, "shortName") || name.slice(0, 12),
       colorPrimary: str(form, "colorPrimary") || "#0f766e",
-      crestEmoji: str(form, "crestEmoji") || "\u26BD",
+      colorAlternate: str(form, "colorAlternate") || "#ffffff",
       captainName: optional(form, "captainName"),
       contactEmail: str(form, "contactEmail"),
     },
@@ -217,6 +270,71 @@ export async function createTeamAction(_prev: ActionState, form: FormData): Prom
       });
       refreshAdmin();
       return `Team “${data.name}” created.`;
+    },
+  );
+}
+
+/**
+ * Delete a team, plus any fixtures it appears in.
+ *
+ * Refused outright when any of those fixtures already has a game report — a
+ * played result must never disappear from the standings without a trace. The
+ * admin has to retype the team name, which is the only confirmation step that
+ * survives a mis-click.
+ */
+export async function deleteTeamAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  return run(
+    deleteTeamSchema,
+    { teamId: str(form, "teamId"), confirmName: str(form, "confirmName") },
+    async (data, actor) => {
+      const team = await prisma.team.findUnique({
+        where: { id: data.teamId },
+        include: {
+          _count: { select: { homeMatches: true, awayMatches: true, discipline: true } },
+        },
+      });
+      if (!team) throw new Error("That team no longer exists.");
+
+      if (data.confirmName.toLowerCase() !== team.name.toLowerCase()) {
+        throw new Error(`Type “${team.name}” exactly to confirm the deletion.`);
+      }
+
+      const reported = await prisma.match.count({
+        where: {
+          OR: [{ homeTeamId: team.id }, { awayTeamId: team.id }],
+          report: { isNot: null },
+        },
+      });
+      if (reported > 0) {
+        throw new Error(
+          `${team.name} has ${reported} fixture(s) with a filed game report. Results are never deleted — retire the team instead.`,
+        );
+      }
+
+      const fixtures = team._count.homeMatches + team._count.awayMatches;
+
+      await prisma.$transaction(async (tx) => {
+        // Match rows cascade from neither side of the relation, so clear them first.
+        await tx.match.deleteMany({
+          where: { OR: [{ homeTeamId: team.id }, { awayTeamId: team.id }] },
+        });
+        await tx.team.delete({ where: { id: team.id } });
+        await writeAudit(tx, {
+          actor: actorFrom(actor),
+          action: "team.delete",
+          entity: "Team",
+          entityId: team.id,
+          metadata: {
+            name: team.name,
+            divisionId: team.divisionId,
+            fixturesRemoved: fixtures,
+            disciplineRemoved: team._count.discipline,
+          },
+        });
+      });
+
+      refreshAdmin();
+      return `Team “${team.name}” deleted along with ${fixtures} fixture(s).`;
     },
   );
 }
@@ -253,15 +371,11 @@ export async function deleteDisciplinaryActionAction(
   _prev: ActionState,
   form: FormData,
 ): Promise<ActionState> {
-  return run(
-    z.object({ id: z.string().min(1) }),
-    { id: str(form, "id") },
-    async (data, actor) => {
-      await deleteDisciplinaryAction(prisma, { id: data.id, actor: actorFrom(actor) });
-      refreshAdmin();
-      return "Disciplinary record rescinded.";
-    },
-  );
+  return run(z.object({ id: z.string().min(1) }), { id: str(form, "id") }, async (data, actor) => {
+    await deleteDisciplinaryAction(prisma, { id: data.id, actor: actorFrom(actor) });
+    refreshAdmin();
+    return "Disciplinary record rescinded.";
+  });
 }
 
 export async function createVenueAction(_prev: ActionState, form: FormData): Promise<ActionState> {
@@ -306,6 +420,8 @@ export async function createMatchAction(_prev: ActionState, form: FormData): Pro
       venueId: optional(form, "venueId") ?? null,
       kickoffAt: str(form, "kickoffAt"),
       matchweek: num(form, "matchweek") ?? 1,
+      homeKit: str(form, "homeKit") || "PRIMARY",
+      awayKit: str(form, "awayKit") || "ALTERNATE",
       notes: optional(form, "notes"),
     },
     async (data, actor) => {
@@ -324,6 +440,8 @@ export async function createMatchAction(_prev: ActionState, form: FormData): Pro
           venueId: data.venueId ?? null,
           kickoffAt: kickoff,
           matchweek: data.matchweek,
+          homeKit: data.homeKit,
+          awayKit: data.awayKit,
           notes: data.notes ?? null,
           status: "SCHEDULED",
         },

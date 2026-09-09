@@ -6,7 +6,7 @@ import { matchUpdateSchema } from "@/lib/validation";
 
 export const runtime = "nodejs";
 
-/** Reschedule, postpone or cancel a match. Admin only. */
+/** Reschedule, postpone, cancel or re-kit a match. Admin only. */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   return handleApi(async () => {
     const { id } = await context.params;
@@ -19,6 +19,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       kickoffAt: body.kickoffAt ? new Date(body.kickoffAt) : undefined,
       venueId: body.venueId,
       status: body.status,
+      homeKit: body.homeKit,
+      awayKit: body.awayKit,
       reason: body.reason,
     });
 

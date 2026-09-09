@@ -14,6 +14,7 @@ import {
   type ActorContext,
 } from "@/lib/matches";
 import { calculateStandings } from "@/lib/standings";
+import { getWarningBoard } from "@/lib/queries";
 
 const prisma = new PrismaClient();
 
@@ -488,9 +489,7 @@ describe("admin review", () => {
       input: {
         homeScore: 1,
         awayScore: 0,
-        cards: [
-          { type: "YELLOW", teamId: fx.homeTeamId, playerName: "Hugo Diaz", minute: 30 },
-        ],
+        cards: [{ type: "YELLOW", teamId: fx.homeTeamId, playerName: "Hugo Diaz", minute: 30 }],
       },
     });
   }
@@ -626,6 +625,72 @@ describe("addDisciplinaryAction", () => {
         },
       }),
     ).rejects.toMatchObject({ status: 400, code: "INVALID_STATE" });
+  });
+});
+
+describe("warning board", () => {
+  it("groups a player's cards, folds name casing, and floats league sanctions to the top", async () => {
+    const actor = await claimedMatch(fx);
+    await submitGameReport(prisma, {
+      matchId: fx.matchId,
+      refereeId: fx.refereeA,
+      actor,
+      input: {
+        homeScore: 0,
+        awayScore: 0,
+        cards: [
+          { type: "YELLOW", teamId: fx.homeTeamId, playerName: "Hugo Diaz", minute: 20 },
+          // Same player, sloppier typing — must fold into one row.
+          { type: "YELLOW", teamId: fx.homeTeamId, playerName: "  hugo diaz ", minute: 71 },
+          { type: "YELLOW", teamId: fx.awayTeamId, playerName: "Amara Cole", minute: 55 },
+        ],
+      },
+    });
+
+    await addDisciplinaryAction(prisma, {
+      actor: adminActor,
+      input: {
+        seasonId: fx.seasonId,
+        teamId: fx.awayTeamId,
+        playerName: "Amara Cole",
+        type: "RED",
+        note: "Two-match suspension",
+      },
+    });
+
+    const board = await getWarningBoard(prisma, fx.seasonId, [fx.homeTeamId, fx.awayTeamId]);
+
+    // The sanctioned player leads even though Hugo has the same points total.
+    expect(board[0]).toMatchObject({
+      playerName: "Amara Cole",
+      yellow: 1,
+      red: 1,
+      points: 4,
+    });
+    expect(board[0].sanctions).toHaveLength(1);
+    expect(board[0].sanctions[0].note).toBe("Two-match suspension");
+
+    expect(board[1]).toMatchObject({ playerName: "Hugo Diaz", yellow: 2, red: 0, points: 2 });
+    expect(board[1].sanctions).toHaveLength(0);
+    expect(board).toHaveLength(2);
+  });
+
+  it("is empty when neither side is carrying a card", async () => {
+    expect(await getWarningBoard(prisma, fx.seasonId, [fx.homeTeamId, fx.awayTeamId])).toEqual([]);
+  });
+
+  it("ignores cards belonging to teams outside the fixture", async () => {
+    await addDisciplinaryAction(prisma, {
+      actor: adminActor,
+      input: {
+        seasonId: fx.seasonId,
+        teamId: fx.homeTeamId,
+        playerName: "Hugo Diaz",
+        type: "RED",
+      },
+    });
+
+    expect(await getWarningBoard(prisma, fx.seasonId, [fx.awayTeamId])).toEqual([]);
   });
 });
 

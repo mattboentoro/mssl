@@ -5,7 +5,14 @@ import { useState } from "react";
 
 import { postJson, type ApiResult } from "@/components/match-actions";
 import { Alert, Card, Field, buttonClass, inputClass } from "@/components/ui";
-import { MATCH_STATUSES, MATCH_STATUS_LABELS } from "@/lib/enums";
+import {
+  KIT_CHOICES,
+  KIT_LABELS,
+  MATCH_STATUSES,
+  MATCH_STATUS_LABELS,
+  type KitChoice,
+} from "@/lib/enums";
+import { kitsClash, resolveKit, type TeamColors } from "@/lib/kits";
 
 interface Option {
   id: string;
@@ -28,6 +35,10 @@ export function AdminMatchForms({
   hasReport,
   homeTeamName,
   awayTeamName,
+  homeTeam,
+  awayTeam,
+  homeKit,
+  awayKit,
   currentHomeScore,
   currentAwayScore,
   referees,
@@ -41,6 +52,10 @@ export function AdminMatchForms({
   hasReport: boolean;
   homeTeamName: string;
   awayTeamName: string;
+  homeTeam: TeamColors;
+  awayTeam: TeamColors;
+  homeKit: KitChoice;
+  awayKit: KitChoice;
   currentHomeScore: number;
   currentAwayScore: number;
   referees: Option[];
@@ -49,6 +64,12 @@ export function AdminMatchForms({
   const router = useRouter();
   const [result, setResult] = useState<(ApiResult & { form?: string }) | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [home, setHome] = useState<KitChoice>(homeKit);
+  const [away, setAway] = useState<KitChoice>(awayKit);
+
+  const homeColor = resolveKit(homeTeam, home);
+  const awayColor = resolveKit(awayTeam, away);
+  const clash = kitsClash(homeColor, awayColor);
 
   async function send(form: string, url: string, body: unknown) {
     setBusy(form);
@@ -72,9 +93,9 @@ export function AdminMatchForms({
     <div className="grid gap-6 lg:grid-cols-2">
       {/* ----------------------------- Reschedule --------------------------- */}
       <Card className="p-5">
-        <h3 className="font-semibold">Schedule &amp; status</h3>
+        <h3 className="font-semibold">Schedule, status &amp; kits</h3>
         <p className="text-muted mt-1 text-xs">
-          Rescheduling, postponing or cancelling a fixture is audited with your reason.
+          Rescheduling, postponing, cancelling or re-kitting a fixture is audited with your reason.
         </p>
         <form
           className="mt-4 space-y-3"
@@ -86,6 +107,8 @@ export function AdminMatchForms({
               kickoffAt: local ? new Date(local).toISOString() : undefined,
               venueId: (data.get("venueId") as string) || null,
               status: String(data.get("status") ?? ""),
+              homeKit: String(data.get("homeKit") ?? ""),
+              awayKit: String(data.get("awayKit") ?? ""),
               reason: String(data.get("reason") ?? ""),
             });
           }}
@@ -126,6 +149,31 @@ export function AdminMatchForms({
               placeholder="Pitch waterlogged"
             />
           </Field>
+
+          <fieldset className="border-subtle grid gap-3 rounded-lg border p-3 sm:grid-cols-2">
+            <legend className="text-muted px-1 text-xs font-semibold uppercase">Kits</legend>
+            <KitField
+              id="homeKit"
+              label={`${homeTeamName} wears`}
+              value={home}
+              onChange={setHome}
+              color={homeColor}
+            />
+            <KitField
+              id="awayKit"
+              label={`${awayTeamName} wears`}
+              value={away}
+              onChange={setAway}
+              color={awayColor}
+            />
+            {clash ? (
+              <p className="text-warning text-xs sm:col-span-2">
+                These two kits are too close in colour to tell apart from the touchline. Switch one
+                side to its other kit.
+              </p>
+            ) : null}
+          </fieldset>
+
           <button type="submit" disabled={busy === "schedule"} className={buttonClass("primary")}>
             {busy === "schedule" ? "Saving\u2026" : "Save schedule"}
           </button>
@@ -261,5 +309,45 @@ export function AdminMatchForms({
         </Card>
       ) : null}
     </div>
+  );
+}
+
+function KitField({
+  id,
+  label,
+  value,
+  onChange,
+  color,
+}: {
+  id: string;
+  label: string;
+  value: KitChoice;
+  onChange: (next: KitChoice) => void;
+  color: string;
+}) {
+  return (
+    <Field label={label} htmlFor={id}>
+      <div className="flex items-center gap-2">
+        <span
+          aria-hidden
+          className="inline-block h-8 w-8 shrink-0 rounded-lg ring-1 ring-black/20 dark:ring-white/25"
+          style={{ backgroundColor: color }}
+        />
+        <select
+          id={id}
+          name={id}
+          value={value}
+          onChange={(event) => onChange(event.target.value as KitChoice)}
+          className={inputClass}
+        >
+          {KIT_CHOICES.map((choice) => (
+            <option key={choice} value={choice}>
+              {KIT_LABELS[choice]}
+            </option>
+          ))}
+        </select>
+      </div>
+      <p className="text-muted mt-1 font-mono text-[11px]">{color}</p>
+    </Field>
   );
 }

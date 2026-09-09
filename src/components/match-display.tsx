@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { KitSwatch, TeamCrest } from "@/components/team-crest";
 import { Badge, Card, FormGuide, MatchStatusBadge } from "@/components/ui";
 import { formatDateTime } from "@/lib/dates";
 import type { MatchListItem } from "@/lib/queries";
@@ -25,12 +26,7 @@ export function MatchRow({ match }: { match: MatchListItem }) {
       </div>
 
       <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-        <TeamCell
-          id={match.homeTeam.id}
-          name={match.homeTeam.name}
-          emoji={match.homeTeam.crestEmoji}
-          align="end"
-        />
+        <TeamCell team={match.homeTeam} kit={match.homeKit} align="end" />
         <div className="text-center">
           {score ? (
             <span className="text-xl font-bold tabular-nums">{score}</span>
@@ -41,12 +37,7 @@ export function MatchRow({ match }: { match: MatchListItem }) {
             <span className="text-danger block text-[10px] font-semibold uppercase">Forfeit</span>
           ) : null}
         </div>
-        <TeamCell
-          id={match.awayTeam.id}
-          name={match.awayTeam.name}
-          emoji={match.awayTeam.crestEmoji}
-          align="start"
-        />
+        <TeamCell team={match.awayTeam} kit={match.awayKit} align="start" />
       </div>
 
       <div className="text-muted mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
@@ -57,28 +48,38 @@ export function MatchRow({ match }: { match: MatchListItem }) {
   );
 }
 
+type TeamCellTeam = MatchListItem["homeTeam"];
+
 function TeamCell({
-  id,
-  name,
-  emoji,
+  team,
+  kit,
   align,
 }: {
-  id: string;
-  name: string;
-  emoji: string;
+  team: TeamCellTeam;
+  kit: string;
   align: "start" | "end";
 }) {
+  const crest = <TeamCrest team={team} label={team.shortName || team.name} size="sm" />;
+
   return (
-    <Link
-      href={`/teams/${id}`}
-      className={`flex min-w-0 items-center gap-2 font-semibold hover:underline ${
-        align === "end" ? "justify-end text-right" : "justify-start text-left"
+    <div
+      className={`flex min-w-0 items-center gap-2 ${
+        align === "end" ? "justify-end" : "justify-start"
       }`}
     >
-      {align === "start" ? <span aria-hidden>{emoji}</span> : null}
-      <span className="truncate">{name}</span>
-      {align === "end" ? <span aria-hidden>{emoji}</span> : null}
-    </Link>
+      {align === "start" ? crest : null}
+      <Link
+        href={`/teams/${team.id}`}
+        className={`flex min-w-0 items-center gap-1.5 font-semibold hover:underline ${
+          align === "end" ? "text-right" : "text-left"
+        }`}
+      >
+        {align === "end" ? <KitSwatch team={team} kit={kit} teamName={team.name} /> : null}
+        <span className="truncate">{team.name}</span>
+        {align === "start" ? <KitSwatch team={team} kit={kit} teamName={team.name} /> : null}
+      </Link>
+      {align === "end" ? crest : null}
+    </div>
   );
 }
 
@@ -170,7 +171,7 @@ export function StandingsTable({
                   href={`/teams/${row.teamId}`}
                   className="flex items-center gap-2 hover:underline"
                 >
-                  <span aria-hidden>{row.crestEmoji}</span>
+                  <TeamCrest team={row} label={row.shortName || row.teamName} size="sm" />
                   <span className="truncate">{row.teamName}</span>
                 </Link>
                 {row.separatedBy && row.separatedBy !== "points" ? (

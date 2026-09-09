@@ -1,4 +1,5 @@
 import type { CardType, GameReportStatus, MatchStatus } from "@/lib/enums";
+import { DEFAULT_ALTERNATE, DEFAULT_PRIMARY } from "@/lib/kits";
 
 /**
  * Standings calculator.
@@ -39,7 +40,8 @@ export interface StandingsTeamInput {
   name: string;
   divisionId: string;
   shortName?: string;
-  crestEmoji?: string;
+  colorPrimary?: string | null;
+  colorAlternate?: string | null;
 }
 
 export type FormResult = "W" | "D" | "L";
@@ -48,7 +50,8 @@ export interface StandingsRow {
   teamId: string;
   teamName: string;
   shortName: string;
-  crestEmoji: string;
+  colorPrimary: string;
+  colorAlternate: string;
   divisionId: string;
   rank: number;
   played: number;
@@ -176,7 +179,8 @@ export function calculateStandings(
       teamId: team.id,
       teamName: team.name,
       shortName: team.shortName ?? team.name,
-      crestEmoji: team.crestEmoji ?? "\u26BD",
+      colorPrimary: team.colorPrimary?.trim() || DEFAULT_PRIMARY,
+      colorAlternate: team.colorAlternate?.trim() || DEFAULT_ALTERNATE,
       divisionId: team.divisionId,
       played: 0,
       won: 0,

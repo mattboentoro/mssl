@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { MatchList } from "@/components/match-display";
+import { TeamCrest } from "@/components/team-crest";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { CARD_LABELS, type CardType } from "@/lib/enums";
 import { formatDate } from "@/lib/dates";
+import { resolveKit } from "@/lib/kits";
 import {
   getDisciplinaryRecords,
   getStandingsForSeason,
@@ -61,7 +63,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
     <div>
       <PageHeader
         eyebrow={team.division.name}
-        title={`${team.crestEmoji ?? "\u26bd"} ${team.name}`}
+        title={team.name}
         description={
           <>
             {team.shortName ? `Also known as ${team.shortName}. ` : ""}
@@ -69,6 +71,38 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
           </>
         }
       />
+
+      <div className="mb-8 flex flex-wrap items-center gap-4">
+        <TeamCrest team={team} label={team.shortName || team.name} size="lg" />
+        <dl className="flex flex-wrap gap-4 text-sm">
+          <div className="flex items-center gap-2">
+            <span
+              aria-hidden
+              className="inline-block h-5 w-5 rounded ring-1 ring-black/20 dark:ring-white/25"
+              style={{ backgroundColor: resolveKit(team, "PRIMARY") }}
+            />
+            <div>
+              <dt className="text-muted text-[10px] font-semibold tracking-wide uppercase">
+                Primary kit
+              </dt>
+              <dd className="font-mono text-xs">{resolveKit(team, "PRIMARY")}</dd>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              aria-hidden
+              className="inline-block h-5 w-5 rounded ring-1 ring-black/20 dark:ring-white/25"
+              style={{ backgroundColor: resolveKit(team, "ALTERNATE") }}
+            />
+            <div>
+              <dt className="text-muted text-[10px] font-semibold tracking-wide uppercase">
+                Alternate kit
+              </dt>
+              <dd className="font-mono text-xs">{resolveKit(team, "ALTERNATE")}</dd>
+            </div>
+          </div>
+        </dl>
+      </div>
 
       {summary.length > 0 ? (
         <dl className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">

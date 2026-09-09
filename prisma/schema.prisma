@@ -61,17 +61,19 @@ model Division {
 }
 
 model Team {
-  id           String   @id @default(cuid())
-  divisionId   String
-  name         String
-  slug         String
-  shortName    String
-  colorPrimary String   @default("#0f766e")
-  crestEmoji   String   @default("\u26BD")
-  captainName  String?
-  contactEmail String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String   @id @default(cuid())
+  divisionId     String
+  name           String
+  slug           String
+  shortName      String
+  /// Home/first-choice kit colour as a `#rrggbb` hex string.
+  colorPrimary   String   @default("#0f766e")
+  /// Change/alternate kit colour, worn when the two sides would otherwise clash.
+  colorAlternate String   @default("#ffffff")
+  captainName    String?
+  contactEmail   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   division    Division             @relation(fields: [divisionId], references: [id], onDelete: Cascade)
   homeMatches Match[]              @relation("HomeTeam")
@@ -131,6 +133,11 @@ model Match {
   kickoffAt  DateTime
   matchweek  Int
   status     String    @default("SCHEDULED")
+  /// Which registered kit each side wears, one of KitChoice: PRIMARY | ALTERNATE.
+  /// The colour itself is always read from the Team record so re-colouring a team
+  /// keeps every fixture in sync.
+  homeKit    String    @default("PRIMARY")
+  awayKit    String    @default("ALTERNATE")
   refereeId  String?
   assignedAt DateTime?
   version    Int       @default(0)

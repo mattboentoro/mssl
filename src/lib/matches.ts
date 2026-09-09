@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 
 import type { AuditActor, DbClient } from "@/lib/audit";
 import { writeAudit } from "@/lib/audit";
-import { CLOSED_MATCH_STATUSES, type MatchStatus } from "@/lib/enums";
+import { CLOSED_MATCH_STATUSES, type KitChoice, type MatchStatus } from "@/lib/enums";
 
 /**
  * Match lifecycle service.
@@ -451,7 +451,7 @@ export async function overrideGameReport(
   });
 }
 
-/** Admin reschedule / postpone / cancel. */
+/** Admin reschedule / postpone / cancel, and kit selection. */
 export async function updateMatchSchedule(
   db: DbClient,
   params: {
@@ -460,6 +460,8 @@ export async function updateMatchSchedule(
     kickoffAt?: Date;
     venueId?: string | null;
     status?: MatchStatus;
+    homeKit?: KitChoice;
+    awayKit?: KitChoice;
     reason?: string;
   },
 ): Promise<void> {
@@ -473,6 +475,8 @@ export async function updateMatchSchedule(
     data.venue = params.venueId ? { connect: { id: params.venueId } } : { disconnect: true };
   }
   if (params.status) data.status = params.status;
+  if (params.homeKit) data.homeKit = params.homeKit;
+  if (params.awayKit) data.awayKit = params.awayKit;
 
   await db.match.update({ where: { id: matchId }, data });
 
@@ -483,11 +487,19 @@ export async function updateMatchSchedule(
     entityId: matchId,
     metadata: {
       reason: params.reason ?? null,
-      before: { kickoffAt: match.kickoffAt, status: match.status, venueId: match.venueId },
+      before: {
+        kickoffAt: match.kickoffAt,
+        status: match.status,
+        venueId: match.venueId,
+        homeKit: match.homeKit,
+        awayKit: match.awayKit,
+      },
       after: {
         kickoffAt: params.kickoffAt ?? match.kickoffAt,
         status: params.status ?? match.status,
         venueId: params.venueId === undefined ? match.venueId : params.venueId,
+        homeKit: params.homeKit ?? match.homeKit,
+        awayKit: params.awayKit ?? match.awayKit,
       },
     },
   });

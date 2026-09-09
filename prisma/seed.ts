@@ -1,5 +1,6 @@
- 
 import { PrismaClient } from "@prisma/client";
+
+import { kitsClash } from "../src/lib/kits";
 
 /**
  * Deterministic seed data.
@@ -39,40 +40,162 @@ function atTime(base: Date, hours: number, minutes: number): Date {
 }
 
 const FIRST_NAMES = [
-  "Alex", "Sam", "Jordan", "Riley", "Casey", "Morgan", "Taylor", "Jamie", "Avery", "Quinn",
-  "Rowan", "Devin", "Elliot", "Harper", "Kai", "Logan", "Micah", "Noel", "Parker", "Reese",
-  "Sasha", "Tariq", "Yusuf", "Zara", "Nina", "Priya", "Omar", "Lena", "Diego", "Mateo",
+  "Alex",
+  "Sam",
+  "Jordan",
+  "Riley",
+  "Casey",
+  "Morgan",
+  "Taylor",
+  "Jamie",
+  "Avery",
+  "Quinn",
+  "Rowan",
+  "Devin",
+  "Elliot",
+  "Harper",
+  "Kai",
+  "Logan",
+  "Micah",
+  "Noel",
+  "Parker",
+  "Reese",
+  "Sasha",
+  "Tariq",
+  "Yusuf",
+  "Zara",
+  "Nina",
+  "Priya",
+  "Omar",
+  "Lena",
+  "Diego",
+  "Mateo",
 ];
 const LAST_NAMES = [
-  "Alvarez", "Bakshi", "Chen", "Dahl", "Eriksen", "Fontaine", "Garcia", "Hoffman", "Ibrahim",
-  "Jensen", "Kowalski", "Lindqvist", "Mbeki", "Nakamura", "Oyelaran", "Petrov", "Quintana",
-  "Rossi", "Silva", "Tanaka", "Ustinov", "Vargas", "Weber", "Xiao", "Yilmaz", "Zhang",
+  "Alvarez",
+  "Bakshi",
+  "Chen",
+  "Dahl",
+  "Eriksen",
+  "Fontaine",
+  "Garcia",
+  "Hoffman",
+  "Ibrahim",
+  "Jensen",
+  "Kowalski",
+  "Lindqvist",
+  "Mbeki",
+  "Nakamura",
+  "Oyelaran",
+  "Petrov",
+  "Quintana",
+  "Rossi",
+  "Silva",
+  "Tanaka",
+  "Ustinov",
+  "Vargas",
+  "Weber",
+  "Xiao",
+  "Yilmaz",
+  "Zhang",
 ];
 
 interface TeamSpec {
   name: string;
   shortName: string;
   slug: string;
-  crestEmoji: string;
   colorPrimary: string;
+  colorAlternate: string;
 }
 
-const DIVISION_ONE_TEAMS: TeamSpec[] = [
-  { name: "Redmond Rovers", shortName: "ROV", slug: "redmond-rovers", crestEmoji: "\u{1F985}", colorPrimary: "#b91c1c" },
-  { name: "Studio B Strikers", shortName: "STB", slug: "studio-b-strikers", crestEmoji: "\u{1F3AF}", colorPrimary: "#1d4ed8" },
-  { name: "Azure Athletic", shortName: "AZA", slug: "azure-athletic", crestEmoji: "\u2601\uFE0F", colorPrimary: "#0284c7" },
-  { name: "Bellevue United", shortName: "BEL", slug: "bellevue-united", crestEmoji: "\u{1F535}", colorPrimary: "#4338ca" },
-  { name: "Commons FC", shortName: "COM", slug: "commons-fc", crestEmoji: "\u{1F332}", colorPrimary: "#15803d" },
-  { name: "Kernel Panic FC", shortName: "KPA", slug: "kernel-panic-fc", crestEmoji: "\u{1F4BB}", colorPrimary: "#7c2d12" },
+const PREMIER_LEAGUE_TEAMS: TeamSpec[] = [
+  {
+    name: "Redmond Rovers",
+    shortName: "ROV",
+    slug: "redmond-rovers",
+    colorPrimary: "#b91c1c",
+    colorAlternate: "#fef2f2",
+  },
+  {
+    name: "Studio B Strikers",
+    shortName: "STB",
+    slug: "studio-b-strikers",
+    colorPrimary: "#1d4ed8",
+    colorAlternate: "#fbbf24",
+  },
+  {
+    name: "Azure Athletic",
+    shortName: "AZA",
+    slug: "azure-athletic",
+    colorPrimary: "#0284c7",
+    colorAlternate: "#0c1b33",
+  },
+  {
+    name: "Bellevue United",
+    shortName: "BEL",
+    slug: "bellevue-united",
+    colorPrimary: "#4338ca",
+    colorAlternate: "#f8fafc",
+  },
+  {
+    name: "Commons FC",
+    shortName: "COM",
+    slug: "commons-fc",
+    colorPrimary: "#15803d",
+    colorAlternate: "#f1f5f9",
+  },
+  {
+    name: "Kernel Panic FC",
+    shortName: "KPA",
+    slug: "kernel-panic-fc",
+    colorPrimary: "#7c2d12",
+    colorAlternate: "#fed7aa",
+  },
 ];
 
-const DIVISION_TWO_TEAMS: TeamSpec[] = [
-  { name: "Building 92 Bulls", shortName: "B92", slug: "building-92-bulls", crestEmoji: "\u{1F402}", colorPrimary: "#78350f" },
-  { name: "Sammamish Spurs", shortName: "SAM", slug: "sammamish-spurs", crestEmoji: "\u{1F30A}", colorPrimary: "#0f766e" },
-  { name: "Issaquah Ibis", shortName: "ISS", slug: "issaquah-ibis", crestEmoji: "\u{1F426}", colorPrimary: "#be185d" },
-  { name: "Overlake Owls", shortName: "OVL", slug: "overlake-owls", crestEmoji: "\u{1F989}", colorPrimary: "#4d7c0f" },
-  { name: "Puget Sound City", shortName: "PSC", slug: "puget-sound-city", crestEmoji: "\u26F5", colorPrimary: "#0369a1" },
-  { name: "Latency FC", shortName: "LAT", slug: "latency-fc", crestEmoji: "\u23F1\uFE0F", colorPrimary: "#6d28d9" },
+const DIVISION_ONE_TEAMS: TeamSpec[] = [
+  {
+    name: "Building 92 Bulls",
+    shortName: "B92",
+    slug: "building-92-bulls",
+    colorPrimary: "#78350f",
+    colorAlternate: "#fef3c7",
+  },
+  {
+    name: "Sammamish Spurs",
+    shortName: "SAM",
+    slug: "sammamish-spurs",
+    colorPrimary: "#0f766e",
+    colorAlternate: "#ffffff",
+  },
+  {
+    name: "Issaquah Ibis",
+    shortName: "ISS",
+    slug: "issaquah-ibis",
+    colorPrimary: "#be185d",
+    colorAlternate: "#1f2937",
+  },
+  {
+    name: "Overlake Owls",
+    shortName: "OVL",
+    slug: "overlake-owls",
+    colorPrimary: "#4d7c0f",
+    colorAlternate: "#fafaf9",
+  },
+  {
+    name: "Puget Sound City",
+    shortName: "PSC",
+    slug: "puget-sound-city",
+    colorPrimary: "#0369a1",
+    colorAlternate: "#e0f2fe",
+  },
+  {
+    name: "Latency FC",
+    shortName: "LAT",
+    slug: "latency-fc",
+    colorPrimary: "#6d28d9",
+    colorAlternate: "#ede9fe",
+  },
 ];
 
 const VENUES = [
@@ -115,11 +238,36 @@ const VENUES = [
  * `src/auth.ts`, so signing in as "dev referee" lands on a real referee record.
  */
 const REFEREES = [
-  { name: "Riley Whistle", email: "riley.whistle@example.com", certification: "USSF Grade 7", phone: "425-555-0101" },
-  { name: "Sam Sideline", email: "sam.sideline@example.com", certification: "USSF Grade 8", phone: "425-555-0102" },
-  { name: "Alex Board", email: "alex.board@example.com", certification: "League administrator", phone: "425-555-0100" },
-  { name: "Dana Offside", email: "dana.offside@example.com", certification: "USSF Grade 8", phone: "425-555-0103" },
-  { name: "Chris Cardoso", email: "chris.cardoso@example.com", certification: "USSF Grade 7", phone: "425-555-0104" },
+  {
+    name: "Riley Whistle",
+    email: "riley.whistle@example.com",
+    certification: "USSF Grade 7",
+    phone: "425-555-0101",
+  },
+  {
+    name: "Sam Sideline",
+    email: "sam.sideline@example.com",
+    certification: "USSF Grade 8",
+    phone: "425-555-0102",
+  },
+  {
+    name: "Alex Board",
+    email: "alex.board@example.com",
+    certification: "League administrator",
+    phone: "425-555-0100",
+  },
+  {
+    name: "Dana Offside",
+    email: "dana.offside@example.com",
+    certification: "USSF Grade 8",
+    phone: "425-555-0103",
+  },
+  {
+    name: "Chris Cardoso",
+    email: "chris.cardoso@example.com",
+    certification: "USSF Grade 7",
+    phone: "425-555-0104",
+  },
 ];
 
 /** Circle-method single round robin. Returns rounds of [home, away] index pairs. */
@@ -159,7 +307,13 @@ async function reset() {
  * text on the game report. The seed keeps a deterministic pool of plausible
  * names per team so the sample disciplinary records look realistic.
  */
-type SeededTeam = { id: string; name: string; squad: string[] };
+type SeededTeam = {
+  id: string;
+  name: string;
+  squad: string[];
+  colorPrimary: string;
+  colorAlternate: string;
+};
 
 function makeSquad(seedText: string): string[] {
   const base = [...seedText].reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
@@ -194,8 +348,8 @@ async function seedSeason(options: {
   });
 
   const divisionSpecs = [
-    { name: "Division 1", slug: "division-1", sortOrder: 1, teams: DIVISION_ONE_TEAMS },
-    { name: "Division 2", slug: "division-2", sortOrder: 2, teams: DIVISION_TWO_TEAMS },
+    { name: "Premier League", slug: "premier-league", sortOrder: 1, teams: PREMIER_LEAGUE_TEAMS },
+    { name: "Division 1", slug: "division-1", sortOrder: 2, teams: DIVISION_ONE_TEAMS },
   ];
 
   for (const spec of divisionSpecs) {
@@ -217,13 +371,19 @@ async function seedSeason(options: {
           slug: teamSpec.slug,
           shortName: teamSpec.shortName,
           colorPrimary: teamSpec.colorPrimary,
-          crestEmoji: teamSpec.crestEmoji,
+          colorAlternate: teamSpec.colorAlternate,
           captainName: `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`,
           contactEmail: `${teamSpec.slug}@example.com`,
         },
       });
 
-      teams.push({ id: team.id, name: team.name, squad: makeSquad(teamSpec.slug) });
+      teams.push({
+        id: team.id,
+        name: team.name,
+        squad: makeSquad(teamSpec.slug),
+        colorPrimary: team.colorPrimary,
+        colorAlternate: team.colorAlternate,
+      });
     }
 
     const rounds = roundRobin(teams.length);
@@ -278,6 +438,10 @@ async function seedSeason(options: {
                   ? "POSTPONED"
                   : "SCHEDULED";
 
+        // Home always wears its first-choice kit; the away side switches only
+        // when the two primaries are too close to tell apart.
+        const awayKit = kitsClash(home.colorPrimary, away.colorPrimary) ? "ALTERNATE" : "PRIMARY";
+
         const match = await prisma.match.create({
           data: {
             seasonId: season.id,
@@ -288,6 +452,8 @@ async function seedSeason(options: {
             kickoffAt,
             matchweek,
             status,
+            homeKit: "PRIMARY",
+            awayKit,
             refereeId,
             assignedAt: refereeId ? new Date(kickoffAt.getTime() - 3 * DAY) : null,
             version: stage === "open" ? 0 : stage === "assigned" ? 1 : 2,
@@ -422,12 +588,59 @@ async function createReport(args: {
   });
 }
 
+/**
+ * League sanctions issued by the Game Administrator outside any fixture. These
+ * are what the referee taking a game sees on their warning board, so they are
+ * aimed deliberately at teams playing in the still-unclaimed fixtures.
+ */
+async function seedLeagueSanctions(seasonId: string) {
+  const openMatches = await prisma.match.findMany({
+    where: { seasonId, refereeId: null, status: "SCHEDULED" },
+    orderBy: { kickoffAt: "asc" },
+    take: 3,
+    select: { id: true, homeTeamId: true, awayTeamId: true },
+  });
+
+  const notes = [
+    "Two-match suspension after accumulating five yellows. Not eligible until matchweek 8.",
+    "Dissent towards the officials reported by the previous referee. Monitor closely.",
+    "Final warning from the disciplinary committee following a send-off.",
+  ];
+
+  let issued = 0;
+  for (const match of openMatches) {
+    for (const teamId of [match.homeTeamId, match.awayTeamId]) {
+      // Escalate a card the referee already showed, so the sanction reads as a
+      // follow-up rather than appearing from nowhere.
+      const priorCard = await prisma.disciplinaryAction.findFirst({
+        where: { seasonId, teamId, issuedBy: "REFEREE" },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!priorCard) continue;
+
+      await prisma.disciplinaryAction.create({
+        data: {
+          seasonId,
+          teamId,
+          playerName: priorCard.playerName,
+          type: issued % 2 === 0 ? "RED" : "YELLOW",
+          note: notes[issued % notes.length],
+          issuedBy: "ADMIN",
+        },
+      });
+      issued += 1;
+    }
+  }
+  return issued;
+}
+
 async function seedContent(seasonId: string) {
   const announcements = [
     {
       title: "Fall season kicks off",
       slug: "fall-season-kicks-off",
-      summary: "Matchweek 1 is live across both divisions. Check the schedule for your kickoff time.",
+      summary:
+        "Matchweek 1 is live across both divisions. Check the schedule for your kickoff time.",
       body: "The new MSSL season is underway. Fixtures run on Tuesday and Thursday evenings across the Redmond and Marymoor fields.\n\nCaptains: bring your line-up to the pitch. Referees record cards against player names, so make sure your side introduces itself to the official before kickoff.",
       pinned: true,
     },
@@ -466,12 +679,54 @@ async function seedContent(seasonId: string) {
   }
 
   const documents = [
-    { title: "MSSL League Rules", category: "RULES", url: "/rules", description: "Full competition rules, laws of the game variations and match-day procedures.", fileType: "Page", sortOrder: 1 },
-    { title: "Code of Conduct", category: "POLICY", url: "/rules#code-of-conduct", description: "Expected behaviour for players, captains, referees and spectators.", fileType: "Page", sortOrder: 2 },
-    { title: "Player Registration Form", category: "FORMS", url: "/contact", description: "Register a new player with the league office (captain approval required).", fileType: "Form", sortOrder: 3 },
-    { title: "Incident Report Guidance", category: "FORMS", url: "/rules#incidents", description: "What referees must include when reporting misconduct or injury.", fileType: "Page", sortOrder: 4 },
-    { title: "Field Locations & Parking", category: "OTHER", url: "/contact#venues", description: "Directions and parking notes for every MSSL venue.", fileType: "Page", sortOrder: 5 },
-    { title: "Disciplinary Points Table", category: "POLICY", url: "/rules#discipline", description: "Suspension thresholds and appeal process.", fileType: "Page", sortOrder: 6 },
+    {
+      title: "MSSL League Rules",
+      category: "RULES",
+      url: "/rules",
+      description: "Full competition rules, laws of the game variations and match-day procedures.",
+      fileType: "Page",
+      sortOrder: 1,
+    },
+    {
+      title: "Code of Conduct",
+      category: "POLICY",
+      url: "/rules#code-of-conduct",
+      description: "Expected behaviour for players, captains, referees and spectators.",
+      fileType: "Page",
+      sortOrder: 2,
+    },
+    {
+      title: "Player Registration Form",
+      category: "FORMS",
+      url: "/contact",
+      description: "Register a new player with the league office (captain approval required).",
+      fileType: "Form",
+      sortOrder: 3,
+    },
+    {
+      title: "Incident Report Guidance",
+      category: "FORMS",
+      url: "/rules#incidents",
+      description: "What referees must include when reporting misconduct or injury.",
+      fileType: "Page",
+      sortOrder: 4,
+    },
+    {
+      title: "Field Locations & Parking",
+      category: "OTHER",
+      url: "/contact#venues",
+      description: "Directions and parking notes for every MSSL venue.",
+      fileType: "Page",
+      sortOrder: 5,
+    },
+    {
+      title: "Disciplinary Points Table",
+      category: "POLICY",
+      url: "/rules#discipline",
+      description: "Suspension thresholds and appeal process.",
+      fileType: "Page",
+      sortOrder: 6,
+    },
   ];
 
   for (const doc of documents) {
@@ -520,6 +775,9 @@ async function main() {
   console.log("Seeding announcements and documents...");
   await seedContent(active.id);
 
+  console.log("Seeding league sanctions for the referee warning board...");
+  await seedLeagueSanctions(active.id);
+
   const counts = {
     seasons: await prisma.season.count(),
     divisions: await prisma.division.count(),
@@ -530,6 +788,7 @@ async function main() {
     openMatches: await prisma.match.count({ where: { refereeId: null, status: "SCHEDULED" } }),
     reports: await prisma.gameReport.count(),
     cards: await prisma.disciplinaryAction.count(),
+    sanctions: await prisma.disciplinaryAction.count({ where: { issuedBy: "ADMIN" } }),
   };
 
   console.log("\nSeed complete:");

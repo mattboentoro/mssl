@@ -5,10 +5,12 @@ import { forbidden, notFound, redirect } from "next/navigation";
 import { GameReportForm } from "@/components/game-report-form";
 import { ActionButton } from "@/components/match-actions";
 import { Alert, Badge, Card, MatchStatusBadge, PageHeader } from "@/components/ui";
+import { WarningBoard } from "@/components/warning-board";
 import { AuthzError, requireReferee } from "@/lib/authz";
 import { formatDateTime } from "@/lib/dates";
 import { CARD_LABELS, type CardType } from "@/lib/enums";
 import { prisma } from "@/lib/prisma";
+import { getWarningBoard } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Match" };
@@ -52,6 +54,9 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
 
   const isOwner = match.refereeId === referee.id;
   const canAct = isOwner || user.isAdmin;
+  const warnings = canAct
+    ? await getWarningBoard(prisma, match.seasonId, [match.homeTeamId, match.awayTeamId])
+    : [];
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -128,6 +133,24 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
             </li>
           </ol>
         </Card>
+      ) : null}
+
+      {/* --------------------------- Warning board --------------------------- */}
+      {canAct ? (
+        <section aria-labelledby="warning-board" className="mt-8">
+          <h2 id="warning-board" className="mb-1 text-lg font-semibold">
+            Warning board
+          </h2>
+          <p className="text-muted mb-3 text-sm">
+            Players from either side carrying a card this season, worst first. League sanctions
+            issued by the Game Administrator appear at the top.
+          </p>
+          <WarningBoard
+            entries={warnings}
+            homeTeamName={match.homeTeam.name}
+            awayTeamName={match.awayTeam.name}
+          />
+        </section>
       ) : null}
 
       {/* ------------------------------- Report ------------------------------ */}

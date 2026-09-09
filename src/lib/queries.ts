@@ -1,3 +1,4 @@
+import type { DbClient } from "@/lib/audit";
 import { config } from "@/lib/config";
 import { prisma } from "@/lib/prisma";
 import {
@@ -40,8 +41,24 @@ const STANDINGS_MATCH_SELECT = {
 } as const;
 
 export const MATCH_LIST_INCLUDE = {
-  homeTeam: { select: { id: true, name: true, shortName: true, crestEmoji: true } },
-  awayTeam: { select: { id: true, name: true, shortName: true, crestEmoji: true } },
+  homeTeam: {
+    select: {
+      id: true,
+      name: true,
+      shortName: true,
+      colorPrimary: true,
+      colorAlternate: true,
+    },
+  },
+  awayTeam: {
+    select: {
+      id: true,
+      name: true,
+      shortName: true,
+      colorPrimary: true,
+      colorAlternate: true,
+    },
+  },
   division: { select: { id: true, name: true, slug: true } },
   venue: { select: { id: true, name: true, city: true } },
   referee: { select: { id: true, name: true } },
@@ -111,7 +128,14 @@ export async function getStandingsForSeason(seasonId: string): Promise<DivisionS
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     include: {
       teams: {
-        select: { id: true, name: true, divisionId: true, shortName: true, crestEmoji: true },
+        select: {
+          id: true,
+          name: true,
+          divisionId: true,
+          shortName: true,
+          colorPrimary: true,
+          colorAlternate: true,
+        },
       },
     },
   });
@@ -240,6 +264,80 @@ export async function getTeamDisciplineTotals(seasonId: string) {
     totals.set(row.teamId, entry);
   }
   return totals;
+}
+
+export interface WarningBoardEntry {
+  playerName: string;
+  teamId: string;
+  teamName: string;
+  yellow: number;
+  red: number;
+  /** Yellow = 1, red = 3. Drives the ordering and the severity tone. */
+  points: number;
+  /** Notes from league sanctions an admin issued against this player. */
+  sanctions: { id: string; type: string; note: string | null; createdAt: Date }[];
+}
+
+/**
+ * The pre-match warning board: every player on either team who is carrying a
+ * card in this season, worst first. Shown to the referee who has the fixture so
+ * they walk onto the pitch knowing who is already in the book, and so league
+ * sanctions added by an administrator reach the referee who needs them.
+ *
+ * Takes an explicit client (like `src/lib/matches.ts`) so it is directly
+ * testable against the test database.
+ */
+export async function getWarningBoard(
+  db: DbClient,
+  seasonId: string,
+  teamIds: string[],
+): Promise<WarningBoardEntry[]> {
+  if (teamIds.length === 0) return [];
+
+  const rows = await db.disciplinaryAction.findMany({
+    where: { seasonId, teamId: { in: teamIds } },
+    orderBy: { createdAt: "desc" },
+    include: { team: { select: { id: true, name: true } } },
+  });
+
+  const byPlayer = new Map<string, WarningBoardEntry>();
+  for (const row of rows) {
+    // Free-text names, so fold case and whitespace before grouping.
+    const key = `${row.teamId}::${row.playerName.trim().toLowerCase()}`;
+    const entry = byPlayer.get(key) ?? {
+      playerName: row.playerName.trim(),
+      teamId: row.team.id,
+      teamName: row.team.name,
+      yellow: 0,
+      red: 0,
+      points: 0,
+      sanctions: [],
+    };
+    if (row.type === "RED") {
+      entry.red += 1;
+      entry.points += 3;
+    } else {
+      entry.yellow += 1;
+      entry.points += 1;
+    }
+    if (row.issuedBy === "ADMIN") {
+      entry.sanctions.push({
+        id: row.id,
+        type: row.type,
+        note: row.note,
+        createdAt: row.createdAt,
+      });
+    }
+    byPlayer.set(key, entry);
+  }
+
+  return [...byPlayer.values()].sort(
+    (a, b) =>
+      b.sanctions.length - a.sanctions.length ||
+      b.points - a.points ||
+      b.red - a.red ||
+      a.playerName.localeCompare(b.playerName),
+  );
 }
 
 /* -------------------------------------------------------------------------- */

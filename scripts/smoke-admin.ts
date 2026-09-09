@@ -149,11 +149,17 @@ async function main(): Promise<void> {
     divisionId: division.id,
     name: teamName,
     shortName: "SMK",
-    crestEmoji: "\u26BD",
+    colorPrimary: "#123456",
+    colorAlternate: "#fedcba",
     contactEmail: "",
   });
   const team = await prisma.team.findFirst({ where: { name: teamName } });
   check("createTeamAction writes a team", team !== null);
+  check(
+    "createTeamAction stores both kit colours",
+    team?.colorPrimary === "#123456" && team?.colorAlternate === "#fedcba",
+    `${team?.colorPrimary} / ${team?.colorAlternate}`,
+  );
 
   if (team) {
     await submit("/admin/discipline", 'id="disc-player"', {
@@ -225,6 +231,96 @@ async function main(): Promise<void> {
     afterDupe === 1 && dupe.html.includes("Nothing new to import"),
   );
 
+  console.log("\nKit selection");
+  const importedMatch = await prisma.match.findFirst({ where: { matchweek: MW } });
+  if (importedMatch) {
+    // The schedule panel posts JSON to the API rather than running a server
+    // action, so drive the route directly.
+    const rekit = await req(`/api/matches/${importedMatch.id}/schedule`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        homeKit: "ALTERNATE",
+        awayKit: "PRIMARY",
+        reason: "Smoke kit swap",
+      }),
+    });
+    const rekitted = await prisma.match.findUnique({ where: { id: importedMatch.id } });
+    check(
+      "admin can change which kit each side wears",
+      rekitted?.homeKit === "ALTERNATE" && rekitted?.awayKit === "PRIMARY",
+      `status ${rekit.status} \u2192 ${rekitted?.homeKit} / ${rekitted?.awayKit}`,
+    );
+    const kitAudit = await prisma.auditLog.findFirst({
+      where: { entityId: importedMatch.id, action: "match.update" },
+      orderBy: { createdAt: "desc" },
+    });
+    check("the kit change is audited", (kitAudit?.metadata ?? "").includes("ALTERNATE"));
+
+    const bogus = await req(`/api/matches/${importedMatch.id}/schedule`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ homeKit: "TIE-DYE" }),
+    });
+    check("Zod rejects an unknown kit choice", bogus.status === 422, `status ${bogus.status}`);
+
+    await signIn("referee");
+    const denied = await req(`/api/matches/${importedMatch.id}/schedule`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ homeKit: "PRIMARY" }),
+    });
+    check("a referee cannot change kits", denied.status === 403, `status ${denied.status}`);
+    await signIn("admin");
+  }
+
+  console.log("\nDestructive deletes");
+  if (team) {
+    await submit("/admin/league", `Type ${team.name} to confirm deletion`, {
+      confirmName: "Wrong Name FC",
+    });
+    check(
+      "deleting a team refuses a mistyped name",
+      (await prisma.team.count({ where: { id: team.id } })) === 1,
+    );
+
+    await submit("/admin/league", `Type ${team.name} to confirm deletion`, {
+      confirmName: team.name,
+    });
+    check(
+      "deleteTeamAction removes the team",
+      (await prisma.team.count({ where: { id: team.id } })) === 0,
+    );
+    check(
+      "deleting a team cascades its discipline",
+      (await prisma.disciplinaryAction.count({ where: { teamId: team.id } })) === 0,
+    );
+  }
+
+  const doomedSeason = await prisma.season.create({
+    data: {
+      name: `Smoke Season ${stamp}`,
+      slug: `smoke-season-${stamp}`,
+      startsOn: new Date("2031-01-01"),
+      endsOn: new Date("2031-12-31"),
+      isActive: false,
+    },
+  });
+  await submit("/admin/league", `Type ${doomedSeason.name} to confirm deletion`, {
+    confirmName: doomedSeason.name,
+  });
+  check(
+    "deleteSeasonAction removes an inactive season",
+    (await prisma.season.count({ where: { id: doomedSeason.id } })) === 0,
+  );
+
+  const activeSeason = await prisma.season.findFirstOrThrow({ where: { isActive: true } });
+  const activeLeague = await (await req("/admin/league")).text();
+  check(
+    "the active season offers no delete control",
+    !activeLeague.includes(`Type ${activeSeason.name} to confirm deletion`),
+  );
+
   console.log("\nAudit trail");
   const audited = await prisma.auditLog.count({
     where: {
@@ -242,7 +338,8 @@ async function main(): Promise<void> {
   // ---- clean up -----------------------------------------------------------
   await prisma.match.deleteMany({ where: { matchweek: MW } });
   if (team) await prisma.disciplinaryAction.deleteMany({ where: { teamId: team.id } });
-  if (team) await prisma.team.delete({ where: { id: team.id } });
+  if (team) await prisma.team.deleteMany({ where: { id: team.id } });
+  await prisma.season.deleteMany({ where: { id: doomedSeason.id } });
   if (venue) await prisma.venue.delete({ where: { id: venue.id } });
   if (announcement) await prisma.announcement.delete({ where: { id: announcement.id } });
 

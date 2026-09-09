@@ -4,10 +4,11 @@ import { notFound } from "next/navigation";
 import { ActionForm, SubmitButton } from "@/components/admin-forms";
 import { AdminMatchForms } from "@/components/admin-match-forms";
 import { ActionButton } from "@/components/match-actions";
+import { KitSwatch } from "@/components/team-crest";
 import { Alert, Badge, Card, MatchStatusBadge } from "@/components/ui";
 import { deleteMatchAction } from "@/app/admin/actions";
 import { formatDateTime } from "@/lib/dates";
-import { CARD_LABELS, type CardType } from "@/lib/enums";
+import { CARD_LABELS, type CardType, type KitChoice } from "@/lib/enums";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -26,8 +27,8 @@ export default async function AdminMatchDetailPage({
         division: { select: { name: true } },
         venue: { select: { id: true, name: true } },
         referee: { select: { id: true, name: true, email: true } },
-        homeTeam: { select: { id: true, name: true } },
-        awayTeam: { select: { id: true, name: true } },
+        homeTeam: { select: { id: true, name: true, colorPrimary: true, colorAlternate: true } },
+        awayTeam: { select: { id: true, name: true, colorPrimary: true, colorAlternate: true } },
         report: {
           include: {
             referee: { select: { name: true } },
@@ -65,8 +66,12 @@ export default async function AdminMatchDetailPage({
             <p className="text-muted text-xs">
               {match.division.name} &middot; Matchweek {match.matchweek}
             </p>
-            <h2 className="mt-1 text-xl font-bold">
-              {match.homeTeam.name} v {match.awayTeam.name}
+            <h2 className="mt-1 flex flex-wrap items-center gap-2 text-xl font-bold">
+              <KitSwatch team={match.homeTeam} kit={match.homeKit} teamName={match.homeTeam.name} />
+              {match.homeTeam.name}
+              <span className="text-muted font-normal">v</span>
+              <KitSwatch team={match.awayTeam} kit={match.awayKit} teamName={match.awayTeam.name} />
+              {match.awayTeam.name}
             </h2>
             <p className="text-muted mt-1 text-sm">
               {formatDateTime(match.kickoffAt)}
@@ -177,6 +182,16 @@ export default async function AdminMatchDetailPage({
         hasReport={Boolean(match.report)}
         homeTeamName={match.homeTeam.name}
         awayTeamName={match.awayTeam.name}
+        homeTeam={{
+          colorPrimary: match.homeTeam.colorPrimary,
+          colorAlternate: match.homeTeam.colorAlternate,
+        }}
+        awayTeam={{
+          colorPrimary: match.awayTeam.colorPrimary,
+          colorAlternate: match.awayTeam.colorAlternate,
+        }}
+        homeKit={match.homeKit as KitChoice}
+        awayKit={match.awayKit as KitChoice}
         currentHomeScore={match.report?.homeScore ?? 0}
         currentAwayScore={match.report?.awayScore ?? 0}
         referees={referees.map((r) => ({ id: r.id, name: r.name }))}

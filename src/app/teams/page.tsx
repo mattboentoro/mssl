@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { TeamCrest } from "@/components/team-crest";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { getSeasons, getTeamsBySeason, resolveSeason } from "@/lib/queries";
 
@@ -82,9 +83,7 @@ export default async function TeamsPage({
                   <Card key={team.id} as="li" className="hover:border-brand transition-colors">
                     <Link href={`/teams/${team.id}`} className="block p-4">
                       <div className="flex items-center gap-3">
-                        <span aria-hidden className="text-2xl">
-                          {team.crestEmoji ?? "\u26bd"}
-                        </span>
+                        <TeamCrest team={team} label={team.shortName || team.name} size="lg" />
                         <div className="min-w-0">
                           <p className="truncate font-semibold">{team.name}</p>
                           <p className="text-muted text-xs">

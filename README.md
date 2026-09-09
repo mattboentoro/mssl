@@ -6,7 +6,7 @@ internal SharePoint site at `teams/MicrosoftSoccerLeagueMSSL`.
 The whole point of the app is one flow:
 
 > A referee who belongs to the **`msslrefs`** distribution list signs in, claims
-> a match (claiming *is* the lock), and submits the game report — and the
+> a match (claiming _is_ the lock), and submits the game report — and the
 > standings recompute from that report.
 
 Everything else (schedule, teams, rules, stats, admin) exists to support that.
@@ -45,11 +45,11 @@ Then walk the critical path:
 
 ### Roles at a glance
 
-| Role                   | Can do                                                                |
-| ---------------------- | --------------------------------------------------------------------- |
-| **Public** (anonymous) | Standings for both divisions, fixtures, results, team pages, rules.   |
-| **Referee** (`msslrefs`) | Claim a match, file the score and any disciplinary cards.           |
-| **Game Administrator** | Everything above plus seasons, divisions, teams, venues, the schedule, the discipline register, report confirmation and the audit log. |
+| Role                     | Can do                                                                                                                                                                                                                                                                                                                      |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Public** (anonymous)   | Standings for both divisions (**Premier League** and **Division 1**), match dates and fixture details, team pages, rules.                                                                                                                                                                                                   |
+| **Referee** (`msslrefs`) | Claim a match, read the pre-match **warning board**, input the score, input disciplinary actions.                                                                                                                                                                                                                           |
+| **Game Administrator**   | Create **and delete** a season, add **and delete** a team (with its two kit colours), choose which kit each side wears in a fixture, add a disciplinary result (which reaches the referee taking the game as a warning), **override a score**, plus divisions, venues, the schedule, report confirmation and the audit log. |
 
 ### Verifying it without a browser
 
@@ -80,12 +80,13 @@ Next.js 16 App Router (React 19, TypeScript strict, Tailwind v4)
 │   └── api/                    route handlers, all runtime = "nodejs"
 ├── src/lib/                    all business logic, framework-free where possible
 │   ├── standings.ts            PURE calculator — no I/O, heavily unit tested
+│   ├── kits.ts                 PURE kit colour resolution + clash check
 │   ├── matches.ts              claim / submit / confirm state machine
 │   ├── authz.ts                requireReferee(), requireAdmin()
 │   ├── graph.ts                Microsoft Graph group membership
 │   └── validation.ts           every Zod schema
 ├── prisma/schema.prisma        12 models
-└── tests/                      Vitest — 63 tests
+└── tests/                      Vitest — 76 tests
 ```
 
 ### Request → role resolution
@@ -124,7 +125,7 @@ SCHEDULED ──claim──▶ ASSIGNED ──report──▶ REPORT_SUBMITTED
         admin, any time)                      CONFIRMED
 ```
 
-**Claiming a match *is* locking it.** There is no separate lock step: once a
+**Claiming a match _is_ locking it.** There is no separate lock step: once a
 referee holds a fixture, nobody else can claim it, and the assignment can only be
 reversed by that referee (before the report is filed) or by an admin.
 
@@ -159,23 +160,40 @@ change a game report, and every such change is audited.
 
 ## Data model
 
-| Model                | Notes                                                               |
-| -------------------- | ------------------------------------------------------------------- |
-| `Season`             | Has many divisions; one is flagged current.                         |
-| `Division`           | Belongs to a season; owns teams. Two per season.                    |
-| `Team`               | Belongs to a **division** (a team reaches its season via division). |
-| `Venue`              | Shared across seasons.                                              |
-| `Referee`            | Mirrors an Entra user; auto-provisioned on first referee sign-in.   |
-| `Match`              | `status`, `refereeId`, `assignedAt`, `version` (OCC).               |
-| `GameReport`         | One-to-one with `Match` (unique `matchId`); immutable once filed.   |
+| Model                | Notes                                                                                                                                                                                                                               |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Season`             | Has many divisions; one is flagged current.                                                                                                                                                                                         |
+| `Division`           | Belongs to a season; owns teams. Two per season.                                                                                                                                                                                    |
+| `Team`               | Belongs to a **division** (a team reaches its season via division). Registers a **primary** and an **alternate** kit colour as hex.                                                                                                 |
+| `Venue`              | Shared across seasons.                                                                                                                                                                                                              |
+| `Referee`            | Mirrors an Entra user; auto-provisioned on first referee sign-in.                                                                                                                                                                   |
+| `Match`              | `status`, `refereeId`, `assignedAt`, `homeKit`/`awayKit`, `version` (OCC).                                                                                                                                                          |
+| `GameReport`         | One-to-one with `Match` (unique `matchId`); immutable once filed.                                                                                                                                                                   |
 | `DisciplinaryAction` | A yellow or red card. Free-text `playerName`, optional minute, `issuedBy: REFEREE \| ADMIN`. Links to a report/match when it came from a game report, or to the season and team alone when an admin issued it as a league sanction. |
-| `Announcement`       | Optional season scope; pinned items surface on the home page.       |
-| `Document`           | Rules, waivers, downloads.                                          |
-| `AuditLog`           | Every mutating privileged action.                                   |
+| `Announcement`       | Optional season scope; pinned items surface on the home page.                                                                                                                                                                       |
+| `Document`           | Rules, waivers, downloads.                                                                                                                                                                                                          |
+| `AuditLog`           | Every mutating privileged action.                                                                                                                                                                                                   |
 
 There is deliberately **no `Player` model and no squad lists.** The league does
 not want to maintain rosters, so a referee types the offender's name as free text
 when filing a card.
+
+### Kit colours
+
+Every team registers two colours. A fixture stores only **which kit each side
+wears** (`PRIMARY` or `ALTERNATE`), never a hex value — so re-colouring a team in
+`/admin/league` instantly updates every fixture it appears in, past and future.
+Defaults are home = primary, away = alternate.
+
+`src/lib/kits.ts` is a pure, tested module: `resolveKit()` turns a team plus a
+choice into a hex, `kitsClash()` flags two kits that are too close to tell apart
+(RGB distance below `0.25`), and `readableTextOn()` picks black or white text via
+the WCAG luminance formula. The admin kit pickers show live swatches and warn on a
+clash; the seed script uses the same rule to pick each away kit.
+
+The old emoji crest is gone. Team badges are now a two-tone disc drawn from the
+team's own two colours with its short-name initials on top, so visual identity
+comes from real data rather than an arbitrary emoji field.
 
 ---
 
@@ -185,6 +203,11 @@ when filing a card.
   venue.
 - **Claim** — `POST /api/matches/[id]/assign`, race-safe (above). Claiming is the
   lock: the fixture is now that referee's and nobody else can take it.
+- **Warning board** — once the fixture is theirs, the referee sees every player
+  on either side carrying a card this season, worst first, with any league
+  sanction the Game Administrator has issued pinned to the top. This is how an
+  administrator's disciplinary decision reaches the official who has to enforce
+  it.
 - **Release** — `POST /api/matches/[id]/unassign`. Allowed for the assigned
   referee **until the report is filed**; afterwards only an admin can reverse it.
 - **Submit report** — `POST /api/matches/[id]/report`. Zod enforces non-negative
@@ -199,13 +222,25 @@ The report form is mobile-first: referees file from a phone at the pitch.
 
 ## Match Control (`/admin`)
 
-- `/admin/matches` — reschedule, postpone, cancel, assign or force-unassign a
-  referee, confirm/dispute a report, override a result with a mandatory reason.
-- `/admin/league` — CRUD for seasons, divisions, teams, venues.
+- `/admin/matches` — create a fixture (choosing both teams **and which kit each
+  wears**, with a live clash warning), reschedule, postpone, cancel, change the
+  kits later, assign or force-unassign a referee, confirm/dispute a report,
+  override a result with a mandatory reason.
+- `/admin/league` — CRUD for seasons, divisions, teams, venues. Teams carry a
+  primary and alternate kit colour, picked with a native colour input.
+  **Deletes** live here too, and are guarded:
+  - A **season** can be deleted only when it is not the active one, and only
+    after typing its name. It cascades to its divisions, teams, fixtures and
+    reports, so activate another season first.
+  - A **team** can be deleted only after typing its name, and never once any of
+    its fixtures has a filed game report — results are not rewritten. Deleting a
+    team also removes its unplayed fixtures and its discipline record.
+  - Both write an `AuditLog` row recording exactly what was removed.
 - `/admin/discipline` — the league discipline register: record a card or sanction
   against a team (free-text player name, optional fixture, optional minute), or
-  rescind one. Admin-issued rows are tagged `ADMIN`; rows that arrived on a game
-  report are tagged `REFEREE`.
+  rescind one. Admin-issued rows are tagged `ADMIN`, surface on the **referee's
+  warning board** for that team's next fixture, and count towards the standings
+  tiebreaker. Rows that arrived on a game report are tagged `REFEREE`.
 - `/admin/import` — bulk CSV schedule import with a **dry-run preview**.
   Columns: `matchweek` (1-60), `kickoff` (ISO 8601), `division`, `home`, `away`,
   `venue` (optional). Teams and divisions match by name, slug or short name.
@@ -323,7 +358,7 @@ Checklist for any production environment:
 ```powershell
 npm run dev            # dev server
 npm run build          # production build (stop `npm run dev` first — see below)
-npm test               # vitest, 56 tests
+npm test               # vitest, 76 tests
 npm run lint           # eslint
 npm run typecheck      # tsc --noEmit
 npm run format         # prettier --write
@@ -369,21 +404,40 @@ Ambiguous product decisions, resolved and recorded rather than escalated.
 9. **Disciplinary records are admin-writable, publicly readable.** Only
    `/admin/discipline` can add or rescind a sanction, but each team's card
    history is visible on its public team page.
-10. **Two divisions per season** in the seed data. Nothing in the schema enforces
-    the number; add more in `/admin/league` if the league grows.
-11. **CSV import is all-or-nothing on errors.** Partial imports of a half-valid
+10. **Two divisions per season: Premier League and Division 1.** Nothing in the
+    schema enforces the number or the names; add more in `/admin/league` if the
+    league grows.
+11. **Kit is stored as a choice, not a hex.** `Match.homeKit` / `Match.awayKit`
+    hold `PRIMARY` or `ALTERNATE`; the colour is always resolved from the team
+    record at read time. Re-colouring a team therefore never leaves a fixture
+    showing last season's shirt. The cost is that a genuine one-off third kit
+    cannot be recorded — add a `colorThird` and a third enum value if that ever
+    comes up.
+12. **The kit-clash check is plain RGB distance**, not a perceptual metric like
+    CIEDE2000. It is a touchline sanity check, not colour science, and it is
+    advisory: the admin can save a clashing pair anyway.
+13. **Deleting is guarded, not soft.** There is no "archived" flag. A team with
+    any filed game report cannot be deleted at all, and the active season cannot
+    be deleted, which covers the cases where a delete would corrupt the record.
+    Everything else is a hard delete after typing the name to confirm.
+14. **The warning board groups on a folded player name** (trimmed, lower-cased)
+    because names are free text. "Hugo Diaz" and " hugo diaz " are one player.
+    Two genuinely different people with the same name on the same team would
+    merge — acceptable for a rec league, and the alternative is the roster
+    maintenance the league explicitly does not want.
+15. **CSV import is all-or-nothing on errors.** Partial imports of a half-valid
     file cause more cleanup than they save. Duplicates are skipped silently.
-12. **JWT session strategy, no Prisma adapter.** Required for the
+16. **JWT session strategy, no Prisma adapter.** Required for the
     Credentials-based dev bypass, and it keeps role resolution in one place.
-13. **`experimental.authInterrupts` is enabled** so denied requests return a real
+17. **`experimental.authInterrupts` is enabled** so denied requests return a real
     **403** via `forbidden()` instead of rendering a 200 with an error panel.
-14. **Referee rows are auto-provisioned** on first sign-in by a `msslrefs`
+18. **Referee rows are auto-provisioned** on first sign-in by a `msslrefs`
     member, so no manual roster sync is needed.
-15. **Matchweeks are capped at 60**, which is well beyond any plausible season
+19. **Matchweeks are capped at 60**, which is well beyond any plausible season
     and catches typos in CSV imports.
-16. **No `middleware.ts`.** Prisma needs the Node runtime; authorization lives in
+20. **No `middleware.ts`.** Prisma needs the Node runtime; authorization lives in
     `requireReferee()` / `requireAdmin()` at every entry point instead.
-17. **Content is seeded, not migrated.** The old SharePoint site is
+21. **Content is seeded, not migrated.** The old SharePoint site is
     auth-protected and could not be read, so rules, officers, FAQ and contact
     details are plausible placeholders — replace them in `/admin/content` and
     `src/app/rules` / `src/app/contact`.

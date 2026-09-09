@@ -7,8 +7,8 @@ import { unassignSchema } from "@/lib/validation";
 export const runtime = "nodejs";
 
 /**
- * Give a match back. Allowed for the assigned referee *before* the lock; after
- * the lock `unassignReferee` rejects anyone who is not an admin.
+ * Give a match back. The assigned referee may release it right up until the
+ * game report is filed; once a report exists only an admin can reverse it.
  */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   return handleApi(async () => {
