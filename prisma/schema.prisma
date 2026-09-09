@@ -1,0 +1,275 @@
+// MSSL Prisma schema.
+//
+// PORTABILITY NOTE
+// ----------------
+// The schema is intentionally written to work unchanged on both SQLite (local dev)
+// and PostgreSQL (production on Azure Database for PostgreSQL):
+//
+//   * No native database enums. Prisma's SQLite connector does not support `enum`
+//     blocks, so every enum-like column is a `String` that is constrained in
+//     application code by a TypeScript union + Zod enum (see `src/lib/enums.ts`).
+//   * No `Json` columns. `AuditLog.metadata` and similar payloads are stored as
+//     JSON-encoded `String` values.
+//   * No database-specific attributes (`@db.*`), arrays, or `citext`.
+//
+// To target PostgreSQL, change `provider` below to "postgresql", point
+// DATABASE_URL at the server, and run `npx prisma migrate dev --name init`
+// against a fresh migrations directory. See README.md -> "Switching to PostgreSQL".
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// A competition year, e.g. "2026 Spring".
+model Season {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  startsOn  DateTime
+  endsOn    DateTime
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  divisions     Division[]
+  matches       Match[]
+  announcements Announcement[]
+}
+
+/// A competitive tier inside a season, e.g. "Division 1".
+model Division {
+  id        String   @id @default(cuid())
+  seasonId  String
+  name      String
+  slug      String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  season  Season  @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  teams   Team[]
+  matches Match[]
+
+  @@unique([seasonId, slug])
+  @@index([seasonId])
+}
+
+model Team {
+  id           String   @id @default(cuid())
+  divisionId   String
+  name         String
+  slug         String
+  shortName    String
+  colorPrimary String   @default("#0f766e")
+  crestEmoji   String   @default("\u26BD")
+  captainName  String?
+  contactEmail String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  division    Division    @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+  players     Player[]
+  homeMatches Match[]     @relation("HomeTeam")
+  awayMatches Match[]     @relation("AwayTeam")
+  gameEvents  GameEvent[]
+
+  @@unique([divisionId, slug])
+  @@index([divisionId])
+}
+
+model Player {
+  id           String   @id @default(cuid())
+  teamId       String
+  firstName    String
+  lastName     String
+  jerseyNumber Int?
+  position     String?
+  email        String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  team   Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  events GameEvent[]
+
+  @@index([teamId])
+}
+
+model Venue {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  address   String?
+  city      String?
+  mapUrl    String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  matches Match[]
+}
+
+/// A league referee. `entraObjectId` / `email` link the record to the signed-in
+/// Microsoft identity; membership of the `msslrefs` distribution list is checked
+/// live against Microsoft Graph and is not stored here.
+model Referee {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  entraObjectId String?  @unique
+  phone         String?
+  certification String?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  matches Match[]
+  reports GameReport[]
+}
+
+/// A fixture. `status` is one of the MatchStatus values in `src/lib/enums.ts`.
+/// `version` is an optimistic-concurrency counter used to make referee
+/// self-assignment race safe.
+model Match {
+  id           String    @id @default(cuid())
+  seasonId     String
+  divisionId   String
+  homeTeamId   String
+  awayTeamId   String
+  venueId      String?
+  kickoffAt    DateTime
+  matchweek    Int
+  status       String    @default("SCHEDULED")
+  refereeId    String?
+  assignedAt   DateTime?
+  lockedAt     DateTime?
+  /// Actor id of whoever locked the match (referee id or admin user id).
+  lockedById   String?
+  lockedByName String?
+  version      Int       @default(0)
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  season   Season      @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  division Division    @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+  homeTeam Team        @relation("HomeTeam", fields: [homeTeamId], references: [id], onDelete: Cascade)
+  awayTeam Team        @relation("AwayTeam", fields: [awayTeamId], references: [id], onDelete: Cascade)
+  venue    Venue?      @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  referee  Referee?    @relation(fields: [refereeId], references: [id], onDelete: SetNull)
+  report   GameReport?
+
+  @@index([seasonId])
+  @@index([divisionId])
+  @@index([refereeId])
+  @@index([kickoffAt])
+  @@index([status])
+}
+
+/// The referee's official record of a match. One per match.
+model GameReport {
+  id             String    @id @default(cuid())
+  matchId        String    @unique
+  refereeId      String
+  homeScore      Int       @default(0)
+  awayScore      Int       @default(0)
+  homeForfeit    Boolean   @default(false)
+  awayForfeit    Boolean   @default(false)
+  notes          String?
+  incidentReport String?
+  misconduct     String?
+  /// One of GameReportStatus: SUBMITTED | CONFIRMED | DISPUTED
+  status         String    @default("SUBMITTED")
+  submittedAt    DateTime  @default(now())
+  confirmedAt    DateTime?
+  confirmedById  String?
+  disputeReason  String?
+  overrideReason String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  match   Match       @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  referee Referee     @relation(fields: [refereeId], references: [id], onDelete: Cascade)
+  events  GameEvent[]
+
+  @@index([refereeId])
+  @@index([status])
+}
+
+/// A discrete incident inside a game report (goal, card, substitution).
+model GameEvent {
+  id           String   @id @default(cuid())
+  gameReportId String
+  /// One of GameEventType: GOAL | OWN_GOAL | PENALTY_GOAL | YELLOW | RED | SUBSTITUTION
+  type         String
+  teamId       String
+  playerId     String?
+  minute       Int
+  note         String?
+  createdAt    DateTime @default(now())
+
+  gameReport GameReport @relation(fields: [gameReportId], references: [id], onDelete: Cascade)
+  team       Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  player     Player?    @relation(fields: [playerId], references: [id], onDelete: SetNull)
+
+  @@index([gameReportId])
+  @@index([teamId])
+  @@index([playerId])
+}
+
+model Announcement {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  summary     String
+  body        String
+  pinned      Boolean  @default(false)
+  publishedAt DateTime @default(now())
+  authorName  String   @default("MSSL Board")
+  seasonId    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  season Season? @relation(fields: [seasonId], references: [id], onDelete: SetNull)
+
+  @@index([publishedAt])
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  /// One of DocumentCategory: RULES | FORMS | POLICY | OTHER
+  category    String   @default("OTHER")
+  url         String
+  fileType    String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+}
+
+/// Append-only trail of every privileged mutation.
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actorEmail String?
+  actorName  String?
+  actorRole  String?
+  action     String
+  entity     String
+  entityId   String
+  /// JSON-encoded payload (kept as text so the schema stays portable).
+  metadata   String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entity, entityId])
+  @@index([actorEmail])
+}
