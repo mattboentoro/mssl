@@ -24,7 +24,6 @@ const PUBLIC_LINKS: NavLink[] = [
   { href: "/schedule", label: "Schedule" },
   { href: "/standings", label: "Standings" },
   { href: "/teams", label: "Teams" },
-  { href: "/players/stats", label: "Stats" },
   { href: "/rules", label: "Rules" },
   { href: "/contact", label: "Contact" },
 ];

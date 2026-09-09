@@ -34,7 +34,7 @@ const STANDINGS_MATCH_SELECT = {
       awayScore: true,
       homeForfeit: true,
       awayForfeit: true,
-      events: { select: { type: true, teamId: true } },
+      discipline: { select: { type: true, teamId: true } },
     },
   },
 } as const;
@@ -167,111 +167,79 @@ export async function getDocuments() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Player statistics                                                          */
+/* Discipline                                                                 */
 /* -------------------------------------------------------------------------- */
 
-export interface PlayerStatRow {
-  playerId: string;
+export interface DisciplinaryRow {
+  id: string;
   playerName: string;
-  jerseyNumber: number | null;
+  type: string;
+  minute: number | null;
+  note: string | null;
+  issuedBy: string;
+  createdAt: Date;
   teamId: string;
   teamName: string;
   divisionName: string;
-  goals: number;
-  penalties: number;
-  yellowCards: number;
-  redCards: number;
-  disciplinaryPoints: number;
-  appearances: number;
+  matchId: string | null;
+  matchLabel: string | null;
 }
 
 /**
- * Top scorers and the disciplinary leaderboard, derived from the GameEvent rows
- * that referees file. Own goals are excluded from a player's goal tally.
+ * Every disciplinary record in a season: cards filed by referees on game
+ * reports, plus league sanctions added in Game Administration.
  */
-export async function getPlayerStats(seasonId: string): Promise<PlayerStatRow[]> {
-  const options = standingsOptionsFromConfig();
-  const countableStatuses = options.includeUnconfirmed ? ["SUBMITTED", "CONFIRMED"] : ["CONFIRMED"];
-
-  const events = await prisma.gameEvent.findMany({
-    where: {
-      playerId: { not: null },
-      gameReport: {
-        status: { in: countableStatuses },
-        match: { seasonId, status: { notIn: ["CANCELLED", "POSTPONED"] } },
-      },
-    },
-    select: {
-      type: true,
-      gameReportId: true,
-      player: {
+export async function getDisciplinaryRecords(seasonId: string): Promise<DisciplinaryRow[]> {
+  const rows = await prisma.disciplinaryAction.findMany({
+    where: { seasonId },
+    orderBy: [{ createdAt: "desc" }],
+    include: {
+      team: { select: { id: true, name: true, division: { select: { name: true } } } },
+      match: {
         select: {
           id: true,
-          firstName: true,
-          lastName: true,
-          jerseyNumber: true,
-          team: {
-            select: { id: true, name: true, division: { select: { name: true } } },
-          },
+          matchweek: true,
+          homeTeam: { select: { shortName: true } },
+          awayTeam: { select: { shortName: true } },
         },
       },
     },
   });
 
-  const byPlayer = new Map<string, PlayerStatRow & { reports: Set<string> }>();
-
-  for (const event of events) {
-    const player = event.player;
-    if (!player) continue;
-
-    let row = byPlayer.get(player.id);
-    if (!row) {
-      row = {
-        playerId: player.id,
-        playerName: `${player.firstName} ${player.lastName}`,
-        jerseyNumber: player.jerseyNumber,
-        teamId: player.team.id,
-        teamName: player.team.name,
-        divisionName: player.team.division.name,
-        goals: 0,
-        penalties: 0,
-        yellowCards: 0,
-        redCards: 0,
-        disciplinaryPoints: 0,
-        appearances: 0,
-        reports: new Set<string>(),
-      };
-      byPlayer.set(player.id, row);
-    }
-
-    row.reports.add(event.gameReportId);
-
-    switch (event.type) {
-      case "GOAL":
-        row.goals += 1;
-        break;
-      case "PENALTY_GOAL":
-        row.goals += 1;
-        row.penalties += 1;
-        break;
-      case "YELLOW":
-        row.yellowCards += 1;
-        break;
-      case "RED":
-        row.redCards += 1;
-        break;
-      default:
-        break;
-    }
-  }
-
-  const disciplinary = { yellow: 1, red: 3 };
-
-  return Array.from(byPlayer.values()).map(({ reports, ...row }) => ({
-    ...row,
-    appearances: reports.size,
-    disciplinaryPoints: row.yellowCards * disciplinary.yellow + row.redCards * disciplinary.red,
+  return rows.map((row) => ({
+    id: row.id,
+    playerName: row.playerName,
+    type: row.type,
+    minute: row.minute,
+    note: row.note,
+    issuedBy: row.issuedBy,
+    createdAt: row.createdAt,
+    teamId: row.team.id,
+    teamName: row.team.name,
+    divisionName: row.team.division.name,
+    matchId: row.match?.id ?? null,
+    matchLabel: row.match
+      ? `MW${row.match.matchweek} ${row.match.homeTeam.shortName} v ${row.match.awayTeam.shortName}`
+      : null,
   }));
+}
+
+/** Card counts per team, used by the public discipline summary. */
+export async function getTeamDisciplineTotals(seasonId: string) {
+  const grouped = await prisma.disciplinaryAction.groupBy({
+    by: ["teamId", "type"],
+    where: { seasonId },
+    _count: { _all: true },
+  });
+
+  const totals = new Map<string, { yellow: number; red: number }>();
+  for (const row of grouped) {
+    const entry = totals.get(row.teamId) ?? { yellow: 0, red: 0 };
+    if (row.type === "YELLOW") entry.yellow += row._count._all;
+    if (row.type === "RED") entry.red += row._count._all;
+    totals.set(row.teamId, entry);
+  }
+  return totals;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -281,10 +249,7 @@ export async function getPlayerStats(seasonId: string): Promise<PlayerStatRow[]>
 export async function getTeamsBySeason(seasonId: string) {
   return prisma.team.findMany({
     where: { division: { seasonId } },
-    include: {
-      division: { select: { id: true, name: true, slug: true } },
-      _count: { select: { players: true } },
-    },
+    include: { division: { select: { id: true, name: true, slug: true } } },
     orderBy: [{ division: { sortOrder: "asc" } }, { name: "asc" }],
   });
 }
@@ -292,12 +257,7 @@ export async function getTeamsBySeason(seasonId: string) {
 export async function getTeamDetail(teamId: string) {
   return prisma.team.findUnique({
     where: { id: teamId },
-    include: {
-      division: { select: { id: true, name: true, seasonId: true } },
-      players: {
-        orderBy: [{ jerseyNumber: "asc" }, { lastName: "asc" }],
-      },
-    },
+    include: { division: { select: { id: true, name: true, seasonId: true } } },
   });
 }
 

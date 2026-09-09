@@ -5,8 +5,8 @@ internal SharePoint site at `teams/MicrosoftSoccerLeagueMSSL`.
 
 The whole point of the app is one flow:
 
-> A referee who belongs to the **`msslrefs`** distribution list signs in, assigns
-> themselves to a match, locks it, and submits the game report — and the
+> A referee who belongs to the **`msslrefs`** distribution list signs in, claims
+> a match (claiming *is* the lock), and submits the game report — and the
 > standings recompute from that report.
 
 Everything else (schedule, teams, rules, stats, admin) exists to support that.
@@ -39,25 +39,32 @@ personas (enabled by `DEV_AUTH_BYPASS=true`, hard-disabled when
 
 Then walk the critical path:
 
-1. `/referee` — pick an unassigned match, **Assign myself**.
-2. Open the match, **Lock** it.
-3. Fill in the game report (score, scorers, cards) and **Submit**.
-4. `/standings` — both teams' rows have moved.
+1. `/referee` — pick an unclaimed match, **Claim this match**.
+2. Fill in the game report (final score, forfeits, cards) and **Submit**.
+3. `/standings` — both teams' rows have moved.
+
+### Roles at a glance
+
+| Role                   | Can do                                                                |
+| ---------------------- | --------------------------------------------------------------------- |
+| **Public** (anonymous) | Standings for both divisions, fixtures, results, team pages, rules.   |
+| **Referee** (`msslrefs`) | Claim a match, file the score and any disciplinary cards.           |
+| **Game Administrator** | Everything above plus seasons, divisions, teams, venues, the schedule, the discipline register, report confirmation and the audit log. |
 
 ### Verifying it without a browser
 
 ```powershell
 npm run dev          # terminal 1
-npm run smoke        # terminal 2 — 24 checks, the full referee flow
-npm run smoke:admin  #              14 checks, Match Control
+npm run smoke        # terminal 2 — the full referee flow
+npm run smoke:admin  #              Match Control
 ```
 
 `npm run smoke` drives the real HTTP API: anonymous redirect, referee-vs-admin
 authorization, dev sign-in, self-assignment, a **losing concurrent claim
-(HTTP 409)**, lock ownership, rejected inconsistent reports, submission,
+(HTTP 409)**, claim ownership, rejected invalid reports, submission,
 immutability, and the resulting standings delta. `npm run smoke:admin` drives the
-admin server actions over the progressive-enhancement path (CRUD, CSV dry
-run/commit, audit trail).
+admin server actions over the progressive-enhancement path (CRUD, discipline
+register, CSV dry run/commit, audit trail).
 
 ---
 
@@ -67,13 +74,13 @@ run/commit, audit trail).
 Next.js 16 App Router (React 19, TypeScript strict, Tailwind v4)
 ├── src/app/                    routes — RSC by default
 │   ├── (public)                /, /schedule, /standings, /teams, /rules,
-│   │                           /contact, /players/stats
+│   │                           /contact
 │   ├── referee/                Referee Control (referee role)
 │   ├── admin/                  Match Control + audit (admin role)
 │   └── api/                    route handlers, all runtime = "nodejs"
 ├── src/lib/                    all business logic, framework-free where possible
 │   ├── standings.ts            PURE calculator — no I/O, heavily unit tested
-│   ├── matches.ts              assign / lock / submit / confirm state machine
+│   ├── matches.ts              claim / submit / confirm state machine
 │   ├── authz.ts                requireReferee(), requireAdmin()
 │   ├── graph.ts                Microsoft Graph group membership
 │   └── validation.ts           every Zod schema
@@ -110,12 +117,16 @@ trusted.
 ### Match lifecycle
 
 ```
-SCHEDULED ──assign──▶ ASSIGNED ──lock──▶ LOCKED ──report──▶ REPORT_SUBMITTED
-     ▲                    │                 │                      │
-     └────unassign────────┘                 │                confirm│dispute
-                                  admin force-unlock                ▼
-                                            └──────────────▶  CONFIRMED
+SCHEDULED ──claim──▶ ASSIGNED ──report──▶ REPORT_SUBMITTED
+     ▲                   │                        │
+     └─────release───────┘                  confirm│dispute
+       (referee, before the report;                ▼
+        admin, any time)                      CONFIRMED
 ```
+
+**Claiming a match *is* locking it.** There is no separate lock step: once a
+referee holds a fixture, nobody else can claim it, and the assignment can only be
+reversed by that referee (before the report is filed) or by an admin.
 
 `POSTPONED`, `CANCELLED` and `FORFEIT` are terminal side states set by an admin.
 
@@ -148,47 +159,53 @@ change a game report, and every such change is audited.
 
 ## Data model
 
-| Model          | Notes                                                               |
-| -------------- | ------------------------------------------------------------------- |
-| `Season`       | Has many divisions; one is flagged current.                         |
-| `Division`     | Belongs to a season; owns teams.                                    |
-| `Team`         | Belongs to a **division** (a team reaches its season via division). |
-| `Player`       | Belongs to a team; jersey number unique per team.                   |
-| `Venue`        | Shared across seasons.                                              |
-| `Referee`      | Mirrors an Entra user; auto-provisioned on first referee sign-in.   |
-| `Match`        | `status`, `refereeId`, `lockedAt`/`lockedById`, `version` (OCC).    |
-| `GameReport`   | One-to-one with `Match` (unique `matchId`); immutable once filed.   |
-| `GameEvent`    | Goals/cards/subs belonging to a report.                             |
-| `Announcement` | Optional season scope; pinned items surface on the home page.       |
-| `Document`     | Rules, waivers, downloads.                                          |
-| `AuditLog`     | Every mutating privileged action.                                   |
+| Model                | Notes                                                               |
+| -------------------- | ------------------------------------------------------------------- |
+| `Season`             | Has many divisions; one is flagged current.                         |
+| `Division`           | Belongs to a season; owns teams. Two per season.                    |
+| `Team`               | Belongs to a **division** (a team reaches its season via division). |
+| `Venue`              | Shared across seasons.                                              |
+| `Referee`            | Mirrors an Entra user; auto-provisioned on first referee sign-in.   |
+| `Match`              | `status`, `refereeId`, `assignedAt`, `version` (OCC).               |
+| `GameReport`         | One-to-one with `Match` (unique `matchId`); immutable once filed.   |
+| `DisciplinaryAction` | A yellow or red card. Free-text `playerName`, optional minute, `issuedBy: REFEREE \| ADMIN`. Links to a report/match when it came from a game report, or to the season and team alone when an admin issued it as a league sanction. |
+| `Announcement`       | Optional season scope; pinned items surface on the home page.       |
+| `Document`           | Rules, waivers, downloads.                                          |
+| `AuditLog`           | Every mutating privileged action.                                   |
+
+There is deliberately **no `Player` model and no squad lists.** The league does
+not want to maintain rosters, so a referee types the offender's name as free text
+when filing a card.
 
 ---
 
 ## Referee Control (`/referee`)
 
-- **Available matches** — unassigned fixtures, filterable by date, division and
+- **Available matches** — unclaimed fixtures, filterable by date, division and
   venue.
-- **Self-assign** — `POST /api/matches/[id]/assign`, race-safe (above).
-- **Unassign / unlock** — allowed for the assigned referee **only before lock**;
-  after lock only an admin can reverse it.
-- **Lock** — `POST /api/matches/[id]/lock`. Freezes the fixture and rosters,
-  blocks reassignment, records `lockedAt` / `lockedById`.
-- **Submit report** — `POST /api/matches/[id]/report`. Zod enforces
-  non-negative integer scores, goal events that **sum to the stated score**,
-  players that belong to one of the two teams, and plausible minutes. On success
-  the match becomes `REPORT_SUBMITTED` and the report is immutable to the
+- **Claim** — `POST /api/matches/[id]/assign`, race-safe (above). Claiming is the
+  lock: the fixture is now that referee's and nobody else can take it.
+- **Release** — `POST /api/matches/[id]/unassign`. Allowed for the assigned
+  referee **until the report is filed**; afterwards only an admin can reverse it.
+- **Submit report** — `POST /api/matches/[id]/report`. Zod enforces non-negative
+  integer scores, plausible minutes, and cards that name one of the two teams. On
+  success the match becomes `REPORT_SUBMITTED` and the report is immutable to the
   referee.
-- **My matches** — assigned / locked / submitted history.
+- **My matches** — claimed / submitted history.
+
+Goalscorers are **not** tracked — only the final score and any cards.
 
 The report form is mobile-first: referees file from a phone at the pitch.
 
 ## Match Control (`/admin`)
 
 - `/admin/matches` — reschedule, postpone, cancel, assign or force-unassign a
-  referee, force-unlock, confirm/dispute a report, override a result with a
-  mandatory reason.
-- `/admin/league` — CRUD for seasons, divisions, teams, players, venues.
+  referee, confirm/dispute a report, override a result with a mandatory reason.
+- `/admin/league` — CRUD for seasons, divisions, teams, venues.
+- `/admin/discipline` — the league discipline register: record a card or sanction
+  against a team (free-text player name, optional fixture, optional minute), or
+  rescind one. Admin-issued rows are tagged `ADMIN`; rows that arrived on a game
+  report are tagged `REFEREE`.
 - `/admin/import` — bulk CSV schedule import with a **dry-run preview**.
   Columns: `matchweek` (1-60), `kickoff` (ISO 8601), `division`, `home`, `away`,
   `venue` (optional). Teams and divisions match by name, slug or short name.
@@ -306,7 +323,7 @@ Checklist for any production environment:
 ```powershell
 npm run dev            # dev server
 npm run build          # production build (stop `npm run dev` first — see below)
-npm test               # vitest, 63 tests
+npm test               # vitest, 56 tests
 npm run lint           # eslint
 npm run typecheck      # tsc --noEmit
 npm run format         # prettier --write
@@ -315,8 +332,8 @@ npm run db:studio      # prisma studio
 ```
 
 Tests cover the standings calculator (every tiebreaker, forfeits, form guide,
-the unconfirmed-report flag) and the match lifecycle (race-safe assignment, lock
-ownership, report validation, immutability).
+the unconfirmed-report flag) and the match lifecycle (race-safe claiming, claim
+ownership, report validation, immutability, admin discipline).
 
 > **Windows note:** `npm run build` fails with `EPERM` on the Prisma query-engine
 > DLL while a dev server holds it open. Stop `npm run dev` first.
@@ -341,23 +358,32 @@ Ambiguous product decisions, resolved and recorded rather than escalated.
    the league wants an admin to confirm every result first.
 5. **Forfeits award 3-0** (`STANDINGS_FORFEIT_SCORE`). A **double forfeit is
    0-0** and awards no points to either side.
-6. **Disciplinary points: yellow = 1, red = 3.** Used only as the final
-   standings tiebreaker and to rank `/players/stats`.
-7. **Own goals credit the opposing team** in both the score reconciliation and
-   the standings, and are excluded from the top-scorer leaderboard.
-8. **CSV import is all-or-nothing on errors.** Partial imports of a half-valid
-   file cause more cleanup than they save. Duplicates are skipped silently.
-9. **JWT session strategy, no Prisma adapter.** Required for the
-   Credentials-based dev bypass, and it keeps role resolution in one place.
-10. **`experimental.authInterrupts` is enabled** so denied requests return a real
+6. **Disciplinary points: yellow = 1, red = 3.** Used as the final standings
+   tiebreaker and to rank the team disciplinary records shown on team pages.
+7. **Claiming a match is the lock.** There is no separate lock step. A referee
+   may **release** a match they claimed by mistake right up until they file the
+   report; after that only an admin can reverse it.
+8. **No squads, no goalscorers.** The league does not want to maintain rosters,
+   so there is no `Player` model. A referee names a carded player as free text,
+   and the game report captures the final score only — not who scored.
+9. **Disciplinary records are admin-writable, publicly readable.** Only
+   `/admin/discipline` can add or rescind a sanction, but each team's card
+   history is visible on its public team page.
+10. **Two divisions per season** in the seed data. Nothing in the schema enforces
+    the number; add more in `/admin/league` if the league grows.
+11. **CSV import is all-or-nothing on errors.** Partial imports of a half-valid
+    file cause more cleanup than they save. Duplicates are skipped silently.
+12. **JWT session strategy, no Prisma adapter.** Required for the
+    Credentials-based dev bypass, and it keeps role resolution in one place.
+13. **`experimental.authInterrupts` is enabled** so denied requests return a real
     **403** via `forbidden()` instead of rendering a 200 with an error panel.
-11. **Referee rows are auto-provisioned** on first sign-in by a `msslrefs`
+14. **Referee rows are auto-provisioned** on first sign-in by a `msslrefs`
     member, so no manual roster sync is needed.
-12. **Matchweeks are capped at 60**, which is well beyond any plausible season
+15. **Matchweeks are capped at 60**, which is well beyond any plausible season
     and catches typos in CSV imports.
-13. **No `middleware.ts`.** Prisma needs the Node runtime; authorization lives in
+16. **No `middleware.ts`.** Prisma needs the Node runtime; authorization lives in
     `requireReferee()` / `requireAdmin()` at every entry point instead.
-14. **Content is seeded, not migrated.** The old SharePoint site is
+17. **Content is seeded, not migrated.** The old SharePoint site is
     auth-protected and could not be read, so rules, officers, FAQ and contact
     details are plausible placeholders — replace them in `/admin/content` and
     `src/app/rules` / `src/app/contact`.

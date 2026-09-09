@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { MatchList } from "@/components/match-display";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
+import { CARD_LABELS, type CardType } from "@/lib/enums";
+import { formatDate } from "@/lib/dates";
 import {
-  getPlayerStats,
+  getDisciplinaryRecords,
   getStandingsForSeason,
   getTeamDetail,
   getTeamMatches,
@@ -28,10 +29,10 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
   const team = await getTeamDetail(id);
   if (!team) notFound();
 
-  const [matches, standings, playerStats] = await Promise.all([
+  const [matches, standings, discipline] = await Promise.all([
     getTeamMatches(team.id),
     getStandingsForSeason(team.division.seasonId),
-    getPlayerStats(team.division.seasonId),
+    getDisciplinaryRecords(team.division.seasonId),
   ]);
 
   const row = standings
@@ -40,10 +41,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
 
   const played = matches.filter((m) => m.report);
   const upcoming = matches.filter((m) => !m.report && m.status !== "CANCELLED");
-  const teamStats = playerStats
-    .filter((p) => p.teamId === team.id)
-    .sort((a, b) => b.goals - a.goals || b.disciplinaryPoints - a.disciplinaryPoints);
-  const goalsByPlayer = new Map(teamStats.map((p) => [p.playerId, p]));
+  const teamCards = discipline.filter((d) => d.teamId === team.id);
 
   const summary: { label: string; value: string }[] = row
     ? [
@@ -111,42 +109,48 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
         </div>
 
         <aside>
-          <h2 className="mb-3 text-lg font-semibold">Roster</h2>
-          {team.players.length === 0 ? (
-            <EmptyState title="No players registered" />
+          <h2 className="mb-3 text-lg font-semibold">Disciplinary record</h2>
+          {row ? (
+            <Card className="mb-3 flex gap-4 p-4 text-sm">
+              <span>
+                <span className="text-lg font-semibold">{row.yellowCards}</span>{" "}
+                <span className="text-muted text-xs">yellow</span>
+              </span>
+              <span>
+                <span className="text-lg font-semibold">{row.redCards}</span>{" "}
+                <span className="text-muted text-xs">red</span>
+              </span>
+            </Card>
+          ) : null}
+          {teamCards.length === 0 ? (
+            <EmptyState title="No cards recorded" />
           ) : (
             <Card className="divide-subtle divide-y">
-              {team.players.map((player) => {
-                const stats = goalsByPlayer.get(player.id);
-                return (
-                  <div key={player.id} className="flex items-center gap-3 p-3">
-                    <span className="bg-surface-muted text-muted inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
-                      {player.jerseyNumber ?? "\u2013"}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">
-                        {player.firstName} {player.lastName}
-                        {player.active ? null : <span className="text-muted"> (inactive)</span>}
-                      </p>
-                      <p className="text-muted text-xs">{player.position ?? "Unlisted"}</p>
-                    </div>
-                    {stats ? (
-                      <span className="text-muted shrink-0 text-xs" title="Goals / yellow / red">
-                        {stats.goals}G{stats.yellowCards ? ` ${stats.yellowCards}Y` : ""}
-                        {stats.redCards ? ` ${stats.redCards}R` : ""}
-                      </span>
-                    ) : null}
+              {teamCards.slice(0, 20).map((card) => (
+                <div key={card.id} className="flex items-center gap-3 p-3">
+                  <span
+                    aria-hidden
+                    className={
+                      card.type === "RED"
+                        ? "bg-danger h-5 w-3.5 shrink-0 rounded-sm"
+                        : "h-5 w-3.5 shrink-0 rounded-sm bg-yellow-400"
+                    }
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{card.playerName}</p>
+                    <p className="text-muted text-xs">
+                      {CARD_LABELS[card.type as CardType] ?? card.type}
+                      {card.matchLabel ? ` \u00b7 ${card.matchLabel}` : ""}
+                    </p>
                   </div>
-                );
-              })}
+                  <span className="text-muted shrink-0 text-xs">{formatDate(card.createdAt)}</span>
+                </div>
+              ))}
             </Card>
           )}
           <p className="text-muted mt-4 text-xs">
-            Player statistics are derived from referee game reports.{" "}
-            <Link href="/players/stats" className="underline">
-              League leaderboards
-            </Link>
-            .
+            Cards come from referee game reports and league sanctions. They feed the final standings
+            tiebreaker.
           </p>
         </aside>
       </div>

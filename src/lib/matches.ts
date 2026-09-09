@@ -19,8 +19,6 @@ export type MatchErrorCode =
   | "NOT_ASSIGNED"
   | "NOT_YOUR_MATCH"
   | "MATCH_CLOSED"
-  | "MATCH_LOCKED"
-  | "NOT_LOCKED"
   | "REPORT_EXISTS"
   | "REPORT_MISSING"
   | "VERSION_CONFLICT"
@@ -64,7 +62,8 @@ export interface AssignResult {
 }
 
 /**
- * Race-safe referee self-assignment.
+ * Race-safe referee self-assignment. Claiming a fixture is also what freezes
+ * it: there is no separate lock step.
  *
  * The write is a single conditional `updateMany` guarded by BOTH
  * `refereeId: null` and the expected `version`. Two referees pressing the
@@ -146,7 +145,12 @@ export async function assignRefereeToMatch(
   };
 }
 
-/** A referee dropping a match they claimed. Only allowed before it is locked. */
+/**
+ * A referee releasing a fixture they claimed by mistake.
+ *
+ * Allowed right up until they file the report; after that only an admin can
+ * reverse it (via `adminAssignReferee(null)`).
+ */
 export async function unassignReferee(
   db: DbClient,
   params: { matchId: string; actor: ActorContext; reason?: string },
@@ -160,13 +164,6 @@ export async function unassignReferee(
   if (!isOwner && !actor.isAdmin) {
     throw new MatchError("You are not the assigned referee.", 403, "NOT_YOUR_MATCH");
   }
-  if (match.lockedAt && !actor.isAdmin) {
-    throw new MatchError(
-      "This match is locked. Only a league admin can reverse it now.",
-      409,
-      "MATCH_LOCKED",
-    );
-  }
   if (match.status === "REPORT_SUBMITTED" || match.status === "CONFIRMED") {
     throw new MatchError("A report has already been filed for this match.", 409, "INVALID_STATE");
   }
@@ -176,9 +173,6 @@ export async function unassignReferee(
     data: {
       refereeId: null,
       assignedAt: null,
-      lockedAt: null,
-      lockedById: null,
-      lockedByName: null,
       status: "SCHEDULED",
       version: { increment: 1 },
     },
@@ -198,117 +192,18 @@ export async function unassignReferee(
 }
 
 /* -------------------------------------------------------------------------- */
-/* Locking                                                                    */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Freeze the fixture and rosters ahead of kickoff. Only the assigned referee
- * (or an admin) may lock, and locking blocks reassignment.
- */
-export async function lockMatch(
-  db: DbClient,
-  params: { matchId: string; actor: ActorContext; expectedVersion?: number },
-): Promise<{ version: number }> {
-  const { matchId, actor, expectedVersion } = params;
-  const match = await loadMatch(db, matchId);
-
-  if (!match.refereeId) {
-    throw new MatchError("Assign yourself before locking the match.", 409, "NOT_ASSIGNED");
-  }
-  const isOwner = Boolean(actor.refereeId) && match.refereeId === actor.refereeId;
-  if (!isOwner && !actor.isAdmin) {
-    throw new MatchError("Only the assigned referee can lock this match.", 403, "NOT_YOUR_MATCH");
-  }
-  if (match.status === "LOCKED") {
-    throw new MatchError("This match is already locked.", 409, "MATCH_LOCKED");
-  }
-  if (match.status !== "ASSIGNED") {
-    throw new MatchError(
-      `A match in state ${match.status} cannot be locked.`,
-      409,
-      "INVALID_STATE",
-    );
-  }
-  if (expectedVersion !== undefined && expectedVersion !== match.version) {
-    throw new MatchError("The fixture changed. Refresh and try again.", 409, "VERSION_CONFLICT");
-  }
-
-  const now = new Date();
-  const updated = await db.match.updateMany({
-    where: {
-      id: matchId,
-      status: "ASSIGNED",
-      refereeId: match.refereeId,
-      version: match.version,
-    },
-    data: {
-      status: "LOCKED",
-      lockedAt: now,
-      lockedById: actor.refereeId ?? actor.id ?? null,
-      lockedByName: actor.name ?? null,
-      version: { increment: 1 },
-    },
-  });
-
-  if (updated.count === 0) {
-    throw new MatchError("This match is already locked.", 409, "MATCH_LOCKED");
-  }
-
-  await writeAudit(db, {
-    actor,
-    action: "match.lock",
-    entity: "Match",
-    entityId: matchId,
-    metadata: { lockedAt: now.toISOString(), byAdmin: Boolean(actor.isAdmin && !isOwner) },
-  });
-
-  return { version: match.version + 1 };
-}
-
-/** Admin-only reversal of a lock. */
-export async function forceUnlockMatch(
-  db: DbClient,
-  params: { matchId: string; actor: ActorContext; reason: string },
-): Promise<void> {
-  const { matchId, actor, reason } = params;
-  if (!actor.isAdmin) {
-    throw new MatchError("Only a league admin can unlock a match.", 403, "NOT_YOUR_MATCH");
-  }
-
-  const match = await loadMatch(db, matchId);
-  if (match.status !== "LOCKED") {
-    throw new MatchError("This match is not locked.", 409, "NOT_LOCKED");
-  }
-
-  await db.match.update({
-    where: { id: matchId },
-    data: {
-      status: match.refereeId ? "ASSIGNED" : "SCHEDULED",
-      lockedAt: null,
-      lockedById: null,
-      lockedByName: null,
-      version: { increment: 1 },
-    },
-  });
-
-  await writeAudit(db, {
-    actor,
-    action: "match.force_unlock",
-    entity: "Match",
-    entityId: matchId,
-    metadata: { reason },
-  });
-}
-
-/* -------------------------------------------------------------------------- */
 /* Game report                                                                */
 /* -------------------------------------------------------------------------- */
 
-export interface GameEventInput {
+/**
+ * A card filed on a game report. The league keeps no squad lists, so the
+ * player is free text exactly as the referee recorded it.
+ */
+export interface ReportCardInput {
   type: string;
   teamId: string;
-  playerId?: string | null;
-  minute: number;
+  playerName: string;
+  minute?: number | null;
   note?: string | null;
 }
 
@@ -320,32 +215,11 @@ export interface GameReportInput {
   notes?: string | null;
   incidentReport?: string | null;
   misconduct?: string | null;
-  events?: GameEventInput[];
-}
-
-/** Goals implied by the itemised events (own goals credit the opponent). */
-export function tallyGoalsFromEvents(
-  events: GameEventInput[],
-  homeTeamId: string,
-  awayTeamId: string,
-): { home: number; away: number } {
-  let home = 0;
-  let away = 0;
-  for (const event of events) {
-    const scoresForHome =
-      (event.teamId === homeTeamId && event.type !== "OWN_GOAL") ||
-      (event.teamId === awayTeamId && event.type === "OWN_GOAL");
-
-    if (event.type === "GOAL" || event.type === "PENALTY_GOAL" || event.type === "OWN_GOAL") {
-      if (scoresForHome) home += 1;
-      else away += 1;
-    }
-  }
-  return { home, away };
+  cards?: ReportCardInput[];
 }
 
 /**
- * File the referee's report. The match must be LOCKED and owned by the caller.
+ * File the referee's report. The match must be assigned to the caller.
  * On success the match moves to REPORT_SUBMITTED and the report becomes
  * read-only for the referee.
  */
@@ -362,43 +236,34 @@ export async function submitGameReport(
 
   const match = await db.match.findUnique({
     where: { id: matchId },
-    include: {
-      report: { select: { id: true } },
-      homeTeam: { select: { id: true, players: { select: { id: true } } } },
-      awayTeam: { select: { id: true, players: { select: { id: true } } } },
-    },
+    include: { report: { select: { id: true } } },
   });
   if (!match) throw new MatchError("Match not found.", 404, "NOT_FOUND");
 
   const isOwner = match.refereeId === refereeId;
+  if (!match.refereeId) {
+    throw new MatchError("Claim the match before filing the report.", 409, "NOT_ASSIGNED");
+  }
   if (!isOwner && !actor.isAdmin) {
     throw new MatchError("Only the assigned referee can file this report.", 403, "NOT_YOUR_MATCH");
   }
   if (match.report) {
     throw new MatchError("A report has already been filed for this match.", 409, "REPORT_EXISTS");
   }
-  if (match.status !== "LOCKED") {
-    throw new MatchError("Lock the match before submitting the game report.", 409, "NOT_LOCKED");
+  if (match.status !== "ASSIGNED") {
+    throw new MatchError(
+      `A match in state ${match.status} cannot accept a report.`,
+      409,
+      "INVALID_STATE",
+    );
   }
 
-  const events = input.events ?? [];
+  const cards = input.cards ?? [];
   const validTeamIds = new Set([match.homeTeamId, match.awayTeamId]);
-  const rosterByTeam = new Map<string, Set<string>>([
-    [match.homeTeamId, new Set(match.homeTeam.players.map((p) => p.id))],
-    [match.awayTeamId, new Set(match.awayTeam.players.map((p) => p.id))],
-  ]);
-
-  for (const event of events) {
-    if (!validTeamIds.has(event.teamId)) {
+  for (const card of cards) {
+    if (!validTeamIds.has(card.teamId)) {
       throw new MatchError(
-        "An event references a team that is not playing in this match.",
-        400,
-        "INVALID_STATE",
-      );
-    }
-    if (event.playerId && !rosterByTeam.get(event.teamId)?.has(event.playerId)) {
-      throw new MatchError(
-        "An event references a player who is not on that team's roster.",
+        "A card references a team that is not playing in this match.",
         400,
         "INVALID_STATE",
       );
@@ -407,17 +272,6 @@ export async function submitGameReport(
 
   const homeForfeit = Boolean(input.homeForfeit);
   const awayForfeit = Boolean(input.awayForfeit);
-
-  if (!homeForfeit && !awayForfeit) {
-    const tally = tallyGoalsFromEvents(events, match.homeTeamId, match.awayTeamId);
-    if (tally.home !== input.homeScore || tally.away !== input.awayScore) {
-      throw new MatchError(
-        `Score ${input.homeScore}-${input.awayScore} does not match the ${tally.home}-${tally.away} recorded in the goal events.`,
-        400,
-        "INVALID_STATE",
-      );
-    }
-  }
 
   const report = await db.gameReport.create({
     data: {
@@ -432,13 +286,16 @@ export async function submitGameReport(
       misconduct: input.misconduct ?? null,
       status: "SUBMITTED",
       submittedAt: new Date(),
-      events: {
-        create: events.map((event) => ({
-          type: event.type,
-          teamId: event.teamId,
-          playerId: event.playerId ?? null,
-          minute: event.minute,
-          note: event.note ?? null,
+      discipline: {
+        create: cards.map((card) => ({
+          seasonId: match.seasonId,
+          matchId,
+          type: card.type,
+          teamId: card.teamId,
+          playerName: card.playerName,
+          minute: card.minute ?? null,
+          note: card.note ?? null,
+          issuedBy: "REFEREE",
         })),
       },
     },
@@ -446,7 +303,7 @@ export async function submitGameReport(
   });
 
   const updated = await db.match.updateMany({
-    where: { id: matchId, status: "LOCKED", version: match.version },
+    where: { id: matchId, status: "ASSIGNED", version: match.version },
     data: {
       status: homeForfeit || awayForfeit ? "FORFEIT" : "REPORT_SUBMITTED",
       version: { increment: 1 },
@@ -464,7 +321,7 @@ export async function submitGameReport(
     metadata: {
       matchId,
       score: `${input.homeScore}-${input.awayScore}`,
-      events: events.length,
+      cards: cards.length,
       homeForfeit,
       awayForfeit,
     },
@@ -528,7 +385,7 @@ export async function disputeGameReport(
 
   await db.match.update({
     where: { id: matchId },
-    data: { status: "LOCKED", version: { increment: 1 } },
+    data: { status: "ASSIGNED", version: { increment: 1 } },
   });
 
   await writeAudit(db, {
@@ -652,7 +509,6 @@ export async function adminAssignReferee(
       refereeId,
       assignedAt: refereeId ? new Date() : null,
       status: refereeId ? (match.status === "SCHEDULED" ? "ASSIGNED" : match.status) : "SCHEDULED",
-      ...(refereeId ? {} : { lockedAt: null, lockedById: null, lockedByName: null }),
       version: { increment: 1 },
     },
   });
@@ -663,5 +519,91 @@ export async function adminAssignReferee(
     entity: "Match",
     entityId: matchId,
     metadata: { previousRefereeId: match.refereeId, refereeId, reason: params.reason ?? null },
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/* Discipline                                                                 */
+/* -------------------------------------------------------------------------- */
+
+export interface DisciplinaryInput {
+  seasonId: string;
+  teamId: string;
+  matchId?: string | null;
+  playerName: string;
+  type: string;
+  minute?: number | null;
+  note?: string | null;
+}
+
+/**
+ * A league-issued sanction recorded by an admin, outside any game report.
+ * Referee-filed cards arrive through `submitGameReport` instead.
+ */
+export async function addDisciplinaryAction(
+  db: DbClient,
+  params: { actor: ActorContext; input: DisciplinaryInput },
+): Promise<{ id: string }> {
+  const { actor, input } = params;
+  if (!actor.isAdmin) throw new MatchError("Admin only.", 403, "NOT_YOUR_MATCH");
+
+  const team = await db.team.findUnique({
+    where: { id: input.teamId },
+    select: { id: true, division: { select: { seasonId: true } } },
+  });
+  if (!team) throw new MatchError("Team not found.", 404, "NOT_FOUND");
+  if (team.division.seasonId !== input.seasonId) {
+    throw new MatchError("That team does not play in the selected season.", 400, "INVALID_STATE");
+  }
+
+  const created = await db.disciplinaryAction.create({
+    data: {
+      seasonId: input.seasonId,
+      teamId: input.teamId,
+      matchId: input.matchId ?? null,
+      playerName: input.playerName,
+      type: input.type,
+      minute: input.minute ?? null,
+      note: input.note ?? null,
+      issuedBy: "ADMIN",
+    },
+    select: { id: true },
+  });
+
+  await writeAudit(db, {
+    actor,
+    action: "discipline.create",
+    entity: "DisciplinaryAction",
+    entityId: created.id,
+    metadata: { ...input },
+  });
+
+  return created;
+}
+
+/** Rescind a sanction. Referee-filed cards can be removed too, with an audit trail. */
+export async function deleteDisciplinaryAction(
+  db: DbClient,
+  params: { id: string; actor: ActorContext },
+): Promise<void> {
+  const { id, actor } = params;
+  if (!actor.isAdmin) throw new MatchError("Admin only.", 403, "NOT_YOUR_MATCH");
+
+  const existing = await db.disciplinaryAction.findUnique({ where: { id } });
+  if (!existing) throw new MatchError("Disciplinary record not found.", 404, "NOT_FOUND");
+
+  await db.disciplinaryAction.delete({ where: { id } });
+
+  await writeAudit(db, {
+    actor,
+    action: "discipline.delete",
+    entity: "DisciplinaryAction",
+    entityId: id,
+    metadata: {
+      teamId: existing.teamId,
+      playerName: existing.playerName,
+      type: existing.type,
+      issuedBy: existing.issuedBy,
+    },
   });
 }

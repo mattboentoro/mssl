@@ -39,6 +39,7 @@ model Season {
   divisions     Division[]
   matches       Match[]
   announcements Announcement[]
+  discipline    DisciplinaryAction[]
 }
 
 /// A competitive tier inside a season, e.g. "Division 1".
@@ -72,32 +73,13 @@ model Team {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  division    Division    @relation(fields: [divisionId], references: [id], onDelete: Cascade)
-  players     Player[]
-  homeMatches Match[]     @relation("HomeTeam")
-  awayMatches Match[]     @relation("AwayTeam")
-  gameEvents  GameEvent[]
+  division    Division             @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+  homeMatches Match[]              @relation("HomeTeam")
+  awayMatches Match[]              @relation("AwayTeam")
+  discipline  DisciplinaryAction[]
 
   @@unique([divisionId, slug])
   @@index([divisionId])
-}
-
-model Player {
-  id           String   @id @default(cuid())
-  teamId       String
-  firstName    String
-  lastName     String
-  jerseyNumber Int?
-  position     String?
-  email        String?
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  team   Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  events GameEvent[]
-
-  @@index([teamId])
 }
 
 model Venue {
@@ -135,34 +117,35 @@ model Referee {
 /// A fixture. `status` is one of the MatchStatus values in `src/lib/enums.ts`.
 /// `version` is an optimistic-concurrency counter used to make referee
 /// self-assignment race safe.
+///
+/// There is no separate "lock" step: claiming a fixture IS the lock. Once
+/// `refereeId` is set the fixture is frozen to everyone but that referee (who
+/// may release it until they file a report) and league admins.
 model Match {
-  id           String    @id @default(cuid())
-  seasonId     String
-  divisionId   String
-  homeTeamId   String
-  awayTeamId   String
-  venueId      String?
-  kickoffAt    DateTime
-  matchweek    Int
-  status       String    @default("SCHEDULED")
-  refereeId    String?
-  assignedAt   DateTime?
-  lockedAt     DateTime?
-  /// Actor id of whoever locked the match (referee id or admin user id).
-  lockedById   String?
-  lockedByName String?
-  version      Int       @default(0)
-  notes        String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id         String    @id @default(cuid())
+  seasonId   String
+  divisionId String
+  homeTeamId String
+  awayTeamId String
+  venueId    String?
+  kickoffAt  DateTime
+  matchweek  Int
+  status     String    @default("SCHEDULED")
+  refereeId  String?
+  assignedAt DateTime?
+  version    Int       @default(0)
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
-  season   Season      @relation(fields: [seasonId], references: [id], onDelete: Cascade)
-  division Division    @relation(fields: [divisionId], references: [id], onDelete: Cascade)
-  homeTeam Team        @relation("HomeTeam", fields: [homeTeamId], references: [id], onDelete: Cascade)
-  awayTeam Team        @relation("AwayTeam", fields: [awayTeamId], references: [id], onDelete: Cascade)
-  venue    Venue?      @relation(fields: [venueId], references: [id], onDelete: SetNull)
-  referee  Referee?    @relation(fields: [refereeId], references: [id], onDelete: SetNull)
-  report   GameReport?
+  season     Season               @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  division   Division             @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+  homeTeam   Team                 @relation("HomeTeam", fields: [homeTeamId], references: [id], onDelete: Cascade)
+  awayTeam   Team                 @relation("AwayTeam", fields: [awayTeamId], references: [id], onDelete: Cascade)
+  venue      Venue?               @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  referee    Referee?             @relation(fields: [refereeId], references: [id], onDelete: SetNull)
+  report     GameReport?
+  discipline DisciplinaryAction[]
 
   @@index([seasonId])
   @@index([divisionId])
@@ -172,6 +155,9 @@ model Match {
 }
 
 /// The referee's official record of a match. One per match.
+///
+/// Goalscorers are deliberately NOT tracked: the referee records the final
+/// score and any disciplinary action, nothing else.
 model GameReport {
   id             String    @id @default(cuid())
   matchId        String    @unique
@@ -193,33 +179,50 @@ model GameReport {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  match   Match       @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  referee Referee     @relation(fields: [refereeId], references: [id], onDelete: Cascade)
-  events  GameEvent[]
+  match      Match                @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  referee    Referee              @relation(fields: [refereeId], references: [id], onDelete: Cascade)
+  discipline DisciplinaryAction[]
 
   @@index([refereeId])
   @@index([status])
 }
 
-/// A discrete incident inside a game report (goal, card, substitution).
-model GameEvent {
+/// A card or league sanction charged to a team.
+///
+/// Two sources feed this table:
+///   * REFEREE — filed as part of a game report, so `gameReportId` and
+///     `matchId` are both set.
+///   * ADMIN   — a league-issued sanction added in Game Administration, which
+///     may not relate to any single fixture, so both are null.
+///
+/// `playerName` is free text. The league does not maintain squad lists, so
+/// there is no player record to point at.
+model DisciplinaryAction {
   id           String   @id @default(cuid())
-  gameReportId String
-  /// One of GameEventType: GOAL | OWN_GOAL | PENALTY_GOAL | YELLOW | RED | SUBSTITUTION
-  type         String
+  seasonId     String
   teamId       String
-  playerId     String?
-  minute       Int
+  gameReportId String?
+  matchId      String?
+  playerName   String
+  /// One of CardType: YELLOW | RED
+  type         String
+  /// Minute of the match, when it came from a game report.
+  minute       Int?
   note         String?
+  /// One of DisciplinarySource: REFEREE | ADMIN
+  issuedBy     String   @default("REFEREE")
   createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  gameReport GameReport @relation(fields: [gameReportId], references: [id], onDelete: Cascade)
-  team       Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  player     Player?    @relation(fields: [playerId], references: [id], onDelete: SetNull)
+  season     Season      @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  team       Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  gameReport GameReport? @relation(fields: [gameReportId], references: [id], onDelete: Cascade)
+  match      Match?      @relation(fields: [matchId], references: [id], onDelete: SetNull)
 
-  @@index([gameReportId])
+  @@index([seasonId])
   @@index([teamId])
-  @@index([playerId])
+  @@index([gameReportId])
+  @@index([matchId])
 }
 
 model Announcement {

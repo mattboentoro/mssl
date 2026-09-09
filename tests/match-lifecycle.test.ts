@@ -5,13 +5,11 @@ import {
   MatchError,
   adminAssignReferee,
   assignRefereeToMatch,
+  addDisciplinaryAction,
   confirmGameReport,
   disputeGameReport,
-  forceUnlockMatch,
-  lockMatch,
   overrideGameReport,
   submitGameReport,
-  tallyGoalsFromEvents,
   unassignReferee,
   type ActorContext,
 } from "@/lib/matches";
@@ -23,8 +21,6 @@ interface Fixture {
   matchId: string;
   homeTeamId: string;
   awayTeamId: string;
-  homePlayerId: string;
-  awayPlayerId: string;
   refereeA: string;
   refereeB: string;
   divisionId: string;
@@ -52,10 +48,9 @@ const adminActor: ActorContext = {
 async function resetDatabase() {
   // Order matters: children before parents.
   await prisma.auditLog.deleteMany();
-  await prisma.gameEvent.deleteMany();
+  await prisma.disciplinaryAction.deleteMany();
   await prisma.gameReport.deleteMany();
   await prisma.match.deleteMany();
-  await prisma.player.deleteMany();
   await prisma.team.deleteMany();
   await prisma.division.deleteMany();
   await prisma.announcement.deleteMany();
@@ -89,14 +84,7 @@ async function createFixture(): Promise<Fixture> {
       name: "Home FC",
       slug: "home-fc",
       shortName: "HOM",
-      players: {
-        create: [
-          { firstName: "Hana", lastName: "Ito", jerseyNumber: 9 },
-          { firstName: "Hugo", lastName: "Diaz", jerseyNumber: 10 },
-        ],
-      },
     },
-    include: { players: true },
   });
 
   const away = await prisma.team.create({
@@ -105,14 +93,7 @@ async function createFixture(): Promise<Fixture> {
       name: "Away United",
       slug: "away-united",
       shortName: "AWY",
-      players: {
-        create: [
-          { firstName: "Amara", lastName: "Cole", jerseyNumber: 7 },
-          { firstName: "Andre", lastName: "Lopez", jerseyNumber: 11 },
-        ],
-      },
     },
-    include: { players: true },
   });
 
   const [refA, refB] = await Promise.all([
@@ -137,8 +118,6 @@ async function createFixture(): Promise<Fixture> {
     matchId: match.id,
     homeTeamId: home.id,
     awayTeamId: away.id,
-    homePlayerId: home.players[0].id,
-    awayPlayerId: away.players[0].id,
     refereeA: refA.id,
     refereeB: refB.id,
     divisionId: division.id,
@@ -146,11 +125,10 @@ async function createFixture(): Promise<Fixture> {
   };
 }
 
-/** Drive a match all the way to LOCKED so report tests can start there. */
-async function lockedMatch(fx: Fixture, refereeId = fx.refereeA) {
+/** Claim the match for a referee so report tests can start there. */
+async function claimedMatch(fx: Fixture, refereeId = fx.refereeA) {
   const actor = actorFor(refereeId, "Riley Whistle");
   await assignRefereeToMatch(prisma, { matchId: fx.matchId, refereeId, actor });
-  await lockMatch(prisma, { matchId: fx.matchId, actor });
   return actor;
 }
 
@@ -332,17 +310,23 @@ describe("unassignReferee", () => {
     ).rejects.toMatchObject({ status: 403, code: "NOT_YOUR_MATCH" });
   });
 
-  it("blocks the referee once the match is locked", async () => {
-    const actor = await lockedMatch(fx);
+  it("blocks the referee once a report has been filed", async () => {
+    const actor = await claimedMatch(fx);
+    await submitGameReport(prisma, {
+      matchId: fx.matchId,
+      refereeId: fx.refereeA,
+      actor,
+      input: { homeScore: 1, awayScore: 0 },
+    });
 
     await expect(unassignReferee(prisma, { matchId: fx.matchId, actor })).rejects.toMatchObject({
       status: 409,
-      code: "MATCH_LOCKED",
+      code: "INVALID_STATE",
     });
   });
 
-  it("still allows an admin to reverse a locked match", async () => {
-    await lockedMatch(fx);
+  it("still allows an admin to reverse a claimed match", async () => {
+    await claimedMatch(fx);
     await unassignReferee(prisma, {
       matchId: fx.matchId,
       actor: adminActor,
@@ -351,143 +335,25 @@ describe("unassignReferee", () => {
 
     const match = await prisma.match.findUniqueOrThrow({ where: { id: fx.matchId } });
     expect(match.refereeId).toBeNull();
-    expect(match.lockedAt).toBeNull();
-    expect(
-      await prisma.auditLog.count({ where: { action: "match.force_unassign" } }),
-    ).toBe(1);
-  });
-});
-
-describe("lockMatch", () => {
-  it("locks a match owned by the caller", async () => {
-    const actor = actorFor(fx.refereeA, "Riley Whistle");
-    await assignRefereeToMatch(prisma, { matchId: fx.matchId, refereeId: fx.refereeA, actor });
-    const result = await lockMatch(prisma, { matchId: fx.matchId, actor });
-
-    expect(result.version).toBe(2);
-    const match = await prisma.match.findUniqueOrThrow({ where: { id: fx.matchId } });
-    expect(match.status).toBe("LOCKED");
-    expect(match.lockedAt).toBeInstanceOf(Date);
-    expect(match.lockedById).toBe(fx.refereeA);
-    expect(match.lockedByName).toBe("Riley Whistle");
-  });
-
-  it("refuses to lock an unassigned match", async () => {
-    await expect(
-      lockMatch(prisma, {
-        matchId: fx.matchId,
-        actor: actorFor(fx.refereeA, "Riley Whistle"),
-      }),
-    ).rejects.toMatchObject({ status: 409, code: "NOT_ASSIGNED" });
-  });
-
-  it("refuses to let a non-owner referee lock", async () => {
-    await assignRefereeToMatch(prisma, {
-      matchId: fx.matchId,
-      refereeId: fx.refereeA,
-      actor: actorFor(fx.refereeA, "Riley Whistle"),
-    });
-
-    await expect(
-      lockMatch(prisma, { matchId: fx.matchId, actor: actorFor(fx.refereeB, "Sam Sideline") }),
-    ).rejects.toMatchObject({ status: 403, code: "NOT_YOUR_MATCH" });
-  });
-
-  it("rejects a double lock", async () => {
-    const actor = await lockedMatch(fx);
-    await expect(lockMatch(prisma, { matchId: fx.matchId, actor })).rejects.toMatchObject({
-      status: 409,
-      code: "MATCH_LOCKED",
-    });
-  });
-
-  it("only lets one of two concurrent lock attempts succeed", async () => {
-    const actor = actorFor(fx.refereeA, "Riley Whistle");
-    await assignRefereeToMatch(prisma, { matchId: fx.matchId, refereeId: fx.refereeA, actor });
-
-    const results = await Promise.allSettled([
-      lockMatch(prisma, { matchId: fx.matchId, actor, expectedVersion: 1 }),
-      lockMatch(prisma, { matchId: fx.matchId, actor, expectedVersion: 1 }),
-    ]);
-
-    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
-    const match = await prisma.match.findUniqueOrThrow({ where: { id: fx.matchId } });
-    expect(match.version).toBe(2);
-  });
-
-  it("lets an admin lock on the referee's behalf", async () => {
-    await assignRefereeToMatch(prisma, {
-      matchId: fx.matchId,
-      refereeId: fx.refereeA,
-      actor: actorFor(fx.refereeA, "Riley Whistle"),
-    });
-    await lockMatch(prisma, { matchId: fx.matchId, actor: adminActor });
-
-    const match = await prisma.match.findUniqueOrThrow({ where: { id: fx.matchId } });
-    expect(match.status).toBe("LOCKED");
-  });
-});
-
-describe("forceUnlockMatch", () => {
-  it("is admin only", async () => {
-    const actor = await lockedMatch(fx);
-    await expect(
-      forceUnlockMatch(prisma, { matchId: fx.matchId, actor, reason: "oops" }),
-    ).rejects.toMatchObject({ status: 403 });
-  });
-
-  it("returns a locked match to ASSIGNED and audits the reason", async () => {
-    await lockedMatch(fx);
-    await forceUnlockMatch(prisma, {
-      matchId: fx.matchId,
-      actor: adminActor,
-      reason: "wrong kickoff time",
-    });
-
-    const match = await prisma.match.findUniqueOrThrow({ where: { id: fx.matchId } });
-    expect(match.status).toBe("ASSIGNED");
-    expect(match.lockedAt).toBeNull();
-
-    const audit = await prisma.auditLog.findFirstOrThrow({
-      where: { action: "match.force_unlock" },
-    });
-    expect(audit.metadata).toContain("wrong kickoff time");
-  });
-});
-
-describe("tallyGoalsFromEvents", () => {
-  it("credits own goals to the opposing team", () => {
-    const tally = tallyGoalsFromEvents(
-      [
-        { type: "GOAL", teamId: "home", minute: 10 },
-        { type: "PENALTY_GOAL", teamId: "home", minute: 40 },
-        { type: "OWN_GOAL", teamId: "home", minute: 55 },
-        { type: "YELLOW", teamId: "away", minute: 60 },
-      ],
-      "home",
-      "away",
-    );
-    expect(tally).toEqual({ home: 2, away: 1 });
+    expect(match.status).toBe("SCHEDULED");
+    expect(await prisma.auditLog.count({ where: { action: "match.force_unassign" } })).toBe(1);
   });
 });
 
 describe("submitGameReport", () => {
-  it("requires the match to be locked", async () => {
-    const actor = actorFor(fx.refereeA, "Riley Whistle");
-    await assignRefereeToMatch(prisma, { matchId: fx.matchId, refereeId: fx.refereeA, actor });
-
+  it("requires the match to be claimed first", async () => {
     await expect(
       submitGameReport(prisma, {
         matchId: fx.matchId,
         refereeId: fx.refereeA,
-        actor,
+        actor: actorFor(fx.refereeA, "Riley Whistle"),
         input: { homeScore: 0, awayScore: 0 },
       }),
-    ).rejects.toMatchObject({ status: 409, code: "NOT_LOCKED" });
+    ).rejects.toMatchObject({ status: 409, code: "NOT_ASSIGNED" });
   });
 
   it("rejects a report from a referee who does not own the match", async () => {
-    await lockedMatch(fx);
+    await claimedMatch(fx);
 
     await expect(
       submitGameReport(prisma, {
@@ -499,8 +365,8 @@ describe("submitGameReport", () => {
     ).rejects.toMatchObject({ status: 403, code: "NOT_YOUR_MATCH" });
   });
 
-  it("stores the report, its events, and moves the match to REPORT_SUBMITTED", async () => {
-    const actor = await lockedMatch(fx);
+  it("stores the report, its cards, and moves the match to REPORT_SUBMITTED", async () => {
+    const actor = await claimedMatch(fx);
 
     const { reportId } = await submitGameReport(prisma, {
       matchId: fx.matchId,
@@ -511,22 +377,22 @@ describe("submitGameReport", () => {
         awayScore: 1,
         notes: "Clean game.",
         incidentReport: null,
-        events: [
-          { type: "GOAL", teamId: fx.homeTeamId, playerId: fx.homePlayerId, minute: 12 },
-          { type: "PENALTY_GOAL", teamId: fx.homeTeamId, playerId: fx.homePlayerId, minute: 44 },
-          { type: "GOAL", teamId: fx.awayTeamId, playerId: fx.awayPlayerId, minute: 70 },
-          { type: "YELLOW", teamId: fx.awayTeamId, playerId: fx.awayPlayerId, minute: 75 },
+        cards: [
+          { type: "YELLOW", teamId: fx.awayTeamId, playerName: "Andre Lopez", minute: 75 },
+          { type: "RED", teamId: fx.homeTeamId, playerName: "Hana Ito", minute: 88 },
         ],
       },
     });
 
     const report = await prisma.gameReport.findUniqueOrThrow({
       where: { id: reportId },
-      include: { events: true },
+      include: { discipline: true },
     });
     expect(report.status).toBe("SUBMITTED");
     expect(report.homeScore).toBe(2);
-    expect(report.events).toHaveLength(4);
+    expect(report.discipline).toHaveLength(2);
+    expect(report.discipline.every((c) => c.issuedBy === "REFEREE")).toBe(true);
+    expect(report.discipline.map((c) => c.playerName)).toContain("Andre Lopez");
 
     const match = await prisma.match.findUniqueOrThrow({ where: { id: fx.matchId } });
     expect(match.status).toBe("REPORT_SUBMITTED");
@@ -534,28 +400,8 @@ describe("submitGameReport", () => {
     expect(await prisma.auditLog.count({ where: { action: "report.submit" } })).toBe(1);
   });
 
-  it("rejects a score that contradicts the goal events", async () => {
-    const actor = await lockedMatch(fx);
-
-    await expect(
-      submitGameReport(prisma, {
-        matchId: fx.matchId,
-        refereeId: fx.refereeA,
-        actor,
-        input: {
-          homeScore: 3,
-          awayScore: 0,
-          events: [{ type: "GOAL", teamId: fx.homeTeamId, playerId: fx.homePlayerId, minute: 12 }],
-        },
-      }),
-    ).rejects.toMatchObject({ status: 400, code: "INVALID_STATE" });
-
-    const match = await prisma.match.findUniqueOrThrow({ where: { id: fx.matchId } });
-    expect(match.status).toBe("LOCKED");
-  });
-
-  it("rejects an event for a team that is not playing", async () => {
-    const actor = await lockedMatch(fx);
+  it("rejects a card for a team that is not playing", async () => {
+    const actor = await claimedMatch(fx);
     const other = await prisma.team.create({
       data: {
         divisionId: fx.divisionId,
@@ -573,34 +419,34 @@ describe("submitGameReport", () => {
         input: {
           homeScore: 1,
           awayScore: 0,
-          events: [{ type: "GOAL", teamId: other.id, minute: 10 }],
+          cards: [{ type: "YELLOW", teamId: other.id, playerName: "Nobody Here", minute: 10 }],
         },
       }),
     ).rejects.toMatchObject({ status: 400 });
+
+    const match = await prisma.match.findUniqueOrThrow({ where: { id: fx.matchId } });
+    expect(match.status).toBe("ASSIGNED");
   });
 
-  it("rejects a scorer who is not on that team's roster", async () => {
-    const actor = await lockedMatch(fx);
+  it("accepts a score with no cards at all", async () => {
+    const actor = await claimedMatch(fx);
+    const { reportId } = await submitGameReport(prisma, {
+      matchId: fx.matchId,
+      refereeId: fx.refereeA,
+      actor,
+      input: { homeScore: 4, awayScore: 2 },
+    });
 
-    await expect(
-      submitGameReport(prisma, {
-        matchId: fx.matchId,
-        refereeId: fx.refereeA,
-        actor,
-        input: {
-          homeScore: 1,
-          awayScore: 0,
-          // Away player credited with a home goal.
-          events: [
-            { type: "GOAL", teamId: fx.homeTeamId, playerId: fx.awayPlayerId, minute: 10 },
-          ],
-        },
-      }),
-    ).rejects.toMatchObject({ status: 400 });
+    const report = await prisma.gameReport.findUniqueOrThrow({
+      where: { id: reportId },
+      include: { discipline: true },
+    });
+    expect(report.discipline).toHaveLength(0);
+    expect(report.awayScore).toBe(2);
   });
 
-  it("allows a forfeit to skip the score/event consistency check", async () => {
-    const actor = await lockedMatch(fx);
+  it("records a forfeit and marks the match FORFEIT", async () => {
+    const actor = await claimedMatch(fx);
     await submitGameReport(prisma, {
       matchId: fx.matchId,
       refereeId: fx.refereeA,
@@ -613,7 +459,7 @@ describe("submitGameReport", () => {
   });
 
   it("refuses a second report for the same match", async () => {
-    const actor = await lockedMatch(fx);
+    const actor = await claimedMatch(fx);
     await submitGameReport(prisma, {
       matchId: fx.matchId,
       refereeId: fx.refereeA,
@@ -634,7 +480,7 @@ describe("submitGameReport", () => {
 
 describe("admin review", () => {
   async function submitted() {
-    const actor = await lockedMatch(fx);
+    const actor = await claimedMatch(fx);
     await submitGameReport(prisma, {
       matchId: fx.matchId,
       refereeId: fx.refereeA,
@@ -642,7 +488,9 @@ describe("admin review", () => {
       input: {
         homeScore: 1,
         awayScore: 0,
-        events: [{ type: "GOAL", teamId: fx.homeTeamId, playerId: fx.homePlayerId, minute: 30 }],
+        cards: [
+          { type: "YELLOW", teamId: fx.homeTeamId, playerName: "Hugo Diaz", minute: 30 },
+        ],
       },
     });
   }
@@ -669,7 +517,7 @@ describe("admin review", () => {
     ).rejects.toMatchObject({ status: 403 });
   });
 
-  it("disputes a report and sends the match back to LOCKED", async () => {
+  it("disputes a report and sends the match back to the referee", async () => {
     await submitted();
     await disputeGameReport(prisma, {
       matchId: fx.matchId,
@@ -680,6 +528,9 @@ describe("admin review", () => {
     const report = await prisma.gameReport.findUniqueOrThrow({ where: { matchId: fx.matchId } });
     expect(report.status).toBe("DISPUTED");
     expect(report.disputeReason).toContain("home captain");
+
+    const match = await prisma.match.findUniqueOrThrow({ where: { id: fx.matchId } });
+    expect(match.status).toBe("ASSIGNED");
   });
 
   it("overrides a result with a mandatory audited reason", async () => {
@@ -722,9 +573,65 @@ describe("admin review", () => {
   });
 });
 
+describe("addDisciplinaryAction", () => {
+  it("lets an admin record a league sanction outside any fixture", async () => {
+    const { id } = await addDisciplinaryAction(prisma, {
+      actor: adminActor,
+      input: {
+        seasonId: fx.seasonId,
+        teamId: fx.homeTeamId,
+        playerName: "Hugo Diaz",
+        type: "RED",
+        note: "Retrospective ban after video review",
+      },
+    });
+
+    const record = await prisma.disciplinaryAction.findUniqueOrThrow({ where: { id } });
+    expect(record).toMatchObject({ issuedBy: "ADMIN", type: "RED", matchId: null });
+    expect(await prisma.auditLog.count({ where: { action: "discipline.create" } })).toBe(1);
+  });
+
+  it("refuses a non-admin", async () => {
+    await expect(
+      addDisciplinaryAction(prisma, {
+        actor: actorFor(fx.refereeA, "Riley Whistle"),
+        input: {
+          seasonId: fx.seasonId,
+          teamId: fx.homeTeamId,
+          playerName: "Hugo Diaz",
+          type: "YELLOW",
+        },
+      }),
+    ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("refuses a team that does not play in that season", async () => {
+    const otherSeason = await prisma.season.create({
+      data: {
+        name: "Other Season",
+        slug: "other-season",
+        startsOn: new Date("2027-01-01"),
+        endsOn: new Date("2027-06-01"),
+      },
+    });
+
+    await expect(
+      addDisciplinaryAction(prisma, {
+        actor: adminActor,
+        input: {
+          seasonId: otherSeason.id,
+          teamId: fx.homeTeamId,
+          playerName: "Hugo Diaz",
+          type: "YELLOW",
+        },
+      }),
+    ).rejects.toMatchObject({ status: 400, code: "INVALID_STATE" });
+  });
+});
+
 describe("end-to-end: report feeds the standings", () => {
   it("recomputes the table from a freshly submitted report", async () => {
-    const actor = await lockedMatch(fx);
+    const actor = await claimedMatch(fx);
     await submitGameReport(prisma, {
       matchId: fx.matchId,
       refereeId: fx.refereeA,
@@ -732,11 +639,7 @@ describe("end-to-end: report feeds the standings", () => {
       input: {
         homeScore: 2,
         awayScore: 0,
-        events: [
-          { type: "GOAL", teamId: fx.homeTeamId, playerId: fx.homePlayerId, minute: 10 },
-          { type: "GOAL", teamId: fx.homeTeamId, playerId: fx.homePlayerId, minute: 80 },
-          { type: "YELLOW", teamId: fx.awayTeamId, playerId: fx.awayPlayerId, minute: 85 },
-        ],
+        cards: [{ type: "YELLOW", teamId: fx.awayTeamId, playerName: "Amara Cole", minute: 85 }],
       },
     });
 
@@ -744,26 +647,28 @@ describe("end-to-end: report feeds the standings", () => {
       where: { divisionId: fx.divisionId },
       select: { id: true, name: true, divisionId: true },
     });
-    const matches = await prisma.match.findMany({
-      where: { divisionId: fx.divisionId },
-      select: {
-        id: true,
-        divisionId: true,
-        homeTeamId: true,
-        awayTeamId: true,
-        status: true,
-        kickoffAt: true,
-        report: {
-          select: {
-            status: true,
-            homeScore: true,
-            awayScore: true,
-            homeForfeit: true,
-            awayForfeit: true,
-            events: { select: { type: true, teamId: true } },
-          },
+    const selectMatches = {
+      id: true,
+      divisionId: true,
+      homeTeamId: true,
+      awayTeamId: true,
+      status: true,
+      kickoffAt: true,
+      report: {
+        select: {
+          status: true,
+          homeScore: true,
+          awayScore: true,
+          homeForfeit: true,
+          awayForfeit: true,
+          discipline: { select: { type: true, teamId: true } },
         },
       },
+    } as const;
+
+    const matches = await prisma.match.findMany({
+      where: { divisionId: fx.divisionId },
+      select: selectMatches,
     });
 
     const table = calculateStandings(teams, matches, { includeUnconfirmed: true });
@@ -780,24 +685,7 @@ describe("end-to-end: report feeds the standings", () => {
     await confirmGameReport(prisma, { matchId: fx.matchId, actor: adminActor });
     const confirmedMatches = await prisma.match.findMany({
       where: { divisionId: fx.divisionId },
-      select: {
-        id: true,
-        divisionId: true,
-        homeTeamId: true,
-        awayTeamId: true,
-        status: true,
-        kickoffAt: true,
-        report: {
-          select: {
-            status: true,
-            homeScore: true,
-            awayScore: true,
-            homeForfeit: true,
-            awayForfeit: true,
-            events: { select: { type: true, teamId: true } },
-          },
-        },
-      },
+      select: selectMatches,
     });
     const afterConfirm = calculateStandings(teams, confirmedMatches, {
       includeUnconfirmed: false,

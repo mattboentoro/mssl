@@ -6,15 +6,16 @@ import { writeAudit } from "@/lib/audit";
 import { actorFrom } from "@/lib/api";
 import { parseCsv } from "@/lib/csv";
 import { AuthzError, requireAdmin } from "@/lib/authz";
+import { addDisciplinaryAction, deleteDisciplinaryAction } from "@/lib/matches";
 import { prisma } from "@/lib/prisma";
 import {
   announcementSchema,
   csvMatchRowSchema,
+  disciplinaryActionSchema,
   divisionSchema,
   documentSchema,
   flattenZodError,
   matchCreateSchema,
-  playerSchema,
   seasonSchema,
   teamSchema,
   venueSchema,
@@ -220,51 +221,45 @@ export async function createTeamAction(_prev: ActionState, form: FormData): Prom
   );
 }
 
-export async function createPlayerAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+// ---------------------------------------------------------------------------
+// Discipline
+// ---------------------------------------------------------------------------
+
+/** Record a league-issued sanction that did not come from a game report. */
+export async function createDisciplinaryAction(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
   return run(
-    playerSchema,
+    disciplinaryActionSchema,
     {
+      seasonId: str(form, "seasonId"),
       teamId: str(form, "teamId"),
-      firstName: str(form, "firstName"),
-      lastName: str(form, "lastName"),
-      jerseyNumber: num(form, "jerseyNumber") ?? null,
-      position: optional(form, "position"),
-      email: str(form, "email"),
-      active: form.has("active") ? bool(form, "active") : true,
+      matchId: optional(form, "matchId") ?? null,
+      playerName: str(form, "playerName"),
+      type: str(form, "type"),
+      minute: num(form, "minute") ?? null,
+      note: optional(form, "note") ?? null,
     },
     async (data, actor) => {
-      const player = await prisma.player.create({ data });
-      await writeAudit(prisma, {
-        actor: actorFrom(actor),
-        action: "player.create",
-        entity: "Player",
-        entityId: player.id,
-        metadata: data,
-      });
+      await addDisciplinaryAction(prisma, { actor: actorFrom(actor), input: data });
       refreshAdmin();
-      return `${data.firstName} ${data.lastName} added.`;
+      return `${data.type === "RED" ? "Red" : "Yellow"} card recorded for ${data.playerName}.`;
     },
   );
 }
 
-export async function togglePlayerAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+export async function deleteDisciplinaryActionAction(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
   return run(
-    z.object({ playerId: z.string().min(1) }),
-    { playerId: str(form, "playerId") },
+    z.object({ id: z.string().min(1) }),
+    { id: str(form, "id") },
     async (data, actor) => {
-      const player = await prisma.player.findUniqueOrThrow({ where: { id: data.playerId } });
-      const updated = await prisma.player.update({
-        where: { id: data.playerId },
-        data: { active: !player.active },
-      });
-      await writeAudit(prisma, {
-        actor: actorFrom(actor),
-        action: updated.active ? "player.activate" : "player.deactivate",
-        entity: "Player",
-        entityId: updated.id,
-      });
+      await deleteDisciplinaryAction(prisma, { id: data.id, actor: actorFrom(actor) });
       refreshAdmin();
-      return `${updated.firstName} ${updated.lastName} is now ${updated.active ? "active" : "inactive"}.`;
+      return "Disciplinary record rescinded.";
     },
   );
 }

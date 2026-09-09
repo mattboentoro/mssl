@@ -26,14 +26,14 @@ const QUICK_LINKS = [
     emoji: "\uD83C\uDFC6",
     hint: "Live tables per division",
   },
-  { href: "/teams", label: "Teams", emoji: "\uD83D\uDC65", hint: "Rosters, results & stats" },
-  {
-    href: "/players/stats",
-    label: "Player stats",
-    emoji: "\u26BD",
-    hint: "Top scorers & discipline",
-  },
+  { href: "/teams", label: "Teams", emoji: "\uD83D\uDC65", hint: "Clubs, fixtures & results" },
   { href: "/rules", label: "Rules", emoji: "\uD83D\uDCD8", hint: "Laws, conduct & forms" },
+  {
+    href: "/contact",
+    label: "Contact",
+    emoji: "\u2709\uFE0F",
+    hint: "League officers & FAQ",
+  },
   {
     href: "/referee",
     label: "Referee control",

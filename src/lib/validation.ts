@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { DOCUMENT_CATEGORIES, GAME_EVENT_TYPES, MATCH_STATUSES } from "@/lib/enums";
+import { CARD_TYPES, DOCUMENT_CATEGORIES, MATCH_STATUSES } from "@/lib/enums";
 
 /** Shared Zod schemas. Every API route and server action validates with these. */
 
@@ -23,15 +23,15 @@ export const scoreSchema = z
   .min(0, "Score cannot be negative.")
   .max(99, "Score looks implausible.");
 
-export const gameEventSchema = z.object({
-  type: z.enum(GAME_EVENT_TYPES),
+/**
+ * A card inside a game report. The league keeps no squad lists, so the player
+ * is identified by free text exactly as the referee wrote it on the card.
+ */
+export const reportCardSchema = z.object({
+  type: z.enum(CARD_TYPES),
   teamId: z.string().min(1, "Pick a team."),
-  playerId: z
-    .string()
-    .optional()
-    .nullable()
-    .transform((v) => (v && v.length > 0 ? v : null)),
-  minute: minuteSchema,
+  playerName: trimmed(120).min(2, "Enter the player's name."),
+  minute: minuteSchema.nullable().optional(),
   note: optionalText(280).nullable().optional(),
 });
 
@@ -44,49 +44,36 @@ export const gameReportSchema = z
     notes: optionalText(4000).nullable().optional(),
     incidentReport: optionalText(4000).nullable().optional(),
     misconduct: optionalText(4000).nullable().optional(),
-    events: z.array(gameEventSchema).max(200).default([]),
+    cards: z.array(reportCardSchema).max(60).default([]),
   })
   .superRefine((value, ctx) => {
-    if (value.homeForfeit && value.awayForfeit) {
-      // Allowed (double forfeit) but the scoreline is then meaningless.
-      if (value.homeScore !== 0 || value.awayScore !== 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["homeScore"],
-          message: "A double forfeit must be recorded as 0-0.",
-        });
-      }
-      return;
-    }
-    if (value.homeForfeit || value.awayForfeit) return; // score comes from league rules
-
-    const tally = value.events.reduce(
-      (acc, event) => {
-        if (event.type !== "GOAL" && event.type !== "PENALTY_GOAL" && event.type !== "OWN_GOAL") {
-          return acc;
-        }
-        acc.total += 1;
-        return acc;
-      },
-      { total: 0 },
-    );
-
-    if (tally.total !== value.homeScore + value.awayScore) {
+    if (value.homeForfeit && value.awayForfeit && (value.homeScore !== 0 || value.awayScore !== 0)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["events"],
-        message: `You recorded ${value.homeScore + value.awayScore} goal(s) in the score but itemised ${tally.total}. Add a goal event for each one (the scorer may be left blank).`,
+        path: ["homeScore"],
+        message: "A double forfeit must be recorded as 0-0.",
       });
     }
   });
 
 export type GameReportPayload = z.infer<typeof gameReportSchema>;
 
-export const assignSchema = z.object({
-  expectedVersion: z.number().int().min(0).optional(),
+/** A league-issued sanction added by an admin outside any single fixture. */
+export const disciplinaryActionSchema = z.object({
+  seasonId: z.string().min(1, "Pick a season."),
+  teamId: z.string().min(1, "Pick a team."),
+  matchId: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((v) => (v && v.length > 0 ? v : null)),
+  playerName: trimmed(120).min(2, "Enter the player's name."),
+  type: z.enum(CARD_TYPES),
+  minute: minuteSchema.nullable().optional(),
+  note: optionalText(500).nullable().optional(),
 });
 
-export const lockSchema = z.object({
+export const assignSchema = z.object({
   expectedVersion: z.number().int().min(0).optional(),
 });
 
@@ -152,21 +139,6 @@ export const teamSchema = z.object({
     .optional()
     .or(z.literal(""))
     .transform((v) => v || undefined),
-});
-
-export const playerSchema = z.object({
-  teamId: z.string().min(1),
-  firstName: trimmed(60).min(1),
-  lastName: trimmed(60).min(1),
-  jerseyNumber: z.number().int().min(0).max(99).nullable().optional(),
-  position: optionalText(40).optional(),
-  email: z
-    .string()
-    .email()
-    .optional()
-    .or(z.literal(""))
-    .transform((v) => v || undefined),
-  active: z.boolean().default(true),
 });
 
 export const venueSchema = z.object({

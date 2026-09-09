@@ -7,7 +7,7 @@ import { ActionButton } from "@/components/match-actions";
 import { Alert, Badge, Card, MatchStatusBadge, PageHeader } from "@/components/ui";
 import { AuthzError, requireReferee } from "@/lib/authz";
 import { formatDateTime } from "@/lib/dates";
-import { GAME_EVENT_LABELS, type GameEventType } from "@/lib/enums";
+import { CARD_LABELS, type CardType } from "@/lib/enums";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -34,37 +34,14 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
       division: { select: { name: true } },
       venue: { select: { name: true, city: true } },
       referee: { select: { id: true, name: true } },
-      homeTeam: {
-        select: {
-          id: true,
-          name: true,
-          players: {
-            where: { active: true },
-            orderBy: [{ jerseyNumber: "asc" }, { lastName: "asc" }],
-            select: { id: true, firstName: true, lastName: true, jerseyNumber: true },
-          },
-        },
-      },
-      awayTeam: {
-        select: {
-          id: true,
-          name: true,
-          players: {
-            where: { active: true },
-            orderBy: [{ jerseyNumber: "asc" }, { lastName: "asc" }],
-            select: { id: true, firstName: true, lastName: true, jerseyNumber: true },
-          },
-        },
-      },
+      homeTeam: { select: { id: true, name: true } },
+      awayTeam: { select: { id: true, name: true } },
       report: {
         include: {
           referee: { select: { name: true } },
-          events: {
+          discipline: {
             orderBy: [{ minute: "asc" }],
-            include: {
-              player: { select: { firstName: true, lastName: true, jerseyNumber: true } },
-              team: { select: { name: true } },
-            },
+            include: { team: { select: { name: true } } },
           },
         },
       },
@@ -115,32 +92,17 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
           <ol className="mt-3 space-y-3 text-sm">
             <li className="flex items-start gap-3">
               <StepMarker done={Boolean(match.refereeId)} n={1} />
-              <div>
-                <p className="font-medium">Assigned</p>
-                <p className="text-muted text-xs">
-                  {match.referee ? `${match.referee.name} is the referee.` : "Not yet assigned."}
-                </p>
-              </div>
-            </li>
-            <li className="flex items-start gap-3">
-              <StepMarker done={Boolean(match.lockedAt)} n={2} />
               <div className="flex-1">
-                <p className="font-medium">Locked</p>
+                <p className="font-medium">Claimed</p>
                 <p className="text-muted text-xs">
-                  {match.lockedAt
-                    ? `Locked ${formatDateTime(match.lockedAt)}${
-                        match.lockedByName ? ` by ${match.lockedByName}` : ""
-                      }.`
-                    : "Locking freezes the fixture and rosters. Only an admin can undo it."}
+                  {match.referee
+                    ? `${match.referee.name} has the match${
+                        match.assignedAt ? `, claimed ${formatDateTime(match.assignedAt)}` : ""
+                      }. Nobody else can take it.`
+                    : "Not yet claimed."}
                 </p>
-                {!match.lockedAt && match.status === "ASSIGNED" ? (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <ActionButton
-                      url={`/api/matches/${match.id}/lock`}
-                      body={{ expectedVersion: match.version }}
-                      label="Lock match"
-                      confirm="Lock this match? After locking, only an admin can reverse it."
-                    />
+                {isOwner && !match.report && match.status === "ASSIGNED" ? (
+                  <div className="mt-2">
                     <ActionButton
                       url={`/api/matches/${match.id}/unassign`}
                       label="Release match"
@@ -152,7 +114,7 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
               </div>
             </li>
             <li className="flex items-start gap-3">
-              <StepMarker done={Boolean(match.report)} n={3} />
+              <StepMarker done={Boolean(match.report)} n={2} />
               <div>
                 <p className="font-medium">Game report filed</p>
                 <p className="text-muted text-xs">
@@ -160,7 +122,7 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
                     ? `Submitted ${
                         match.report.submittedAt ? formatDateTime(match.report.submittedAt) : ""
                       }. Standings update immediately.`
-                    : "Available once the match is locked."}
+                    : "Enter the final score and any cards once the match is played."}
                 </p>
               </div>
             </li>
@@ -197,27 +159,25 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
               This report is read-only to referees.
             </p>
 
-            {match.report.events.length > 0 ? (
+            {match.report.discipline.length > 0 ? (
               <ul className="divide-subtle mt-4 divide-y text-sm">
-                {match.report.events.map((event) => (
-                  <li key={event.id} className="flex items-center gap-3 py-2">
+                {match.report.discipline.map((card) => (
+                  <li key={card.id} className="flex items-center gap-3 py-2">
                     <span className="text-muted w-10 shrink-0 text-right font-mono text-xs">
-                      {event.minute}&rsquo;
+                      {card.minute === null ? "\u2014" : `${card.minute}\u2019`}
                     </span>
-                    <span className="w-28 shrink-0 text-xs font-semibold">
-                      {GAME_EVENT_LABELS[event.type as GameEventType] ?? event.type}
+                    <span className="w-24 shrink-0 text-xs font-semibold">
+                      {CARD_LABELS[card.type as CardType] ?? card.type}
                     </span>
                     <span className="min-w-0 flex-1 truncate">
-                      {event.player
-                        ? `${event.player.jerseyNumber ? `#${event.player.jerseyNumber} ` : ""}${event.player.firstName} ${event.player.lastName}`
-                        : "Unattributed"}
-                      <span className="text-muted"> ({event.team.name})</span>
+                      {card.playerName}
+                      <span className="text-muted"> ({card.team.name})</span>
                     </span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-muted mt-4 text-sm">No events itemised.</p>
+              <p className="text-muted mt-4 text-sm">No cards shown.</p>
             )}
 
             {match.report.notes || match.report.incidentReport || match.report.misconduct ? (
@@ -244,7 +204,7 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
             ) : null}
           </Card>
         </section>
-      ) : canAct && match.status === "LOCKED" ? (
+      ) : canAct && match.status === "ASSIGNED" ? (
         <section aria-labelledby="file-report" className="mt-8">
           <h2 id="file-report" className="mb-3 text-lg font-semibold">
             File the game report
@@ -259,8 +219,9 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
         </section>
       ) : canAct ? (
         <div className="mt-8">
-          <Alert tone="info" title="Lock the match to unlock the report form">
-            Rosters are frozen at lock time, so the report form only opens once the match is locked.
+          <Alert tone="info" title="Claim the match to open the report form">
+            Claiming a fixture assigns it to you and locks out every other referee. The report form
+            opens as soon as it is yours.
           </Alert>
         </div>
       ) : null}

@@ -1,4 +1,4 @@
-import type { GameEventType, GameReportStatus, MatchStatus } from "@/lib/enums";
+import type { CardType, GameReportStatus, MatchStatus } from "@/lib/enums";
 
 /**
  * Standings calculator.
@@ -8,9 +8,9 @@ import type { GameEventType, GameReportStatus, MatchStatus } from "@/lib/enums";
  * therefore *always* derived from game reports and can never be hand-edited.
  */
 
-export interface StandingsEventInput {
-  type: GameEventType | string;
-  /** Team the event is charged to (for cards) / credited to (for goals). */
+export interface StandingsCardInput {
+  type: CardType | string;
+  /** Team the card is charged to. */
   teamId: string;
 }
 
@@ -20,7 +20,8 @@ export interface StandingsReportInput {
   awayScore: number;
   homeForfeit: boolean;
   awayForfeit: boolean;
-  events?: StandingsEventInput[];
+  /** Cards filed on this report, used by the disciplinary tiebreaker. */
+  discipline?: StandingsCardInput[];
 }
 
 export interface StandingsMatchInput {
@@ -210,21 +211,20 @@ export function calculateStandings(
     const away = table.get(match.awayTeamId);
     if (!home || !away) continue; // team outside the requested set (e.g. other division)
 
-    // Cards count even when the result itself is disputed? No: a table row must
-    // be derivable from the same reports that produce the result, so cards are
-    // only counted for matches that count.
     const result = resolveResult(match, opts);
     if (!result) continue;
 
     const kickoff = toTime(match.kickoffAt);
 
-    for (const event of match.report?.events ?? []) {
-      const target = table.get(event.teamId);
+    // Cards are only counted for matches whose result counts, so that every
+    // column in a row is derivable from the same set of reports.
+    for (const card of match.report?.discipline ?? []) {
+      const target = table.get(card.teamId);
       if (!target) continue;
-      if (event.type === "YELLOW") {
+      if (card.type === "YELLOW") {
         target.yellowCards += 1;
         target.disciplinaryPoints += opts.disciplinary.yellow;
-      } else if (event.type === "RED") {
+      } else if (card.type === "RED") {
         target.redCards += 1;
         target.disciplinaryPoints += opts.disciplinary.red;
       }

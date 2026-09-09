@@ -124,7 +124,6 @@ export function Badge({
 const STATUS_TONES: Record<MatchStatus, BadgeTone> = {
   SCHEDULED: "neutral",
   ASSIGNED: "accent",
-  LOCKED: "warning",
   REPORT_SUBMITTED: "brand",
   CONFIRMED: "success",
   POSTPONED: "warning",

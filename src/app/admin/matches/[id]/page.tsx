@@ -7,7 +7,7 @@ import { ActionButton } from "@/components/match-actions";
 import { Alert, Badge, Card, MatchStatusBadge } from "@/components/ui";
 import { deleteMatchAction } from "@/app/admin/actions";
 import { formatDateTime } from "@/lib/dates";
-import { GAME_EVENT_LABELS, type GameEventType } from "@/lib/enums";
+import { CARD_LABELS, type CardType } from "@/lib/enums";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -31,12 +31,9 @@ export default async function AdminMatchDetailPage({
         report: {
           include: {
             referee: { select: { name: true } },
-            events: {
+            discipline: {
               orderBy: { minute: "asc" },
-              include: {
-                player: { select: { firstName: true, lastName: true } },
-                team: { select: { name: true } },
-              },
+              include: { team: { select: { name: true } } },
             },
           },
         },
@@ -77,7 +74,7 @@ export default async function AdminMatchDetailPage({
             </p>
             <p className="text-muted mt-1 text-xs">
               Referee: {match.referee?.name ?? "unassigned"}
-              {match.lockedAt ? ` \u00b7 locked ${formatDateTime(match.lockedAt)}` : ""}
+              {match.assignedAt ? ` \u00b7 claimed ${formatDateTime(match.assignedAt)}` : ""}
               {` \u00b7 v${match.version}`}
             </p>
           </div>
@@ -111,21 +108,19 @@ export default async function AdminMatchDetailPage({
                 : ""}
             </p>
 
-            {match.report.events.length > 0 ? (
+            {match.report.discipline.length > 0 ? (
               <ul className="divide-subtle mt-4 divide-y text-sm">
-                {match.report.events.map((event) => (
-                  <li key={event.id} className="flex items-center gap-3 py-1.5">
+                {match.report.discipline.map((card) => (
+                  <li key={card.id} className="flex items-center gap-3 py-1.5">
                     <span className="text-muted w-10 text-right font-mono text-xs">
-                      {event.minute}&rsquo;
+                      {card.minute === null ? "\u2014" : `${card.minute}\u2019`}
                     </span>
-                    <span className="w-28 text-xs font-semibold">
-                      {GAME_EVENT_LABELS[event.type as GameEventType] ?? event.type}
+                    <span className="w-24 text-xs font-semibold">
+                      {CARD_LABELS[card.type as CardType] ?? card.type}
                     </span>
                     <span className="min-w-0 flex-1 truncate">
-                      {event.player
-                        ? `${event.player.firstName} ${event.player.lastName}`
-                        : "Unattributed"}
-                      <span className="text-muted"> ({event.team.name})</span>
+                      {card.playerName}
+                      <span className="text-muted"> ({card.team.name})</span>
                     </span>
                   </li>
                 ))}
@@ -169,14 +164,13 @@ export default async function AdminMatchDetailPage({
         </section>
       ) : (
         <Alert tone="info" title="No report filed yet">
-          The assigned referee files the report after locking the match.
+          The assigned referee files the report once the match has been played.
         </Alert>
       )}
 
       <AdminMatchForms
         matchId={match.id}
         status={match.status}
-        lockedAt={match.lockedAt ? match.lockedAt.toISOString() : null}
         kickoffAt={match.kickoffAt.toISOString()}
         venueId={match.venueId}
         refereeId={match.refereeId}

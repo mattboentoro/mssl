@@ -26,7 +26,7 @@ export default async function AdminOverviewPage() {
     Promise.all([
       prisma.season.count(),
       prisma.team.count(),
-      prisma.player.count(),
+      prisma.disciplinaryAction.count(),
       prisma.match.count(),
       prisma.gameReport.count(),
       prisma.referee.count({ where: { active: true } }),
@@ -35,12 +35,12 @@ export default async function AdminOverviewPage() {
     prisma.match.count({ where: { refereeId: null, status: "SCHEDULED" } }),
   ]);
 
-  const [seasons, teams, players, matches, reports, referees] = counts;
+  const [seasons, teams, cards, matches, reports, referees] = counts;
 
   const stats = [
     { label: "Seasons", value: seasons },
     { label: "Teams", value: teams },
-    { label: "Players", value: players },
+    { label: "Cards", value: cards },
     { label: "Fixtures", value: matches },
     { label: "Reports filed", value: reports },
     { label: "Active referees", value: referees },

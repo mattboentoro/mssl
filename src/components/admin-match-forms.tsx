@@ -22,7 +22,6 @@ function toLocalInput(iso: string): string {
 export function AdminMatchForms({
   matchId,
   status,
-  lockedAt,
   kickoffAt,
   venueId,
   refereeId,
@@ -36,7 +35,6 @@ export function AdminMatchForms({
 }: {
   matchId: string;
   status: string;
-  lockedAt: string | null;
   kickoffAt: string;
   venueId: string | null;
   refereeId: string | null;
@@ -137,10 +135,10 @@ export function AdminMatchForms({
 
       {/* ------------------------------ Officials --------------------------- */}
       <Card className="p-5">
-        <h3 className="font-semibold">Officials &amp; lock</h3>
+        <h3 className="font-semibold">Officials</h3>
         <p className="text-muted mt-1 text-xs">
-          Force-assign a referee, clear the assignment, or reverse a lock the referee cannot undo
-          themselves.
+          Force-assign a referee, or clear the assignment to put the fixture back on the open list.
+          A referee cannot release a match once they have filed the report.
         </p>
         <form
           className="mt-4 space-y-3"
@@ -181,24 +179,6 @@ export function AdminMatchForms({
           </button>
           {feedback("referee")}
         </form>
-
-        {lockedAt ? (
-          <div className="border-subtle mt-5 border-t pt-4">
-            <button
-              type="button"
-              disabled={busy === "unlock"}
-              className={buttonClass("danger")}
-              onClick={() => {
-                const reason = window.prompt("Why are you force-unlocking this match?");
-                if (reason === null) return;
-                void send("unlock", `/api/matches/${matchId}/unlock`, { reason });
-              }}
-            >
-              {busy === "unlock" ? "Unlocking\u2026" : "Force unlock"}
-            </button>
-            {feedback("unlock")}
-          </div>
-        ) : null}
       </Card>
 
       {/* ------------------------------- Override --------------------------- */}

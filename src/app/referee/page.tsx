@@ -74,15 +74,15 @@ export default async function RefereePage({
     listMatches({ refereeId: referee.id }),
   ]);
 
-  const active = mine.filter((m) => m.status === "ASSIGNED" || m.status === "LOCKED");
-  const history = mine.filter((m) => m.status !== "ASSIGNED" && m.status !== "LOCKED");
+  const active = mine.filter((m) => m.status === "ASSIGNED");
+  const history = mine.filter((m) => m.status !== "ASSIGNED");
 
   return (
     <div>
       <PageHeader
         eyebrow={season.name}
         title="Referee Control"
-        description={`Signed in as ${referee.name}. Claim an open fixture, lock it at kickoff, then file the game report.`}
+        description={`Signed in as ${referee.name}. Claim an open fixture \u2014 that locks it to you \u2014 then file the game report.`}
       />
 
       {user.isDevBypass ? (
@@ -135,7 +135,7 @@ export default async function RefereePage({
                       href={`/referee/${match.id}`}
                       className="bg-brand text-brand-contrast rounded-lg px-4 py-2 text-sm font-semibold"
                     >
-                      {match.status === "LOCKED" ? "File report" : "Open"}
+                      {match.report ? "Open" : "File report"}
                     </Link>
                   </div>
                 </div>

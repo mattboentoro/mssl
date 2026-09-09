@@ -107,7 +107,10 @@ async function submit(
 async function main(): Promise<void> {
   console.log(`MSSL Match Control smoke test against ${BASE}\n`);
 
-  const division = await prisma.division.findFirstOrThrow({ include: { teams: { take: 2 } } });
+  const division = await prisma.division.findFirstOrThrow({
+    where: { season: { isActive: true } },
+    include: { teams: { take: 2 } },
+  });
   const stamp = Date.now();
 
   // csvMatchRowSchema caps matchweek at 60, so import into the first unused slot.
@@ -153,16 +156,18 @@ async function main(): Promise<void> {
   check("createTeamAction writes a team", team !== null);
 
   if (team) {
-    await submit("/admin/league", 'id="player-first"', {
+    await submit("/admin/discipline", 'id="disc-player"', {
+      seasonId: division.seasonId,
       teamId: team.id,
-      firstName: "Smoke",
-      lastName: `Tester ${stamp}`,
-      jerseyNumber: "7",
-      position: "Forward",
-      email: "",
+      playerName: `Smoke Tester ${stamp}`,
+      type: "RED",
+      minute: "",
+      matchId: "",
+      note: "Automated smoke sanction",
     });
-    const player = await prisma.player.findFirst({ where: { teamId: team.id } });
-    check("createPlayerAction writes a player", player !== null);
+    const card = await prisma.disciplinaryAction.findFirst({ where: { teamId: team.id } });
+    check("createDisciplinaryAction writes a league sanction", card !== null);
+    check("the sanction is stamped ADMIN", card?.issuedBy === "ADMIN", String(card?.issuedBy));
   }
 
   console.log("\nContent");
@@ -236,7 +241,7 @@ async function main(): Promise<void> {
 
   // ---- clean up -----------------------------------------------------------
   await prisma.match.deleteMany({ where: { matchweek: MW } });
-  if (team) await prisma.player.deleteMany({ where: { teamId: team.id } });
+  if (team) await prisma.disciplinaryAction.deleteMany({ where: { teamId: team.id } });
   if (team) await prisma.team.delete({ where: { id: team.id } });
   if (venue) await prisma.venue.delete({ where: { id: venue.id } });
   if (announcement) await prisma.announcement.delete({ where: { id: announcement.id } });

@@ -87,7 +87,9 @@ export default async function TeamsPage({
                         </span>
                         <div className="min-w-0">
                           <p className="truncate font-semibold">{team.name}</p>
-                          <p className="text-muted text-xs">{team._count.players} players</p>
+                          <p className="text-muted text-xs">
+                            {team.captainName ? `Captain: ${team.captainName}` : team.shortName}
+                          </p>
                         </div>
                       </div>
                     </Link>

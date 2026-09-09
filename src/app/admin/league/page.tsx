@@ -3,11 +3,9 @@ import { Card, Field, inputClass } from "@/components/ui";
 import {
   activateSeasonAction,
   createDivisionAction,
-  createPlayerAction,
   createSeasonAction,
   createTeamAction,
   createVenueAction,
-  togglePlayerAction,
 } from "@/app/admin/actions";
 import { formatDate } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
@@ -16,12 +14,7 @@ import { getActiveSeason } from "@/lib/queries";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "League setup" };
 
-export default async function AdminLeaguePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ team?: string }>;
-}) {
-  const params = await searchParams;
+export default async function AdminLeaguePage() {
   const active = await getActiveSeason();
 
   const [seasons, divisions, teams, venues] = await Promise.all([
@@ -34,18 +27,10 @@ export default async function AdminLeaguePage({
     prisma.team.findMany({
       where: active ? { division: { seasonId: active.id } } : undefined,
       orderBy: { name: "asc" },
-      include: { division: { select: { name: true } }, _count: { select: { players: true } } },
+      include: { division: { select: { name: true } } },
     }),
     prisma.venue.findMany({ orderBy: { name: "asc" } }),
   ]);
-
-  const selectedTeamId = params.team ?? teams[0]?.id;
-  const players = selectedTeamId
-    ? await prisma.player.findMany({
-        where: { teamId: selectedTeamId },
-        orderBy: [{ jerseyNumber: "asc" }, { lastName: "asc" }],
-      })
-    : [];
 
   return (
     <div className="space-y-10">
@@ -181,19 +166,21 @@ export default async function AdminLeaguePage({
         </h2>
         <div className="grid gap-4 lg:grid-cols-2">
           <Card className="divide-subtle max-h-96 divide-y overflow-y-auto">
-            {teams.map((team) => (
-              <a
-                key={team.id}
-                href={`/admin/league?team=${team.id}`}
-                className="hover:bg-surface-muted flex items-center justify-between p-3 text-sm"
-              >
-                <span>
-                  {team.crestEmoji} {team.name}
-                  <span className="text-muted block text-xs">{team.division.name}</span>
-                </span>
-                <span className="text-muted text-xs">{team._count.players} player(s)</span>
-              </a>
-            ))}
+            {teams.length === 0 ? (
+              <p className="text-muted p-4 text-sm">No teams yet.</p>
+            ) : (
+              teams.map((team) => (
+                <div key={team.id} className="flex items-center justify-between p-3 text-sm">
+                  <span>
+                    {team.crestEmoji} {team.name}
+                    <span className="text-muted block text-xs">{team.division.name}</span>
+                  </span>
+                  <a href={`/teams/${team.id}`} className="text-muted text-xs underline">
+                    View
+                  </a>
+                </div>
+              ))
+            )}
           </Card>
           <Card className="p-5">
             <h3 className="mb-3 font-semibold">New team</h3>
@@ -233,90 +220,6 @@ export default async function AdminLeaguePage({
               </Field>
               <div className="sm:col-span-2">
                 <SubmitButton>Create team</SubmitButton>
-              </div>
-            </ActionForm>
-          </Card>
-        </div>
-      </section>
-
-      {/* -------------------------------- Players --------------------------- */}
-      <section aria-labelledby="players">
-        <h2 id="players" className="mb-3 text-lg font-semibold">
-          Roster: {teams.find((t) => t.id === selectedTeamId)?.name ?? "pick a team above"}
-        </h2>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card className="divide-subtle max-h-96 divide-y overflow-y-auto">
-            {players.length === 0 ? (
-              <p className="text-muted p-4 text-sm">No players registered.</p>
-            ) : (
-              players.map((player) => (
-                <div
-                  key={player.id}
-                  className="flex items-center justify-between gap-2 p-3 text-sm"
-                >
-                  <span className={player.active ? "" : "text-muted line-through"}>
-                    {player.jerseyNumber !== null ? `#${player.jerseyNumber} ` : ""}
-                    {player.firstName} {player.lastName}
-                    {player.position ? (
-                      <span className="text-muted text-xs"> &middot; {player.position}</span>
-                    ) : null}
-                  </span>
-                  <ActionForm action={togglePlayerAction} resetOnSuccess={false}>
-                    <input type="hidden" name="playerId" value={player.id} />
-                    <SubmitButton variant="ghost">
-                      {player.active ? "Deactivate" : "Reactivate"}
-                    </SubmitButton>
-                  </ActionForm>
-                </div>
-              ))
-            )}
-          </Card>
-          <Card className="p-5">
-            <h3 className="mb-3 font-semibold">Add a player</h3>
-            <ActionForm action={createPlayerAction} className="grid gap-3 sm:grid-cols-2">
-              <Field label="Team" htmlFor="player-team">
-                <select
-                  id="player-team"
-                  name="teamId"
-                  defaultValue={selectedTeamId ?? ""}
-                  className={inputClass}
-                  required
-                >
-                  {teams.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Shirt number" htmlFor="player-number">
-                <input
-                  id="player-number"
-                  name="jerseyNumber"
-                  type="number"
-                  min={0}
-                  max={99}
-                  className={inputClass}
-                />
-                <FieldError name="jerseyNumber" />
-              </Field>
-              <Field label="First name" htmlFor="player-first">
-                <input id="player-first" name="firstName" className={inputClass} required />
-                <FieldError name="firstName" />
-              </Field>
-              <Field label="Last name" htmlFor="player-last">
-                <input id="player-last" name="lastName" className={inputClass} required />
-                <FieldError name="lastName" />
-              </Field>
-              <Field label="Position" htmlFor="player-position">
-                <input id="player-position" name="position" className={inputClass} />
-              </Field>
-              <Field label="E-mail" htmlFor="player-email">
-                <input id="player-email" name="email" type="email" className={inputClass} />
-                <FieldError name="email" />
-              </Field>
-              <div className="sm:col-span-2">
-                <SubmitButton>Add player</SubmitButton>
               </div>
             </ActionForm>
           </Card>

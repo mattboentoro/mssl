@@ -10,6 +10,7 @@ const TABS = [
   { href: "/admin", label: "Overview" },
   { href: "/admin/matches", label: "Matches" },
   { href: "/admin/league", label: "League setup" },
+  { href: "/admin/discipline", label: "Discipline" },
   { href: "/admin/import", label: "CSV import" },
   { href: "/admin/content", label: "Content" },
   { href: "/admin/audit", label: "Audit log" },

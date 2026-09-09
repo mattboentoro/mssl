@@ -6,9 +6,8 @@ import { PrismaClient } from "@prisma/client";
  *
  * Goal: `npm run seed && npm run dev` gives a fully browsable league with
  * finished matchweeks (so the standings table has content), a matchweek that is
- * mid-flight (assigned / locked / report submitted) and future unassigned
- * fixtures that a referee can claim to exercise the assign -> lock -> report
- * flow end to end.
+ * mid-flight (claimed / report submitted) and future unclaimed fixtures that a
+ * referee can claim to exercise the claim -> report flow end to end.
  */
 
 const prisma = new PrismaClient();
@@ -49,7 +48,6 @@ const LAST_NAMES = [
   "Jensen", "Kowalski", "Lindqvist", "Mbeki", "Nakamura", "Oyelaran", "Petrov", "Quintana",
   "Rossi", "Silva", "Tanaka", "Ustinov", "Vargas", "Weber", "Xiao", "Yilmaz", "Zhang",
 ];
-const POSITIONS = ["GK", "DF", "DF", "DF", "MF", "MF", "MF", "FW", "FW", "DF", "MF"];
 
 interface TeamSpec {
   name: string;
@@ -144,10 +142,9 @@ function roundRobin(count: number): [number, number][][] {
 async function reset() {
   // Order matters: children first (SQLite foreign keys are enforced by Prisma).
   await prisma.auditLog.deleteMany();
-  await prisma.gameEvent.deleteMany();
+  await prisma.disciplinaryAction.deleteMany();
   await prisma.gameReport.deleteMany();
   await prisma.match.deleteMany();
-  await prisma.player.deleteMany();
   await prisma.team.deleteMany();
   await prisma.division.deleteMany();
   await prisma.announcement.deleteMany();
@@ -157,7 +154,21 @@ async function reset() {
   await prisma.document.deleteMany();
 }
 
-type SeededTeam = { id: string; name: string; playerIds: string[] };
+/**
+ * Squads are not stored in the database — referees type player names as free
+ * text on the game report. The seed keeps a deterministic pool of plausible
+ * names per team so the sample disciplinary records look realistic.
+ */
+type SeededTeam = { id: string; name: string; squad: string[] };
+
+function makeSquad(seedText: string): string[] {
+  const base = [...seedText].reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  return Array.from({ length: 11 }, (_, i) => {
+    const first = FIRST_NAMES[(base + i * 7) % FIRST_NAMES.length];
+    const last = LAST_NAMES[(base + i * 5) % LAST_NAMES.length];
+    return `${first} ${last}`;
+  });
+}
 
 async function seedSeason(options: {
   name: string;
@@ -212,21 +223,7 @@ async function seedSeason(options: {
         },
       });
 
-      const playerIds: string[] = [];
-      for (let i = 0; i < 11; i += 1) {
-        const player = await prisma.player.create({
-          data: {
-            teamId: team.id,
-            firstName: FIRST_NAMES[(i * 7 + spec.sortOrder * 3) % FIRST_NAMES.length],
-            lastName: LAST_NAMES[(i * 5 + teamSpec.shortName.length) % LAST_NAMES.length],
-            jerseyNumber: i + 1,
-            position: POSITIONS[i],
-          },
-        });
-        playerIds.push(player.id);
-      }
-
-      teams.push({ id: team.id, name: team.name, playerIds });
+      teams.push({ id: team.id, name: team.name, squad: makeSquad(teamSpec.slug) });
     }
 
     const rounds = roundRobin(teams.length);
@@ -252,7 +249,7 @@ async function seedSeason(options: {
         const daysUntil = (kickoffAt.getTime() - now) / DAY;
 
         // Lifecycle stage for this fixture.
-        let stage: "played" | "submitted" | "locked" | "assigned" | "open" | "postponed";
+        let stage: "played" | "submitted" | "assigned" | "open" | "postponed";
         if (!isActive) {
           stage = "played";
         } else if (inPast && daysUntil < -3) {
@@ -260,7 +257,7 @@ async function seedSeason(options: {
         } else if (inPast) {
           stage = slotIndex % 3 === 0 ? "submitted" : "played";
         } else if (daysUntil < 4) {
-          stage = slotIndex % 3 === 0 ? "locked" : slotIndex % 3 === 1 ? "assigned" : "open";
+          stage = slotIndex % 3 === 2 ? "open" : "assigned";
         } else {
           stage = slotIndex % 7 === 0 ? "postponed" : "open";
         }
@@ -275,13 +272,11 @@ async function seedSeason(options: {
             ? "CONFIRMED"
             : stage === "submitted"
               ? "REPORT_SUBMITTED"
-              : stage === "locked"
-                ? "LOCKED"
-                : stage === "assigned"
-                  ? "ASSIGNED"
-                  : stage === "postponed"
-                    ? "POSTPONED"
-                    : "SCHEDULED";
+              : stage === "assigned"
+                ? "ASSIGNED"
+                : stage === "postponed"
+                  ? "POSTPONED"
+                  : "SCHEDULED";
 
         const match = await prisma.match.create({
           data: {
@@ -295,23 +290,15 @@ async function seedSeason(options: {
             status,
             refereeId,
             assignedAt: refereeId ? new Date(kickoffAt.getTime() - 3 * DAY) : null,
-            lockedAt:
-              stage === "locked" || stage === "submitted" || stage === "played"
-                ? new Date(kickoffAt.getTime() - 60 * 60 * 1000)
-                : null,
-            lockedById: stage === "open" || stage === "assigned" ? null : refereeId,
-            lockedByName:
-              stage === "open" || stage === "assigned"
-                ? null
-                : (REFEREES.find((_, idx) => refereeIds[idx] === refereeId)?.name ?? null),
             version: stage === "open" ? 0 : stage === "assigned" ? 1 : 2,
-            notes: stage === "postponed" ? "Postponed — field closed for maintenance." : null,
+            notes: stage === "postponed" ? "Postponed \u2014 field closed for maintenance." : null,
           },
         });
 
         if (stage === "played" || stage === "submitted") {
           await createReport({
             matchId: match.id,
+            seasonId: season.id,
             refereeId: refereeId as string,
             home,
             away,
@@ -328,13 +315,14 @@ async function seedSeason(options: {
 
 async function createReport(args: {
   matchId: string;
+  seasonId: string;
   refereeId: string;
   home: SeededTeam;
   away: SeededTeam;
   confirmed: boolean;
   kickoffAt: Date;
 }) {
-  const { matchId, refereeId, home, away, confirmed, kickoffAt } = args;
+  const { matchId, seasonId, refereeId, home, away, confirmed, kickoffAt } = args;
 
   // Roughly realistic low-scoring soccer results.
   const forfeit = chance(0.04);
@@ -358,54 +346,53 @@ async function createReport(args: {
     awayScore = intBetween(0, 3);
   }
 
-  const events: {
-    type: string;
+  const cards: {
+    seasonId: string;
+    matchId: string;
     teamId: string;
-    playerId: string | null;
+    playerName: string;
+    type: string;
     minute: number;
     note: string | null;
+    issuedBy: string;
   }[] = [];
 
   if (!homeForfeit && !awayForfeit) {
-    const addGoals = (team: SeededTeam, count: number) => {
-      for (let i = 0; i < count; i += 1) {
-        const isPenalty = chance(0.12);
-        events.push({
-          type: isPenalty ? "PENALTY_GOAL" : "GOAL",
+    for (const team of [home, away]) {
+      const yellows = chance(0.55) ? intBetween(1, 2) : 0;
+      for (let i = 0; i < yellows; i += 1) {
+        cards.push({
+          seasonId,
+          matchId,
           teamId: team.id,
-          playerId: pick(team.playerIds),
-          minute: intBetween(1, 90),
-          note: null,
+          playerName: pick(team.squad),
+          type: "YELLOW",
+          minute: intBetween(10, 90),
+          note: pick([
+            "Dissent",
+            "Reckless challenge",
+            "Delaying the restart",
+            "Persistent infringement",
+          ]),
+          issuedBy: "REFEREE",
         });
       }
-    };
-    addGoals(home, homeScore);
-    addGoals(away, awayScore);
-  }
-
-  for (const team of [home, away]) {
-    const yellows = chance(0.55) ? intBetween(1, 2) : 0;
-    for (let i = 0; i < yellows; i += 1) {
-      events.push({
-        type: "YELLOW",
-        teamId: team.id,
-        playerId: pick(team.playerIds),
-        minute: intBetween(10, 90),
-        note: pick(["Dissent", "Reckless challenge", "Delaying the restart", "Persistent infringement"]),
-      });
-    }
-    if (chance(0.08)) {
-      events.push({
-        type: "RED",
-        teamId: team.id,
-        playerId: pick(team.playerIds),
-        minute: intBetween(40, 90),
-        note: "Serious foul play",
-      });
+      if (chance(0.08)) {
+        cards.push({
+          seasonId,
+          matchId,
+          teamId: team.id,
+          playerName: pick(team.squad),
+          type: "RED",
+          minute: intBetween(40, 90),
+          note: "Serious foul play",
+          issuedBy: "REFEREE",
+        });
+      }
     }
   }
 
-  events.sort((a, b) => a.minute - b.minute);
+  cards.sort((a, b) => a.minute - b.minute);
 
   await prisma.gameReport.create({
     data: {
@@ -427,10 +414,10 @@ async function createReport(args: {
       incidentReport: chance(0.1)
         ? "Spectator asked to move behind the barrier in the 70th minute. Complied immediately."
         : null,
-      misconduct: events.some((e) => e.type === "RED")
+      misconduct: cards.some((c) => c.type === "RED")
         ? "Send-off reported to the disciplinary committee."
         : null,
-      events: { create: events },
+      discipline: { create: cards },
     },
   });
 }
@@ -441,14 +428,14 @@ async function seedContent(seasonId: string) {
       title: "Fall season kicks off",
       slug: "fall-season-kicks-off",
       summary: "Matchweek 1 is live across both divisions. Check the schedule for your kickoff time.",
-      body: "The new MSSL season is underway. Fixtures run on Tuesday and Thursday evenings across the Redmond and Marymoor fields.\n\nCaptains: please confirm your roster in the team page before your first fixture. Any player not listed on the roster cannot be recorded in a game report.",
+      body: "The new MSSL season is underway. Fixtures run on Tuesday and Thursday evenings across the Redmond and Marymoor fields.\n\nCaptains: bring your line-up to the pitch. Referees record cards against player names, so make sure your side introduces itself to the official before kickoff.",
       pinned: true,
     },
     {
-      title: "Referees needed — sign up through Referee Control",
+      title: "Referees needed \u2014 sign up through Referee Control",
       slug: "referees-needed",
       summary: "Members of the msslrefs distribution list can now self-assign to fixtures online.",
-      body: "Referee Control replaces the old sign-up spreadsheet. Sign in with your Microsoft account, open Referee Control, pick an open fixture and claim it.\n\nOnce you have claimed a match, lock it about an hour before kickoff — that freezes the fixture and rosters. After the final whistle, file the game report from the same screen. Standings update automatically from your report.",
+      body: "Referee Control replaces the old sign-up spreadsheet. Sign in with your Microsoft account, open Referee Control, pick an open fixture and claim it.\n\nClaiming a fixture assigns it to you exclusively \u2014 nobody else can take it. After the final whistle, file the game report from the same screen: final score, any cards, and your notes. Standings update automatically from your report.",
       pinned: true,
     },
     {
@@ -481,7 +468,7 @@ async function seedContent(seasonId: string) {
   const documents = [
     { title: "MSSL League Rules", category: "RULES", url: "/rules", description: "Full competition rules, laws of the game variations and match-day procedures.", fileType: "Page", sortOrder: 1 },
     { title: "Code of Conduct", category: "POLICY", url: "/rules#code-of-conduct", description: "Expected behaviour for players, captains, referees and spectators.", fileType: "Page", sortOrder: 2 },
-    { title: "Player Registration Form", category: "FORMS", url: "/contact", description: "Add a player to your roster mid-season (captain approval required).", fileType: "Form", sortOrder: 3 },
+    { title: "Player Registration Form", category: "FORMS", url: "/contact", description: "Register a new player with the league office (captain approval required).", fileType: "Form", sortOrder: 3 },
     { title: "Incident Report Guidance", category: "FORMS", url: "/rules#incidents", description: "What referees must include when reporting misconduct or injury.", fileType: "Page", sortOrder: 4 },
     { title: "Field Locations & Parking", category: "OTHER", url: "/contact#venues", description: "Directions and parking notes for every MSSL venue.", fileType: "Page", sortOrder: 5 },
     { title: "Disciplinary Points Table", category: "POLICY", url: "/rules#discipline", description: "Suspension thresholds and appeal process.", fileType: "Page", sortOrder: 6 },
@@ -537,13 +524,12 @@ async function main() {
     seasons: await prisma.season.count(),
     divisions: await prisma.division.count(),
     teams: await prisma.team.count(),
-    players: await prisma.player.count(),
     venues: await prisma.venue.count(),
     referees: await prisma.referee.count(),
     matches: await prisma.match.count(),
     openMatches: await prisma.match.count({ where: { refereeId: null, status: "SCHEDULED" } }),
     reports: await prisma.gameReport.count(),
-    events: await prisma.gameEvent.count(),
+    cards: await prisma.disciplinaryAction.count(),
   };
 
   console.log("\nSeed complete:");

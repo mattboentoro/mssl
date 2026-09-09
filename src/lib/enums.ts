@@ -11,7 +11,6 @@ import { z } from "zod";
 export const MATCH_STATUSES = [
   "SCHEDULED",
   "ASSIGNED",
-  "LOCKED",
   "REPORT_SUBMITTED",
   "CONFIRMED",
   "POSTPONED",
@@ -33,20 +32,23 @@ export const GameReportStatus = Object.fromEntries(GAME_REPORT_STATUSES.map((s) 
   [K in GameReportStatus]: K;
 };
 
-export const GAME_EVENT_TYPES = [
-  "GOAL",
-  "OWN_GOAL",
-  "PENALTY_GOAL",
-  "YELLOW",
-  "RED",
-  "SUBSTITUTION",
-] as const;
-export type GameEventType = (typeof GAME_EVENT_TYPES)[number];
-export const gameEventTypeSchema = z.enum(GAME_EVENT_TYPES);
+/**
+ * Cards are the only in-match incident the league records. Goalscorers are
+ * deliberately not tracked: referees file the final score and any disciplinary
+ * action, nothing more.
+ */
+export const CARD_TYPES = ["YELLOW", "RED"] as const;
+export type CardType = (typeof CARD_TYPES)[number];
+export const cardTypeSchema = z.enum(CARD_TYPES);
 
-export const GameEventType = Object.fromEntries(GAME_EVENT_TYPES.map((s) => [s, s])) as {
-  [K in GameEventType]: K;
+export const CardType = Object.fromEntries(CARD_TYPES.map((s) => [s, s])) as {
+  [K in CardType]: K;
 };
+
+/** Who issued a disciplinary action. */
+export const DISCIPLINARY_SOURCES = ["REFEREE", "ADMIN"] as const;
+export type DisciplinarySource = (typeof DISCIPLINARY_SOURCES)[number];
+export const disciplinarySourceSchema = z.enum(DISCIPLINARY_SOURCES);
 
 export const DOCUMENT_CATEGORIES = ["RULES", "FORMS", "POLICY", "OTHER"] as const;
 export type DocumentCategory = (typeof DOCUMENT_CATEGORIES)[number];
@@ -62,17 +64,9 @@ export const DOCUMENT_CATEGORY_LABELS: Record<DocumentCategory, string> = {
 export const ROLES = ["public", "viewer", "referee", "admin"] as const;
 export type Role = (typeof ROLES)[number];
 
-/** Event types that put the ball in the net for the *scoring* team. */
-export const SCORING_EVENT_TYPES: readonly GameEventType[] = ["GOAL", "PENALTY_GOAL"];
-
-/** Own goals count for the opposing team. */
-export const isScoringEvent = (type: string): boolean =>
-  SCORING_EVENT_TYPES.includes(type as GameEventType) || type === "OWN_GOAL";
-
 export const MATCH_STATUS_LABELS: Record<MatchStatus, string> = {
-  SCHEDULED: "Scheduled",
+  SCHEDULED: "Needs a referee",
   ASSIGNED: "Referee assigned",
-  LOCKED: "Locked",
   REPORT_SUBMITTED: "Report submitted",
   CONFIRMED: "Confirmed",
   POSTPONED: "Postponed",
@@ -80,13 +74,14 @@ export const MATCH_STATUS_LABELS: Record<MatchStatus, string> = {
   FORFEIT: "Forfeit",
 };
 
-export const GAME_EVENT_LABELS: Record<GameEventType, string> = {
-  GOAL: "Goal",
-  OWN_GOAL: "Own goal",
-  PENALTY_GOAL: "Penalty goal",
+export const CARD_LABELS: Record<CardType, string> = {
   YELLOW: "Yellow card",
   RED: "Red card",
-  SUBSTITUTION: "Substitution",
+};
+
+export const DISCIPLINARY_SOURCE_LABELS: Record<DisciplinarySource, string> = {
+  REFEREE: "Match report",
+  ADMIN: "League sanction",
 };
 
 /** Statuses whose fixture is finished and should never be self-assigned. */

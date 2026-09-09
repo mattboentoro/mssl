@@ -141,12 +141,8 @@ async function main(): Promise<void> {
     where: { refereeId: null, status: "SCHEDULED" },
     orderBy: { kickoffAt: "asc" },
     include: {
-      homeTeam: {
-        select: { id: true, name: true, players: { where: { active: true }, take: 1 } },
-      },
-      awayTeam: {
-        select: { id: true, name: true, players: { where: { active: true }, take: 1 } },
-      },
+      homeTeam: { select: { id: true, name: true } },
+      awayTeam: { select: { id: true, name: true } },
     },
   });
 
@@ -160,7 +156,7 @@ async function main(): Promise<void> {
   const beforeHome = await pointsFor(match.seasonId, match.homeTeamId);
   const beforeAway = await pointsFor(match.seasonId, match.awayTeamId);
 
-  console.log("\nSelf-assign");
+  console.log("\nSelf-assign (claiming is the lock)");
   const assign = await postJson(`/api/matches/${match.id}/assign`, {
     expectedVersion: match.version,
   });
@@ -171,59 +167,62 @@ async function main(): Promise<void> {
   await signIn("referee2");
   const steal = await postJson(`/api/matches/${match.id}/assign`, {});
   check("a second referee gets 409", steal.status === 409, `status ${steal.status}`);
-  const stealLock = await postJson(`/api/matches/${match.id}/lock`, {});
+  const stealReport = await postJson(`/api/matches/${match.id}/report`, {
+    homeScore: 1,
+    awayScore: 0,
+  });
   check(
-    "a second referee cannot lock the match",
-    stealLock.status === 403,
-    `status ${stealLock.status}`,
+    "a second referee cannot file the report",
+    stealReport.status === 403,
+    `status ${stealReport.status}`,
+  );
+  const stealRelease = await postJson(`/api/matches/${match.id}/unassign`, {});
+  check(
+    "a second referee cannot release the match",
+    stealRelease.status === 403,
+    `status ${stealRelease.status}`,
   );
   restore(refereeOneCookies);
 
-  console.log("\nLock");
-  const lock = await postJson(`/api/matches/${match.id}/lock`, {});
-  check("assigned referee can lock", lock.status === 200, snippet(lock.body));
-  const relock = await postJson(`/api/matches/${match.id}/unassign`, {});
-  check(
-    "referee cannot release after locking",
-    relock.status === 409 || relock.status === 403,
-    `status ${relock.status}`,
-  );
-
   console.log("\nGame report");
-  const homePlayer = match.homeTeam.players[0];
-  const awayPlayer = match.awayTeam.players[0];
   const payload = {
     homeScore: 2,
     awayScore: 1,
     homeForfeit: false,
     awayForfeit: false,
     notes: "Automated smoke-test report.",
-    events: [
-      { type: "GOAL", teamId: match.homeTeamId, playerId: homePlayer?.id, minute: 12 },
-      { type: "PENALTY_GOAL", teamId: match.homeTeamId, playerId: homePlayer?.id, minute: 58 },
-      { type: "GOAL", teamId: match.awayTeamId, playerId: awayPlayer?.id, minute: 77 },
-      { type: "YELLOW", teamId: match.awayTeamId, playerId: awayPlayer?.id, minute: 80 },
+    cards: [
+      {
+        type: "YELLOW",
+        teamId: match.awayTeamId,
+        playerName: "Smoke Tester",
+        minute: 80,
+        note: "Dissent",
+      },
+      { type: "RED", teamId: match.homeTeamId, playerName: "Test Subject", minute: 88 },
     ],
   };
 
-  const mismatched = await postJson(`/api/matches/${match.id}/report`, {
+  const negativeScore = await postJson(`/api/matches/${match.id}/report`, {
     ...payload,
-    homeScore: 5,
+    homeScore: -1,
   });
   check(
-    "score that disagrees with the goal events is rejected",
-    mismatched.status === 400 || mismatched.status === 422,
-    `status ${mismatched.status}`,
+    "a negative score is rejected",
+    negativeScore.status === 400 || negativeScore.status === 422,
+    `status ${negativeScore.status}`,
   );
 
-  const wrongRoster = await postJson(`/api/matches/${match.id}/report`, {
+  const wrongTeam = await postJson(`/api/matches/${match.id}/report`, {
     ...payload,
-    events: [{ type: "GOAL", teamId: match.homeTeamId, playerId: awayPlayer?.id, minute: 12 }],
+    cards: [
+      { type: "YELLOW", teamId: "not-a-team-in-this-match", playerName: "Ghost", minute: 12 },
+    ],
   });
   check(
-    "a player from the wrong team is rejected",
-    wrongRoster.status === 400 || wrongRoster.status === 422,
-    `status ${wrongRoster.status}`,
+    "a card for a team not in this fixture is rejected",
+    wrongTeam.status === 400 || wrongTeam.status === 422,
+    `status ${wrongTeam.status}`,
   );
 
   const submit = await postJson(`/api/matches/${match.id}/report`, payload);
@@ -235,6 +234,16 @@ async function main(): Promise<void> {
 
   const resubmit = await postJson(`/api/matches/${match.id}/report`, payload);
   check("report is immutable to the referee", resubmit.status === 409, `status ${resubmit.status}`);
+
+  const releaseAfterReport = await postJson(`/api/matches/${match.id}/unassign`, {});
+  check(
+    "referee cannot release once the report is filed",
+    releaseAfterReport.status === 409 || releaseAfterReport.status === 403,
+    `status ${releaseAfterReport.status}`,
+  );
+
+  const cardCount = await prisma.disciplinaryAction.count({ where: { matchId: match.id } });
+  check("the report's cards were stored", cardCount === 2, `${cardCount} card(s)`);
 
   console.log("\nStandings recomputed from the report");
   const afterHome = await pointsFor(match.seasonId, match.homeTeamId);
@@ -260,7 +269,7 @@ async function main(): Promise<void> {
   );
 
   console.log("\nPages still render");
-  for (const path of ["/", "/standings", "/schedule", "/players/stats", `/referee/${match.id}`]) {
+  for (const path of ["/", "/standings", "/schedule", "/teams", `/referee/${match.id}`]) {
     const res = await req(path);
     check(`${path} returns 200`, res.status === 200, `status ${res.status}`);
   }
@@ -273,6 +282,8 @@ async function main(): Promise<void> {
   check("admin can confirm the report", confirm.status === 200, snippet(confirm.body));
   const audit = await req("/admin/audit");
   check("audit log renders", audit.status === 200, `status ${audit.status}`);
+  const discipline = await req("/admin/discipline");
+  check("discipline register renders", discipline.status === 200, `status ${discipline.status}`);
 
   console.log(
     failures === 0 ? "\nAll smoke checks passed." : `\n${failures} smoke check(s) FAILED.`,

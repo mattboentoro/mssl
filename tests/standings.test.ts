@@ -24,7 +24,7 @@ interface MatchOptions {
   reportStatus?: string;
   homeForfeit?: boolean;
   awayForfeit?: boolean;
-  events?: { type: string; teamId: string }[];
+  discipline?: { type: string; teamId: string }[];
   /** Day offset used to order the form guide. */
   day?: number;
   noReport?: boolean;
@@ -54,7 +54,7 @@ function match(
           awayScore,
           homeForfeit: options.homeForfeit ?? false,
           awayForfeit: options.awayForfeit ?? false,
-          events: options.events ?? [],
+          discipline: options.discipline ?? [],
         },
   };
 }
@@ -268,7 +268,7 @@ describe("calculateStandings — tiebreakers", () => {
       [team("a", "Alpha"), team("b", "Bravo"), team("x", "Xray"), team("y", "Yankee")],
       [
         match("a", 2, 1, "b", {
-          events: [
+          discipline: [
             { type: "YELLOW", teamId: "a" },
             { type: "YELLOW", teamId: "a" },
           ],
@@ -293,7 +293,7 @@ describe("calculateStandings — tiebreakers", () => {
     const rows = calculateStandings(
       [team("a", "Alpha"), team("b", "Bravo"), team("x", "Xray"), team("y", "Yankee")],
       [
-        match("a", 2, 1, "x", { events: [{ type: "RED", teamId: "a" }] }),
+        match("a", 2, 1, "x", { discipline: [{ type: "RED", teamId: "a" }] }),
         match("y", 1, 0, "a"),
         match("b", 2, 1, "y"),
         match("x", 1, 0, "b"),
@@ -325,7 +325,7 @@ describe("calculateStandings — tiebreakers", () => {
       [team("a"), team("b")],
       [
         match("a", 0, 0, "b", {
-          events: [
+          discipline: [
             { type: "YELLOW", teamId: "a" },
             { type: "RED", teamId: "b" },
           ],
@@ -342,11 +342,10 @@ describe("calculateStandings — tiebreakers", () => {
       [team("a"), team("b")],
       [
         match("a", 0, 0, "b", {
-          events: [
+          discipline: [
             { type: "YELLOW", teamId: "a" },
             { type: "YELLOW", teamId: "a" },
             { type: "RED", teamId: "a" },
-            { type: "GOAL", teamId: "b" },
           ],
         }),
       ],
