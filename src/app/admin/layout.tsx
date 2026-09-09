@@ -1,8 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { forbidden, redirect } from "next/navigation";
 
-import { Alert } from "@/components/ui";
 import { AuthzError, requireAdmin } from "@/lib/authz";
 
 export const dynamic = "force-dynamic";
@@ -22,15 +21,9 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     user = await requireAdmin();
   } catch (error) {
     if (error instanceof AuthzError) {
+      // 401 -> send them to sign in; 403 -> answer with a real HTTP 403.
       if (error.status === 401) redirect("/signin?callbackUrl=/admin");
-      return (
-        <div className="mx-auto max-w-2xl py-10">
-          <Alert tone="danger" title="Administrator access required">
-            {error.message} Admin rights come from the configured admin group or the
-            <code className="mx-1 font-mono">MSSL_ADMIN_UPNS</code> allowlist.
-          </Alert>
-        </div>
-      );
+      forbidden();
     }
     throw error;
   }

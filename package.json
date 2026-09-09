@@ -16,6 +16,7 @@
     "test:watch": "vitest",
     "seed": "tsx prisma/seed.ts",
     "smoke": "tsx scripts/smoke-referee.ts",
+    "smoke:admin": "tsx scripts/smoke-admin.ts",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",

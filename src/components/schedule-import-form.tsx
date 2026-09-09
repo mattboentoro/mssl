@@ -38,7 +38,7 @@ export function ScheduleImportForm({ seasons }: { seasons: { id: string; name: s
           <Field
             label="CSV"
             htmlFor="import-csv"
-            hint="Columns: matchweek, kickoff (ISO 8601), division, home, away, venue (optional). Teams and divisions are matched by name, slug or short name."
+            hint="Columns: matchweek (1-60), kickoff (ISO 8601), division, home, away, venue (optional). Teams and divisions are matched by name, slug or short name."
           >
             <textarea
               id="import-csv"

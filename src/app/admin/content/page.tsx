@@ -45,45 +45,41 @@ export default async function AdminContentPage() {
           <Card className="p-5">
             <h3 className="mb-3 font-semibold">Publish an announcement</h3>
             <ActionForm action={createAnnouncementAction} className="space-y-3">
-              {(state) => (
-                <>
-                  <Field label="Title" htmlFor="ann-title">
-                    <input id="ann-title" name="title" className={inputClass} required />
-                    <FieldError state={state} name="title" />
-                  </Field>
-                  <Field label="Summary" htmlFor="ann-summary">
-                    <input id="ann-summary" name="summary" className={inputClass} required />
-                    <FieldError state={state} name="summary" />
-                  </Field>
-                  <Field
-                    label="Body"
-                    htmlFor="ann-body"
-                    hint="Plain text; blank lines separate paragraphs."
-                  >
-                    <textarea id="ann-body" name="body" rows={6} className={inputClass} required />
-                    <FieldError state={state} name="body" />
-                  </Field>
-                  <Field
-                    label="Season"
-                    htmlFor="ann-season"
-                    hint="Optional — leave blank for league-wide news."
-                  >
-                    <select id="ann-season" name="seasonId" defaultValue="" className={inputClass}>
-                      <option value="">League-wide</option>
-                      {seasons.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" name="pinned" className="h-4 w-4" />
-                    Pin to the home page
-                  </label>
-                  <SubmitButton>Publish</SubmitButton>
-                </>
-              )}
+              <Field label="Title" htmlFor="ann-title">
+                <input id="ann-title" name="title" className={inputClass} required />
+                <FieldError name="title" />
+              </Field>
+              <Field label="Summary" htmlFor="ann-summary">
+                <input id="ann-summary" name="summary" className={inputClass} required />
+                <FieldError name="summary" />
+              </Field>
+              <Field
+                label="Body"
+                htmlFor="ann-body"
+                hint="Plain text; blank lines separate paragraphs."
+              >
+                <textarea id="ann-body" name="body" rows={6} className={inputClass} required />
+                <FieldError name="body" />
+              </Field>
+              <Field
+                label="Season"
+                htmlFor="ann-season"
+                hint="Optional — leave blank for league-wide news."
+              >
+                <select id="ann-season" name="seasonId" defaultValue="" className={inputClass}>
+                  <option value="">League-wide</option>
+                  {seasons.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="pinned" className="h-4 w-4" />
+                Pin to the home page
+              </label>
+              <SubmitButton>Publish</SubmitButton>
             </ActionForm>
           </Card>
         </div>
@@ -116,51 +112,42 @@ export default async function AdminContentPage() {
           <Card className="p-5">
             <h3 className="mb-3 font-semibold">Add a document</h3>
             <ActionForm action={createDocumentAction} className="grid gap-3 sm:grid-cols-2">
-              {(state) => (
-                <>
-                  <Field label="Title" htmlFor="doc-title">
-                    <input id="doc-title" name="title" className={inputClass} required />
-                    <FieldError state={state} name="title" />
-                  </Field>
-                  <Field label="Category" htmlFor="doc-category">
-                    <select id="doc-category" name="category" className={inputClass}>
-                      {DOCUMENT_CATEGORIES.map((category) => (
-                        <option key={category} value={category}>
-                          {DOCUMENT_CATEGORY_LABELS[category]}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="URL" htmlFor="doc-url">
-                    <input id="doc-url" name="url" className={inputClass} required />
-                    <FieldError state={state} name="url" />
-                  </Field>
-                  <Field label="File type" htmlFor="doc-filetype">
-                    <input
-                      id="doc-filetype"
-                      name="fileType"
-                      placeholder="PDF"
-                      className={inputClass}
-                    />
-                  </Field>
-                  <Field label="Description" htmlFor="doc-description">
-                    <input id="doc-description" name="description" className={inputClass} />
-                  </Field>
-                  <Field label="Sort order" htmlFor="doc-sort">
-                    <input
-                      id="doc-sort"
-                      name="sortOrder"
-                      type="number"
-                      min={0}
-                      defaultValue={documents.length}
-                      className={inputClass}
-                    />
-                  </Field>
-                  <div className="sm:col-span-2">
-                    <SubmitButton>Add document</SubmitButton>
-                  </div>
-                </>
-              )}
+              <Field label="Title" htmlFor="doc-title">
+                <input id="doc-title" name="title" className={inputClass} required />
+                <FieldError name="title" />
+              </Field>
+              <Field label="Category" htmlFor="doc-category">
+                <select id="doc-category" name="category" className={inputClass}>
+                  {DOCUMENT_CATEGORIES.map((category) => (
+                    <option key={category} value={category}>
+                      {DOCUMENT_CATEGORY_LABELS[category]}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="URL" htmlFor="doc-url">
+                <input id="doc-url" name="url" className={inputClass} required />
+                <FieldError name="url" />
+              </Field>
+              <Field label="File type" htmlFor="doc-filetype">
+                <input id="doc-filetype" name="fileType" placeholder="PDF" className={inputClass} />
+              </Field>
+              <Field label="Description" htmlFor="doc-description">
+                <input id="doc-description" name="description" className={inputClass} />
+              </Field>
+              <Field label="Sort order" htmlFor="doc-sort">
+                <input
+                  id="doc-sort"
+                  name="sortOrder"
+                  type="number"
+                  min={0}
+                  defaultValue={documents.length}
+                  className={inputClass}
+                />
+              </Field>
+              <div className="sm:col-span-2">
+                <SubmitButton>Add document</SubmitButton>
+              </div>
             </ActionForm>
           </Card>
         </div>

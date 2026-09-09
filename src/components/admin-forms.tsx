@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, type ReactNode } from "react";
+import { createContext, useActionState, useContext, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 
 import { Alert, buttonClass, type ButtonVariant } from "@/components/ui";
@@ -10,6 +10,12 @@ export type ServerAction<S extends ActionState = ActionState> = (
   prev: S,
   form: FormData,
 ) => Promise<S>;
+
+/**
+ * Server components cannot pass functions across the RSC boundary, so the
+ * current action state is published through context instead of a render prop.
+ */
+const ActionStateContext = createContext<ActionState>({});
 
 export function SubmitButton({
   children,
@@ -48,8 +54,8 @@ export function SubmitButton({
 }
 
 /**
- * A form bound to a server action, rendering its `ok` / `error` / `fieldErrors`
- * result. Children receive the current state so inputs can show inline errors.
+ * A form bound to a server action, rendering its `ok` / `error` result and
+ * making `fieldErrors` available to any nested {@link FieldError}.
  */
 export function ActionForm({
   action,
@@ -58,34 +64,38 @@ export function ActionForm({
   resetOnSuccess = true,
 }: {
   action: ServerAction;
-  children: ReactNode | ((state: ActionState) => ReactNode);
+  children: ReactNode;
   className?: string;
   resetOnSuccess?: boolean;
 }) {
   const [state, formAction] = useActionState<ActionState, FormData>(action, {});
 
   return (
-    <form
-      action={formAction}
-      className={className}
-      key={resetOnSuccess && state.ok ? state.ok : undefined}
-    >
-      {state.error ? (
-        <Alert tone="danger" className="mb-3">
-          {state.error}
-        </Alert>
-      ) : null}
-      {state.ok ? (
-        <Alert tone="success" className="mb-3">
-          {state.ok}
-        </Alert>
-      ) : null}
-      {typeof children === "function" ? children(state) : children}
-    </form>
+    <ActionStateContext.Provider value={state}>
+      <form
+        action={formAction}
+        className={className}
+        key={resetOnSuccess && state.ok ? state.ok : undefined}
+      >
+        {state.error ? (
+          <Alert tone="danger" className="mb-3">
+            {state.error}
+          </Alert>
+        ) : null}
+        {state.ok ? (
+          <Alert tone="success" className="mb-3">
+            {state.ok}
+          </Alert>
+        ) : null}
+        {children}
+      </form>
+    </ActionStateContext.Provider>
   );
 }
 
-export function FieldError({ state, name }: { state: ActionState; name: string }) {
+/** Inline validation message for a single field, read from the enclosing form. */
+export function FieldError({ name }: { name: string }) {
+  const state = useContext(ActionStateContext);
   const message = state.fieldErrors?.[name];
   if (!message) return null;
   return (

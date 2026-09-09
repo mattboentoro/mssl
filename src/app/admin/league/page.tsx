@@ -82,45 +82,35 @@ export default async function AdminLeaguePage({
           <Card className="p-5">
             <h3 className="mb-3 font-semibold">New season</h3>
             <ActionForm action={createSeasonAction} className="grid gap-3 sm:grid-cols-2">
-              {(state) => (
-                <>
-                  <Field label="Name" htmlFor="season-name">
-                    <input id="season-name" name="name" className={inputClass} required />
-                    <FieldError state={state} name="name" />
-                  </Field>
-                  <Field label="Slug" htmlFor="season-slug" hint="Blank = derived from the name.">
-                    <input id="season-slug" name="slug" className={inputClass} />
-                    <FieldError state={state} name="slug" />
-                  </Field>
-                  <Field label="Starts" htmlFor="season-start">
-                    <input
-                      id="season-start"
-                      name="startsOn"
-                      type="date"
-                      className={inputClass}
-                      required
-                    />
-                    <FieldError state={state} name="startsOn" />
-                  </Field>
-                  <Field label="Ends" htmlFor="season-end">
-                    <input
-                      id="season-end"
-                      name="endsOn"
-                      type="date"
-                      className={inputClass}
-                      required
-                    />
-                    <FieldError state={state} name="endsOn" />
-                  </Field>
-                  <label className="flex items-center gap-2 text-sm sm:col-span-2">
-                    <input type="checkbox" name="isActive" className="h-4 w-4" />
-                    Make this the active season
-                  </label>
-                  <div className="sm:col-span-2">
-                    <SubmitButton>Create season</SubmitButton>
-                  </div>
-                </>
-              )}
+              <Field label="Name" htmlFor="season-name">
+                <input id="season-name" name="name" className={inputClass} required />
+                <FieldError name="name" />
+              </Field>
+              <Field label="Slug" htmlFor="season-slug" hint="Blank = derived from the name.">
+                <input id="season-slug" name="slug" className={inputClass} />
+                <FieldError name="slug" />
+              </Field>
+              <Field label="Starts" htmlFor="season-start">
+                <input
+                  id="season-start"
+                  name="startsOn"
+                  type="date"
+                  className={inputClass}
+                  required
+                />
+                <FieldError name="startsOn" />
+              </Field>
+              <Field label="Ends" htmlFor="season-end">
+                <input id="season-end" name="endsOn" type="date" className={inputClass} required />
+                <FieldError name="endsOn" />
+              </Field>
+              <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                <input type="checkbox" name="isActive" className="h-4 w-4" />
+                Make this the active season
+              </label>
+              <div className="sm:col-span-2">
+                <SubmitButton>Create season</SubmitButton>
+              </div>
             </ActionForm>
           </Card>
         </div>
@@ -147,42 +137,38 @@ export default async function AdminLeaguePage({
           <Card className="p-5">
             <h3 className="mb-3 font-semibold">New division</h3>
             <ActionForm action={createDivisionAction} className="grid gap-3 sm:grid-cols-2">
-              {(state) => (
-                <>
-                  <Field label="Season" htmlFor="div-season">
-                    <select
-                      id="div-season"
-                      name="seasonId"
-                      defaultValue={active?.id ?? ""}
-                      className={inputClass}
-                      required
-                    >
-                      {seasons.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Name" htmlFor="div-name">
-                    <input id="div-name" name="name" className={inputClass} required />
-                    <FieldError state={state} name="name" />
-                  </Field>
-                  <Field label="Sort order" htmlFor="div-sort">
-                    <input
-                      id="div-sort"
-                      name="sortOrder"
-                      type="number"
-                      min={0}
-                      defaultValue={divisions.length}
-                      className={inputClass}
-                    />
-                  </Field>
-                  <div className="flex items-end">
-                    <SubmitButton>Create division</SubmitButton>
-                  </div>
-                </>
-              )}
+              <Field label="Season" htmlFor="div-season">
+                <select
+                  id="div-season"
+                  name="seasonId"
+                  defaultValue={active?.id ?? ""}
+                  className={inputClass}
+                  required
+                >
+                  {seasons.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Name" htmlFor="div-name">
+                <input id="div-name" name="name" className={inputClass} required />
+                <FieldError name="name" />
+              </Field>
+              <Field label="Sort order" htmlFor="div-sort">
+                <input
+                  id="div-sort"
+                  name="sortOrder"
+                  type="number"
+                  min={0}
+                  defaultValue={divisions.length}
+                  className={inputClass}
+                />
+              </Field>
+              <div className="flex items-end">
+                <SubmitButton>Create division</SubmitButton>
+              </div>
             </ActionForm>
           </Card>
         </div>
@@ -212,51 +198,42 @@ export default async function AdminLeaguePage({
           <Card className="p-5">
             <h3 className="mb-3 font-semibold">New team</h3>
             <ActionForm action={createTeamAction} className="grid gap-3 sm:grid-cols-2">
-              {(state) => (
-                <>
-                  <Field label="Division" htmlFor="team-division">
-                    <select id="team-division" name="divisionId" className={inputClass} required>
-                      {divisions.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.name}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Name" htmlFor="team-name">
-                    <input id="team-name" name="name" className={inputClass} required />
-                    <FieldError state={state} name="name" />
-                  </Field>
-                  <Field label="Short name" htmlFor="team-short">
-                    <input id="team-short" name="shortName" maxLength={24} className={inputClass} />
-                    <FieldError state={state} name="shortName" />
-                  </Field>
-                  <Field label="Crest emoji" htmlFor="team-crest">
-                    <input
-                      id="team-crest"
-                      name="crestEmoji"
-                      maxLength={4}
-                      defaultValue={"\u26BD"}
-                      className={inputClass}
-                    />
-                  </Field>
-                  <Field label="Captain" htmlFor="team-captain">
-                    <input id="team-captain" name="captainName" className={inputClass} />
-                  </Field>
-                  <Field label="Contact e-mail" htmlFor="team-email">
-                    <input
-                      id="team-email"
-                      name="contactEmail"
-                      type="email"
-                      className={inputClass}
-                    />
-                    <FieldError state={state} name="contactEmail" />
-                  </Field>
-                  <div className="sm:col-span-2">
-                    <SubmitButton>Create team</SubmitButton>
-                  </div>
-                </>
-              )}
+              <Field label="Division" htmlFor="team-division">
+                <select id="team-division" name="divisionId" className={inputClass} required>
+                  {divisions.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Name" htmlFor="team-name">
+                <input id="team-name" name="name" className={inputClass} required />
+                <FieldError name="name" />
+              </Field>
+              <Field label="Short name" htmlFor="team-short">
+                <input id="team-short" name="shortName" maxLength={24} className={inputClass} />
+                <FieldError name="shortName" />
+              </Field>
+              <Field label="Crest emoji" htmlFor="team-crest">
+                <input
+                  id="team-crest"
+                  name="crestEmoji"
+                  maxLength={4}
+                  defaultValue={"\u26BD"}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Captain" htmlFor="team-captain">
+                <input id="team-captain" name="captainName" className={inputClass} />
+              </Field>
+              <Field label="Contact e-mail" htmlFor="team-email">
+                <input id="team-email" name="contactEmail" type="email" className={inputClass} />
+                <FieldError name="contactEmail" />
+              </Field>
+              <div className="sm:col-span-2">
+                <SubmitButton>Create team</SubmitButton>
+              </div>
             </ActionForm>
           </Card>
         </div>
@@ -297,54 +274,50 @@ export default async function AdminLeaguePage({
           <Card className="p-5">
             <h3 className="mb-3 font-semibold">Add a player</h3>
             <ActionForm action={createPlayerAction} className="grid gap-3 sm:grid-cols-2">
-              {(state) => (
-                <>
-                  <Field label="Team" htmlFor="player-team">
-                    <select
-                      id="player-team"
-                      name="teamId"
-                      defaultValue={selectedTeamId ?? ""}
-                      className={inputClass}
-                      required
-                    >
-                      {teams.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.name}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Shirt number" htmlFor="player-number">
-                    <input
-                      id="player-number"
-                      name="jerseyNumber"
-                      type="number"
-                      min={0}
-                      max={99}
-                      className={inputClass}
-                    />
-                    <FieldError state={state} name="jerseyNumber" />
-                  </Field>
-                  <Field label="First name" htmlFor="player-first">
-                    <input id="player-first" name="firstName" className={inputClass} required />
-                    <FieldError state={state} name="firstName" />
-                  </Field>
-                  <Field label="Last name" htmlFor="player-last">
-                    <input id="player-last" name="lastName" className={inputClass} required />
-                    <FieldError state={state} name="lastName" />
-                  </Field>
-                  <Field label="Position" htmlFor="player-position">
-                    <input id="player-position" name="position" className={inputClass} />
-                  </Field>
-                  <Field label="E-mail" htmlFor="player-email">
-                    <input id="player-email" name="email" type="email" className={inputClass} />
-                    <FieldError state={state} name="email" />
-                  </Field>
-                  <div className="sm:col-span-2">
-                    <SubmitButton>Add player</SubmitButton>
-                  </div>
-                </>
-              )}
+              <Field label="Team" htmlFor="player-team">
+                <select
+                  id="player-team"
+                  name="teamId"
+                  defaultValue={selectedTeamId ?? ""}
+                  className={inputClass}
+                  required
+                >
+                  {teams.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Shirt number" htmlFor="player-number">
+                <input
+                  id="player-number"
+                  name="jerseyNumber"
+                  type="number"
+                  min={0}
+                  max={99}
+                  className={inputClass}
+                />
+                <FieldError name="jerseyNumber" />
+              </Field>
+              <Field label="First name" htmlFor="player-first">
+                <input id="player-first" name="firstName" className={inputClass} required />
+                <FieldError name="firstName" />
+              </Field>
+              <Field label="Last name" htmlFor="player-last">
+                <input id="player-last" name="lastName" className={inputClass} required />
+                <FieldError name="lastName" />
+              </Field>
+              <Field label="Position" htmlFor="player-position">
+                <input id="player-position" name="position" className={inputClass} />
+              </Field>
+              <Field label="E-mail" htmlFor="player-email">
+                <input id="player-email" name="email" type="email" className={inputClass} />
+                <FieldError name="email" />
+              </Field>
+              <div className="sm:col-span-2">
+                <SubmitButton>Add player</SubmitButton>
+              </div>
             </ActionForm>
           </Card>
         </div>
@@ -369,26 +342,22 @@ export default async function AdminLeaguePage({
           <Card className="p-5">
             <h3 className="mb-3 font-semibold">New venue</h3>
             <ActionForm action={createVenueAction} className="grid gap-3 sm:grid-cols-2">
-              {(state) => (
-                <>
-                  <Field label="Name" htmlFor="venue-name">
-                    <input id="venue-name" name="name" className={inputClass} required />
-                    <FieldError state={state} name="name" />
-                  </Field>
-                  <Field label="City" htmlFor="venue-city">
-                    <input id="venue-city" name="city" className={inputClass} />
-                  </Field>
-                  <Field label="Address" htmlFor="venue-address">
-                    <input id="venue-address" name="address" className={inputClass} />
-                  </Field>
-                  <Field label="Map URL" htmlFor="venue-map">
-                    <input id="venue-map" name="mapUrl" className={inputClass} />
-                  </Field>
-                  <div className="sm:col-span-2">
-                    <SubmitButton>Create venue</SubmitButton>
-                  </div>
-                </>
-              )}
+              <Field label="Name" htmlFor="venue-name">
+                <input id="venue-name" name="name" className={inputClass} required />
+                <FieldError name="name" />
+              </Field>
+              <Field label="City" htmlFor="venue-city">
+                <input id="venue-city" name="city" className={inputClass} />
+              </Field>
+              <Field label="Address" htmlFor="venue-address">
+                <input id="venue-address" name="address" className={inputClass} />
+              </Field>
+              <Field label="Map URL" htmlFor="venue-map">
+                <input id="venue-map" name="mapUrl" className={inputClass} />
+              </Field>
+              <div className="sm:col-span-2">
+                <SubmitButton>Create venue</SubmitButton>
+              </div>
             </ActionForm>
           </Card>
         </div>

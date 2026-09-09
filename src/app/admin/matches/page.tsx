@@ -195,78 +195,74 @@ export default async function AdminMatchesPage({
         </h2>
         <Card className="p-5">
           <ActionForm action={createMatchAction} className="grid gap-4 sm:grid-cols-2">
-            {(state) => (
-              <>
-                <input type="hidden" name="seasonId" value={seasonId} />
-                <Field label="Division" htmlFor="new-division">
-                  <select id="new-division" name="divisionId" className={inputClass} required>
-                    {divisions.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </select>
-                  <FieldError state={state} name="divisionId" />
-                </Field>
-                <Field label="Matchweek" htmlFor="new-mw">
-                  <input
-                    id="new-mw"
-                    name="matchweek"
-                    type="number"
-                    min={1}
-                    max={60}
-                    defaultValue={1}
-                    className={inputClass}
-                    required
-                  />
-                  <FieldError state={state} name="matchweek" />
-                </Field>
-                <Field label="Home team" htmlFor="new-home">
-                  <select id="new-home" name="homeTeamId" className={inputClass} required>
-                    {teams.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
-                  <FieldError state={state} name="homeTeamId" />
-                </Field>
-                <Field label="Away team" htmlFor="new-away">
-                  <select id="new-away" name="awayTeamId" className={inputClass} required>
-                    {teams.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
-                  <FieldError state={state} name="awayTeamId" />
-                </Field>
-                <Field label="Kick-off" htmlFor="new-kickoff">
-                  <input
-                    id="new-kickoff"
-                    name="kickoffAt"
-                    type="datetime-local"
-                    defaultValue={toDateTimeInputValue(new Date())}
-                    className={inputClass}
-                    required
-                  />
-                  <FieldError state={state} name="kickoffAt" />
-                </Field>
-                <Field label="Venue" htmlFor="new-venue">
-                  <select id="new-venue" name="venueId" className={inputClass}>
-                    <option value="">To be confirmed</option>
-                    {venues.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <div className="sm:col-span-2">
-                  <SubmitButton>Create fixture</SubmitButton>
-                </div>
-              </>
-            )}
+            <input type="hidden" name="seasonId" value={seasonId} />
+            <Field label="Division" htmlFor="new-division">
+              <select id="new-division" name="divisionId" className={inputClass} required>
+                {divisions.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+              <FieldError name="divisionId" />
+            </Field>
+            <Field label="Matchweek" htmlFor="new-mw">
+              <input
+                id="new-mw"
+                name="matchweek"
+                type="number"
+                min={1}
+                max={60}
+                defaultValue={1}
+                className={inputClass}
+                required
+              />
+              <FieldError name="matchweek" />
+            </Field>
+            <Field label="Home team" htmlFor="new-home">
+              <select id="new-home" name="homeTeamId" className={inputClass} required>
+                {teams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              <FieldError name="homeTeamId" />
+            </Field>
+            <Field label="Away team" htmlFor="new-away">
+              <select id="new-away" name="awayTeamId" className={inputClass} required>
+                {teams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              <FieldError name="awayTeamId" />
+            </Field>
+            <Field label="Kick-off" htmlFor="new-kickoff">
+              <input
+                id="new-kickoff"
+                name="kickoffAt"
+                type="datetime-local"
+                defaultValue={toDateTimeInputValue(new Date())}
+                className={inputClass}
+                required
+              />
+              <FieldError name="kickoffAt" />
+            </Field>
+            <Field label="Venue" htmlFor="new-venue">
+              <select id="new-venue" name="venueId" className={inputClass}>
+                <option value="">To be confirmed</option>
+                {venues.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <div className="sm:col-span-2">
+              <SubmitButton>Create fixture</SubmitButton>
+            </div>
           </ActionForm>
         </Card>
       </section>

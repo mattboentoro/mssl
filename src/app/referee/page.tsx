@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { forbidden, redirect } from "next/navigation";
 
 import { ActionButton } from "@/components/match-actions";
 import { Alert, Card, EmptyState, PageHeader, inputClass, labelClass } from "@/components/ui";
@@ -30,8 +30,9 @@ export default async function RefereePage({
   try {
     context = await requireReferee();
   } catch (error) {
-    if (error instanceof AuthzError && error.status === 401) {
-      redirect("/signin?callbackUrl=/referee");
+    if (error instanceof AuthzError) {
+      if (error.status === 401) redirect("/signin?callbackUrl=/referee");
+      forbidden();
     }
     throw error;
   }

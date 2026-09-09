@@ -25,8 +25,9 @@ export default async function AdminImportPage() {
             duplicates and skipped.
           </li>
           <li>
-            Press <strong>Import valid rows</strong> to commit. Errored and duplicate rows are never
-            written, and the import is recorded in the audit log.
+            Press <strong>Import valid rows</strong> to commit. The import is all-or-nothing: if any
+            row still has an error nothing is written, so fix the file and re-run the dry run.
+            Duplicate rows are skipped, and the commit is recorded in the audit log.
           </li>
         </ol>
       </Card>

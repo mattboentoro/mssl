@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { forbidden, notFound, redirect } from "next/navigation";
 
 import { GameReportForm } from "@/components/game-report-form";
 import { ActionButton } from "@/components/match-actions";
@@ -20,8 +20,9 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
   try {
     context = await requireReferee();
   } catch (error) {
-    if (error instanceof AuthzError && error.status === 401) {
-      redirect(`/signin?callbackUrl=/referee/${id}`);
+    if (error instanceof AuthzError) {
+      if (error.status === 401) redirect(`/signin?callbackUrl=/referee/${id}`);
+      forbidden();
     }
     throw error;
   }
