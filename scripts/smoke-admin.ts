@@ -114,16 +114,18 @@ async function submit(
 async function main(): Promise<void> {
   console.log(`MSSL Match Control smoke test against ${BASE}\n`);
 
+  const season = await prisma.season.findFirstOrThrow({ where: { isActive: true } });
   const division = await prisma.division.findFirstOrThrow({
-    where: { season: { isActive: true } },
-    include: { teams: { take: 2 } },
+    orderBy: { sortOrder: "asc" },
+    include: { teams: { take: 4 } },
   });
   const stamp = Date.now();
 
-  // csvMatchRowSchema caps matchweek at 60, so import into the first unused slot.
+  // csvMatchRowSchema caps matchweek at 60, and the import checks claim two
+  // consecutive slots, so leave room for both.
   const busiest = await prisma.match.aggregate({ _max: { matchweek: true } });
-  const MW = Math.min(60, (busiest._max.matchweek ?? 0) + 1);
-  await prisma.match.deleteMany({ where: { matchweek: MW } });
+  const MW = Math.min(59, (busiest._max.matchweek ?? 0) + 1);
+  await prisma.match.deleteMany({ where: { matchweek: { in: [MW, MW + 1] } } });
 
   console.log("Access control");
   await signIn("referee");
@@ -170,7 +172,7 @@ async function main(): Promise<void> {
 
   if (team) {
     await submit("/admin/discipline", 'id="disc-player"', {
-      seasonId: division.seasonId,
+      seasonId: season.id,
       teamId: team.id,
       playerName: `Smoke Tester ${stamp}`,
       type: "RED",
@@ -234,11 +236,9 @@ async function main(): Promise<void> {
     }
 
     // ...but the same slug in a *different* division is not a clash. The
-    // database only requires (divisionId, slug) to be unique, and the same club
-    // appears in every season it played, so a global check locked teams out of
-    // their own editor.
+    // database only requires (divisionId, slug) to be unique, so a global check
+    // locked teams out of their own editor.
     const seasonTeams = await prisma.team.findMany({
-      where: { division: { seasonId: division.seasonId } },
       select: { id: true, name: true, slug: true, divisionId: true },
     });
     let twinned: (typeof seasonTeams)[number] | undefined;
@@ -285,7 +285,7 @@ async function main(): Promise<void> {
     const reason = `Smoke sanction ${stamp}`;
 
     // A deduction must reduce the points the calculator reports, not just store a row.
-    const beforeRow = (await getStandingsForSeason(division.seasonId))
+    const beforeRow = (await getStandingsForSeason(season.id))
       .flatMap((d) => d.rows)
       .find((r) => r.teamId === target.id);
 
@@ -301,7 +301,7 @@ async function main(): Promise<void> {
       `status ${applied.status}`,
     );
 
-    const afterRow = (await getStandingsForSeason(division.seasonId))
+    const afterRow = (await getStandingsForSeason(season.id))
       .flatMap((d) => d.rows)
       .find((r) => r.teamId === target.id);
     check(
@@ -343,7 +343,7 @@ async function main(): Promise<void> {
       const gone = await prisma.pointsAdjustment.findUnique({ where: { id: stored.id } });
       check("deletePointsAdjustmentAction reverses it", gone === null);
 
-      const restored = (await getStandingsForSeason(division.seasonId))
+      const restored = (await getStandingsForSeason(season.id))
         .flatMap((d) => d.rows)
         .find((r) => r.teamId === target.id);
       check(
@@ -359,7 +359,7 @@ async function main(): Promise<void> {
   // The filter now runs in the browser, so every team ships with the page and
   // the check is that the picker has the data it needs to narrow itself.
   const otherDivision = await prisma.division.findFirst({
-    where: { seasonId: division.seasonId, id: { not: division.id } },
+    where: { id: { not: division.id } },
     include: { teams: { take: 1 } },
   });
   if (otherDivision?.teams[0]) {
@@ -374,15 +374,15 @@ async function main(): Promise<void> {
 
   console.log("\nSeason ranking rule");
   const tbBefore = await prisma.season.findUniqueOrThrow({
-    where: { id: division.seasonId },
+    where: { id: season.id },
     select: { tiebreakerMode: true },
   });
-  await submit("/admin/league", `id="tiebreak-${division.seasonId}"`, {
-    seasonId: division.seasonId,
+  await submit("/admin/league", `id="tiebreak-${season.id}"`, {
+    seasonId: season.id,
     tiebreakerMode: "POINTS_PER_GAME",
   });
   const tbAfter = await prisma.season.findUniqueOrThrow({
-    where: { id: division.seasonId },
+    where: { id: season.id },
     select: { tiebreakerMode: true },
   });
   check(
@@ -393,11 +393,11 @@ async function main(): Promise<void> {
   check(
     "the ranking change is audited",
     (await prisma.auditLog.count({
-      where: { action: "season.tiebreaker", entityId: division.seasonId },
+      where: { action: "season.tiebreaker", entityId: season.id },
     })) > 0,
   );
-  await submit("/admin/league", `id="tiebreak-${division.seasonId}"`, {
-    seasonId: division.seasonId,
+  await submit("/admin/league", `id="tiebreak-${season.id}"`, {
+    seasonId: season.id,
     tiebreakerMode: tbBefore.tiebreakerMode,
   });
 
@@ -433,13 +433,11 @@ async function main(): Promise<void> {
     // reads "Home vs Away". Both need visible space around the middle token,
     // which is why the separator is a flex gap rather than literal whitespace.
     const played = await prisma.match.findFirst({
-      where: { divisionId: division.id, report: { isNot: null } },
+      where: { seasonId: season.id, divisionId: division.id, report: { isNot: null } },
       include: { report: true, homeTeam: true, awayTeam: true },
     });
     if (played?.report) {
-      const withResult = await (
-        await req(`/admin/matches?season=${division.seasonId}&when=all`)
-      ).text();
+      const withResult = await (await req(`/admin/matches?season=${season.id}&when=all`)).text();
       check(
         "a played fixture shows its score inline",
         withResult.includes(`${played.report.homeScore}\u2013${played.report.awayScore}`),
@@ -453,7 +451,7 @@ async function main(): Promise<void> {
     }
   }
 
-  const csv = await req(`/admin/schedule.csv?season=${division.seasonId}`);
+  const csv = await req(`/admin/schedule.csv?season=${season.id}`);
   const csvBody = await csv.text();
   check("CSV export downloads", csv.status === 200, `status ${csv.status}`);
   const exportHeader = csvBody.split("\n")[0]?.trim() ?? "";
@@ -468,7 +466,7 @@ async function main(): Promise<void> {
   // exported file straight back through the importer's dry run.
   const roundTrip = await submit("/admin/import", 'id="import-csv"', {
     csv: csvBody.split("\n").slice(0, 4).join("\n"),
-    seasonId: division.seasonId,
+    seasonId: season.id,
     mode: "dry-run",
   });
   const roundTripHtml = roundTrip.html;
@@ -479,21 +477,28 @@ async function main(): Promise<void> {
 
   console.log("\nCSV schedule import");
   const goodRow = `${MW},2030-06-01T18:00:00Z,${division.name},${division.teams[0].name},${division.teams[1].name}`;
-  const badRow = `${MW},2030-06-01T20:00:00Z,${division.name},Nobody FC,${division.teams[1].name}`;
+  // A club the register has never heard of is no longer an error: the importer
+  // enrols it. Only genuinely unreadable input — a kick-off it cannot parse —
+  // still fails a row.
+  const newTeamRow = `${MW},2030-06-01T20:00:00Z,${division.name},Nobody FC,${division.teams[1].name}`;
+  const brokenRow = `${MW},not-a-date,${division.name},${division.teams[2].name},${division.teams[3].name}`;
   const header = "matchweek,kickoff,division,home,away";
 
   const dry = await submit("/admin/import", 'id="import-csv"', {
-    csv: `${header}\n${goodRow}\n${badRow}`,
-    seasonId: division.seasonId,
+    csv: `${header}\n${goodRow}\n${newTeamRow}`,
+    seasonId: season.id,
     mode: "dry-run",
   });
   const untouched = await prisma.match.count({ where: { matchweek: MW } });
   check("dry run writes nothing", untouched === 0, `status ${dry.status}`);
-  check("dry run reports the unknown team", dry.html.includes("Nobody FC"));
+  check(
+    "the dry run previews the club it will enrol",
+    dry.html.includes("Nobody FC") && dry.html.includes("Will be added to the league"),
+  );
 
   const refused = await submit("/admin/import", 'id="import-csv"', {
-    csv: `${header}\n${goodRow}\n${badRow}`,
-    seasonId: division.seasonId,
+    csv: `${header}\n${goodRow}\n${brokenRow}`,
+    seasonId: season.id,
     mode: "commit",
   });
   const stillUntouched = await prisma.match.count({ where: { matchweek: MW } });
@@ -504,7 +509,7 @@ async function main(): Promise<void> {
 
   await submit("/admin/import", 'id="import-csv"', {
     csv: `${header}\n${goodRow}`,
-    seasonId: division.seasonId,
+    seasonId: season.id,
     mode: "commit",
   });
   const imported = await prisma.match.count({ where: { matchweek: MW } });
@@ -512,7 +517,7 @@ async function main(): Promise<void> {
 
   const dupe = await submit("/admin/import", 'id="import-csv"', {
     csv: `${header}\n${goodRow}`,
-    seasonId: division.seasonId,
+    seasonId: season.id,
     mode: "commit",
   });
   const afterDupe = await prisma.match.count({ where: { matchweek: MW } });
@@ -520,6 +525,64 @@ async function main(): Promise<void> {
     "re-importing the same row is skipped as a duplicate",
     afterDupe === 1 && dupe.html.includes("Nothing new to import"),
   );
+
+  {
+    // The three complaints that made a real admin's import unusable: a US-style
+    // kick-off, a division nobody had created, and a venue that is not on file.
+    // None of them may block an import any more.
+    const tolerant = await submit("/admin/import", 'id="import-csv"', {
+      csv: [
+        `${header},venue`,
+        `${MW + 1},8/5/2030 5:30 pm,Sunday Invitational,Rovers Athletic,Harbour Town,East Field`,
+      ].join("\n"),
+      seasonId: season.id,
+      mode: "dry-run",
+    });
+    check(
+      "a month-first kick-off parses",
+      !tolerant.html.includes("unreadable kick-off"),
+      "8/5/2030 5:30 pm",
+    );
+    check(
+      "an unknown venue is a note, not an error",
+      tolerant.html.includes("is not on file"),
+      "East Field",
+    );
+    check(
+      "an unknown division is enrolled rather than rejected",
+      tolerant.html.includes("Sunday Invitational") && !tolerant.html.includes("unknown division"),
+    );
+    check("the importer accepts a file as well as pasted text", dry.html.includes('type="file"'));
+
+    const committed = await submit("/admin/import", 'id="import-csv"', {
+      csv: [
+        `${header},venue`,
+        `${MW + 1},8/5/2030 5:30 pm,Sunday Invitational,Rovers Athletic,Harbour Town,East Field`,
+      ].join("\n"),
+      seasonId: season.id,
+      mode: "commit",
+    });
+    const enrolled = await prisma.match.findFirst({
+      where: { seasonId: season.id, matchweek: MW + 1 },
+      include: { division: true, homeTeam: true, awayTeam: true },
+    });
+    check(
+      "committing enrols the division, both clubs and the fixture",
+      enrolled?.division.name === "Sunday Invitational" &&
+        enrolled?.homeTeam.name === "Rovers Athletic" &&
+        enrolled?.awayTeam.name === "Harbour Town",
+      `status ${committed.status} → ${enrolled?.division.name ?? "no fixture created"}`,
+    );
+    check("a fixture with no known venue still imports", enrolled?.venueId === null);
+    check(
+      "an enrolled club is given a kit that does not clash with its opponent",
+      Boolean(enrolled) &&
+        !kitsClash(
+          resolveKit(enrolled!.homeTeam, enrolled!.homeKit),
+          resolveKit(enrolled!.awayTeam, enrolled!.awayKit),
+        ),
+    );
+  }
 
   console.log("\nKit selection");
   const importedMatch = await prisma.match.findFirst({ where: { matchweek: MW } });
@@ -620,12 +683,29 @@ async function main(): Promise<void> {
       isActive: false,
     },
   });
+  // Divisions and teams are standing members of the league, not entries in one
+  // year's competition. An admin deleting a season must lose that season's
+  // fixtures and nothing else — this used to cascade away the entire register.
+  const clubsBefore = await prisma.team.count();
+  const divisionsBefore = await prisma.division.count();
   await submit("/admin/league", `Type ${doomedSeason.name} to confirm deletion`, {
     confirmName: doomedSeason.name,
   });
   check(
     "deleteSeasonAction removes an inactive season",
     (await prisma.season.count({ where: { id: doomedSeason.id } })) === 0,
+  );
+  const clubsAfter = await prisma.team.count();
+  const divisionsAfter = await prisma.division.count();
+  check(
+    "deleting a season leaves every club standing",
+    clubsAfter === clubsBefore,
+    `${clubsBefore} → ${clubsAfter}`,
+  );
+  check(
+    "deleting a season leaves every division standing",
+    divisionsAfter === divisionsBefore,
+    `${divisionsBefore} → ${divisionsAfter}`,
   );
 
   const activeSeason = await prisma.season.findFirstOrThrow({ where: { isActive: true } });

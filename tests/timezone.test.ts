@@ -132,7 +132,32 @@ describe("parseLeagueDateTime", () => {
   it("rejects unparseable text", () => {
     expect(parseLeagueDateTime("")).toBeNull();
     expect(parseLeagueDateTime("next tuesday")).toBeNull();
-    expect(parseLeagueDateTime("07/03/2026")).toBeNull();
+    expect(parseLeagueDateTime("13/5/2026")).toBeNull();
+  });
+
+  it("accepts the month-first dates organisers actually type", () => {
+    // 8/5/2026 is 5 August, PDT (UTC-7).
+    expect(parseLeagueDateTime("8/5/2026 17:30")?.toISOString()).toBe("2026-08-06T00:30:00.000Z");
+    // Two-digit years and a 12-hour clock are both common in exported files.
+    expect(parseLeagueDateTime("8/5/26 5:30 pm")?.toISOString()).toBe("2026-08-06T00:30:00.000Z");
+    // 07/03 is 3 July read month-first, never 7 March.
+    expect(parseLeagueDateTime("07/03/2026")?.toISOString()).toBe("2026-07-03T07:00:00.000Z");
+  });
+
+  it("reads an ISO date as ISO even though the digits would also parse month-first", () => {
+    // 2026-08-05 must never be read as the 8th day of month 5.
+    expect(parseLeagueDateTime("2026-08-05 17:30")?.toISOString()).toBe("2026-08-06T00:30:00.000Z");
+    expect(parseLeagueDateTime("2026-8-5 17:30")?.toISOString()).toBe("2026-08-06T00:30:00.000Z");
+  });
+
+  it("treats midnight and noon on a 12-hour clock correctly", () => {
+    // 12am is the start of the day, 12pm is the middle of it.
+    expect(parseLeagueDateTime("2026-07-04 12:00 am")?.toISOString()).toBe(
+      "2026-07-04T07:00:00.000Z",
+    );
+    expect(parseLeagueDateTime("2026-07-04 12:00 pm")?.toISOString()).toBe(
+      "2026-07-04T19:00:00.000Z",
+    );
   });
 
   it("round-trips through the datetime-local input format", () => {

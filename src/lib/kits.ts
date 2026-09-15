@@ -140,6 +140,48 @@ export function pickKitsForFixture(
 }
 
 /**
+ * Choose a first-choice and change strip for a brand-new club.
+ *
+ * A bulk import creates teams the league has never seen, so their colours have
+ * to come from somewhere. Picking the palette entry that sits furthest from
+ * every strip already worn nearby means an imported schedule does not quietly
+ * fill a division with six shades of blue. `taken` is the set of colours
+ * already in use — pass the division's existing strips.
+ *
+ * The change kit is then the colour furthest from the first choice, so a team
+ * always has a usable second option. Pure and deterministic: the same inputs
+ * give the same wardrobe every time, which is what makes it testable.
+ */
+export function pickKitsForNewTeam(taken: readonly string[]): {
+  primary: string;
+  alternate: string;
+} {
+  const used = taken.map(normalizeHex).filter(isHexColor);
+
+  // Distance to the nearest already-worn strip. With nothing taken every
+  // colour scores the same, so palette order breaks the tie and the first
+  // imported club gets White.
+  const farthestFrom = (from: readonly string[], exclude: string[] = []) => {
+    let best = KIT_PALETTE[0].hex;
+    let bestScore = -1;
+    for (const entry of KIT_PALETTE) {
+      if (exclude.includes(entry.hex)) continue;
+      const score =
+        from.length === 0 ? 0 : Math.min(...from.map((c) => colorDistance(entry.hex, c)));
+      if (score > bestScore) {
+        bestScore = score;
+        best = entry.hex;
+      }
+    }
+    return best;
+  };
+
+  const primary = farthestFrom(used);
+  const alternate = farthestFrom([primary], [primary]);
+  return { primary, alternate };
+}
+
+/**
  * Black or white, whichever stays readable on top of `hex`. Uses the WCAG
  * relative-luminance formula so mid-tones flip at the right point.
  */

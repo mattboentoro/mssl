@@ -10,6 +10,7 @@ import {
   kitColorName,
   kitsClash,
   normalizeHex,
+  pickKitsForNewTeam,
   readableTextOn,
   resolveKit,
 } from "@/lib/kits";
@@ -150,5 +151,40 @@ describe("readableTextOn", () => {
   it("handles shorthand hex", () => {
     expect(readableTextOn("#fff")).toBe("#000000");
     expect(readableTextOn("#000")).toBe("#ffffff");
+  });
+});
+
+describe("pickKitsForNewTeam", () => {
+  it("always returns two different palette colours", () => {
+    const kit = pickKitsForNewTeam([]);
+    expect(isHexColor(kit.primary)).toBe(true);
+    expect(isHexColor(kit.alternate)).toBe(true);
+    expect(kit.primary).not.toBe(kit.alternate);
+    expect(KIT_PALETTE.some((entry) => entry.hex === kit.primary)).toBe(true);
+    expect(KIT_PALETTE.some((entry) => entry.hex === kit.alternate)).toBe(true);
+  });
+
+  it("gives a first kit that does not clash with its own change kit", () => {
+    const kit = pickKitsForNewTeam([]);
+    expect(kitsClash(kit.primary, kit.alternate)).toBe(false);
+  });
+
+  it("stays clear of the strips already worn in the division", () => {
+    const taken = ["#ffffff", "#dc2626"];
+    const kit = pickKitsForNewTeam(taken);
+    for (const worn of taken) {
+      expect(kitsClash(kit.primary, worn)).toBe(false);
+    }
+  });
+
+  it("is deterministic, so a dry run shows what the import will commit", () => {
+    const taken = ["#1d4ed8", "#16a34a"];
+    expect(pickKitsForNewTeam(taken)).toEqual(pickKitsForNewTeam(taken));
+  });
+
+  it("ignores junk in the taken list rather than throwing", () => {
+    const kit = pickKitsForNewTeam(["not a colour", "", "#1d4ed8"]);
+    expect(isHexColor(kit.primary)).toBe(true);
+    expect(kitsClash(kit.primary, "#1d4ed8")).toBe(false);
   });
 });

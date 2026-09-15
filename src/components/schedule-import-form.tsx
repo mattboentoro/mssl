@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 
 import { importScheduleAction, type CsvImportState } from "@/app/admin/actions";
 import { SubmitButton } from "@/components/admin-forms";
@@ -13,6 +13,22 @@ const SAMPLE = `matchweek,kickoff,division,home,away,venue
 export function ScheduleImportForm({ seasons }: { seasons: { id: string; name: string }[] }) {
   const [state, formAction] = useActionState<CsvImportState, FormData>(importScheduleAction, {});
   const [seasonId, setSeasonId] = useState(state.seasonId ?? seasons[0]?.id ?? "");
+  const [fileName, setFileName] = useState("");
+  const csvRef = useRef<HTMLTextAreaElement>(null);
+
+  // The file is read in the browser and dropped into the textarea, so the
+  // server action keeps its single `csv` string input and the pasted and
+  // uploaded paths validate through exactly the same code.
+  function onFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (csvRef.current) csvRef.current.value = String(reader.result ?? "");
+      setFileName(file.name);
+    };
+    reader.readAsText(file);
+  }
 
   return (
     <div className="space-y-6">
@@ -50,14 +66,30 @@ export function ScheduleImportForm({ seasons }: { seasons: { id: string; name: s
             </select>
           </Field>
 
+          <Field label="Upload a CSV file" htmlFor="import-file">
+            <input
+              id="import-file"
+              type="file"
+              accept=".csv,text/csv"
+              onChange={onFile}
+              className={`${inputClass} file:border-0 file:bg-transparent file:text-sm`}
+            />
+            <p className="text-muted mt-1 text-xs">
+              {fileName
+                ? `Loaded ${fileName}. Review it below, then dry run.`
+                : "Optional \u2014 the file is loaded into the box below, where you can still edit it."}
+            </p>
+          </Field>
+
           <Field
             label="CSV"
             htmlFor="import-csv"
-            hint="Columns: matchweek (1-60), kickoff, division, home, away, venue (optional). Kick-off is written as YYYY-MM-DD HH:mm and is always read as Redmond time — no timezone suffix needed. Teams and divisions are matched by name, slug or short name."
+            hint="Columns: matchweek (1-60), kickoff, division, home, away, venue (optional). Kick-off is read as Redmond time; YYYY-MM-DD HH:mm and M/D/YYYY HH:mm both work. Divisions and teams that are not on file yet are created for you, and an unrecognised venue simply imports without one."
           >
             <textarea
               id="import-csv"
               name="csv"
+              ref={csvRef}
               rows={10}
               defaultValue={state.csv ?? SAMPLE}
               className={`${inputClass} font-mono text-xs`}
@@ -79,6 +111,43 @@ export function ScheduleImportForm({ seasons }: { seasons: { id: string; name: s
           </div>
         </form>
       </Card>
+
+      {(state.newDivisions && state.newDivisions.length > 0) ||
+      (state.newTeams && state.newTeams.length > 0) ? (
+        <Card className="p-5">
+          <h3 className="mb-1 text-sm font-semibold">Will be added to the league</h3>
+          <p className="text-muted mb-3 text-xs">
+            These names are not on file yet. Importing creates them, with a kit colour chosen to
+            avoid a clash inside their division. You can edit them afterwards in League setup.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {state.newDivisions && state.newDivisions.length > 0 ? (
+              <div>
+                <p className="text-muted text-xs font-semibold uppercase">
+                  New divisions ({state.newDivisions.length})
+                </p>
+                <ul className="mt-1 space-y-0.5 text-sm">
+                  {state.newDivisions.map((name) => (
+                    <li key={name}>{name}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {state.newTeams && state.newTeams.length > 0 ? (
+              <div>
+                <p className="text-muted text-xs font-semibold uppercase">
+                  New teams ({state.newTeams.length})
+                </p>
+                <ul className="mt-1 space-y-0.5 text-sm">
+                  {state.newTeams.map((name) => (
+                    <li key={name}>{name}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        </Card>
+      ) : null}
 
       {state.rows && state.rows.length > 0 ? (
         <Card className="overflow-x-auto">
@@ -130,6 +199,13 @@ export function ScheduleImportForm({ seasons }: { seasons: { id: string; name: s
                     ) : (
                       <span className="text-success">Ready</span>
                     )}
+                    {row.notes && row.notes.length > 0 ? (
+                      <ul className="text-muted mt-1 space-y-0.5 text-xs">
+                        {row.notes.map((note) => (
+                          <li key={note}>{note}</li>
+                        ))}
+                      </ul>
+                    ) : null}
                   </td>
                 </tr>
               ))}

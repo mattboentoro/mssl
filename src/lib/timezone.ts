@@ -117,15 +117,47 @@ export function zonedToUtc(
 /** Matches an explicit UTC marker or numeric offset at the end of a string. */
 const EXPLICIT_OFFSET = /(?:Z|[+-]\d{2}:?\d{2})$/i;
 
-const WALL_CLOCK = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?\s*(?:hrs?)?$/i;
+/** `YYYY-MM-DD`, with the rest of the string handed to {@link parseClock}. */
+const ISO_DATE = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ]+(.+))?$/;
+
+/** `M/D/YYYY` and friends — what Excel writes and what organisers type. */
+const US_DATE = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4}|\d{2})(?:[T, ]+(.+))?$/;
+
+/** `HH:mm`, `H:mm:ss`, either optionally followed by `am`/`pm`. */
+const CLOCK = /^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?\s*(?:hrs?)?$/i;
+
+/** Read the time half of a stamp. A missing time means midnight, not an error. */
+function parseClock(value: string | undefined) {
+  if (value === undefined) return { hour: 0, minute: 0, second: 0 };
+
+  const match = CLOCK.exec(value.trim());
+  if (!match) return null;
+
+  const [, h, mi, s, meridiem] = match;
+  let hour = Number(h);
+  const minute = Number(mi);
+  const second = s === undefined ? 0 : Number(s);
+
+  if (meridiem) {
+    // 12-hour input: 12am is midnight and 12pm is noon, everything else shifts.
+    if (hour < 1 || hour > 12) return null;
+    if (meridiem.toLowerCase() === "pm") hour = hour === 12 ? 12 : hour + 12;
+    else hour = hour === 12 ? 0 : hour;
+  }
+
+  if (hour > 23 || minute > 59 || second > 59) return null;
+  return { hour, minute, second };
+}
 
 /**
  * Parse a date/time that an organiser typed, interpreting it as Redmond time.
  *
- * Accepts `YYYY-MM-DD`, `YYYY-MM-DDTHH:mm`, `YYYY-MM-DD HH:mm` and the
- * seconds-bearing variants. A string that *does* carry an explicit `Z` or
- * `±HH:MM` is honoured as written — it is unambiguous, so there is nothing to
- * guess — which keeps older ISO exports importable.
+ * Accepts the ISO shapes (`YYYY-MM-DD`, `YYYY-MM-DD HH:mm`, `…THH:mm:ss`) and
+ * the US shapes Excel produces when it rewrites a CSV (`M/D/YYYY HH:mm`,
+ * `8/5/26 5:30 pm`). Slash dates are read month-first because the league runs
+ * on Redmond time, so `8/5/2026` is 5 August. A string that *does* carry an
+ * explicit `Z` or `±HH:MM` is honoured as written — it is unambiguous, so
+ * there is nothing to guess — which keeps older ISO exports importable.
  *
  * Returns `null` on anything it cannot read, so callers can report a row error
  * rather than silently storing an Invalid Date.
@@ -139,21 +171,29 @@ export function parseLeagueDateTime(value: string): Date | null {
     return Number.isNaN(explicit.getTime()) ? null : explicit;
   }
 
-  const match = WALL_CLOCK.exec(trimmed);
-  if (!match) return null;
+  const iso = ISO_DATE.exec(trimmed);
+  const us = iso ? null : US_DATE.exec(trimmed);
 
-  const [, y, mo, d, h, mi, s] = match;
-  const year = Number(y);
-  const month = Number(mo);
-  const day = Number(d);
+  let year: number;
+  let month: number;
+  let day: number;
+  let rest: string | undefined;
+
+  if (iso) {
+    [year, month, day, rest] = [Number(iso[1]), Number(iso[2]), Number(iso[3]), iso[4]];
+  } else if (us) {
+    [month, day, rest] = [Number(us[1]), Number(us[2]), us[4]];
+    year = us[3].length === 2 ? 2000 + Number(us[3]) : Number(us[3]);
+  } else {
+    return null;
+  }
+
   if (month < 1 || month > 12 || day < 1 || day > 31) return null;
 
-  const hour = h === undefined ? 0 : Number(h);
-  const minute = mi === undefined ? 0 : Number(mi);
-  const second = s === undefined ? 0 : Number(s);
-  if (hour > 23 || minute > 59 || second > 59) return null;
+  const clock = parseClock(rest);
+  if (!clock) return null;
 
-  const instant = zonedToUtc(year, month, day, hour, minute, second);
+  const instant = zonedToUtc(year, month, day, clock.hour, clock.minute, clock.second);
   // Reject rubbish like 2026-02-31, which Date.UTC would happily roll over.
   const back = toZonedParts(instant);
   if (back.day !== day || back.month !== month || back.year !== year) return null;

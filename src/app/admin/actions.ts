@@ -6,7 +6,7 @@ import { writeAudit } from "@/lib/audit";
 import { actorFrom } from "@/lib/api";
 import { parseCsv } from "@/lib/csv";
 import { AuthzError, requireAdmin } from "@/lib/authz";
-import { pickKitsForFixture } from "@/lib/kits";
+import { pickKitsForFixture, pickKitsForNewTeam } from "@/lib/kits";
 import { addDisciplinaryAction, deleteDisciplinaryAction } from "@/lib/matches";
 import { prisma } from "@/lib/prisma";
 import { parseLeagueDateTime } from "@/lib/timezone";
@@ -205,8 +205,12 @@ export async function setSeasonTiebreakerAction(
 }
 
 /**
- * Delete a season and everything under it — divisions, teams, fixtures, game
- * reports and disciplinary records all cascade.
+ * Delete a season and its fixtures — matches, game reports, disciplinary
+ * records and points adjustments all cascade.
+ *
+ * Divisions and teams are deliberately *not* touched: clubs belong to the
+ * league and outlive any single competition year. Deleting a season retires
+ * the calendar, not the league.
  *
  * The active season is protected: make another season active first. The admin
  * also has to retype the season name, because there is no undo.
@@ -218,7 +222,7 @@ export async function deleteSeasonAction(_prev: ActionState, form: FormData): Pr
     async (data, actor) => {
       const season = await prisma.season.findUnique({
         where: { id: data.seasonId },
-        include: { _count: { select: { divisions: true, matches: true } } },
+        include: { _count: { select: { matches: true } } },
       });
       if (!season) throw new Error("That season no longer exists.");
 
@@ -242,7 +246,6 @@ export async function deleteSeasonAction(_prev: ActionState, form: FormData): Pr
           entityId: season.id,
           metadata: {
             name: season.name,
-            divisionsRemoved: season._count.divisions,
             matchesRemoved: season._count.matches,
             reportsRemoved: reports,
           },
@@ -250,7 +253,7 @@ export async function deleteSeasonAction(_prev: ActionState, form: FormData): Pr
       });
 
       refreshAdmin();
-      return `Season “${season.name}” deleted (${season._count.matches} fixture(s), ${reports} report(s)).`;
+      return `Season “${season.name}” deleted (${season._count.matches} fixture(s), ${reports} report(s)). Divisions and teams were kept.`;
     },
   );
 }
@@ -267,7 +270,6 @@ export async function createDivisionAction(
   return run(
     divisionSchema,
     {
-      seasonId: str(form, "seasonId"),
       name,
       slug: str(form, "slug") || slugify(name),
       sortOrder: num(form, "sortOrder") ?? 0,
@@ -462,20 +464,29 @@ export async function createPointsAdjustmentAction(
   return run(
     pointsAdjustmentSchema,
     {
+      seasonId: str(form, "seasonId"),
       teamId: str(form, "teamId"),
       points: str(form, "points"),
       reason: str(form, "reason"),
     },
     async (data, actor) => {
-      const team = await prisma.team.findUnique({
-        where: { id: data.teamId },
-        select: { id: true, name: true, divisionId: true },
-      });
+      const [season, team] = await Promise.all([
+        prisma.season.findUnique({
+          where: { id: data.seasonId },
+          select: { id: true, name: true },
+        }),
+        prisma.team.findUnique({
+          where: { id: data.teamId },
+          select: { id: true, name: true, divisionId: true },
+        }),
+      ]);
+      if (!season) throw new Error("That season no longer exists.");
       if (!team) throw new Error("That team no longer exists.");
 
       const adjustment = await prisma.$transaction(async (tx) => {
         const created = await tx.pointsAdjustment.create({
           data: {
+            seasonId: season.id,
             teamId: team.id,
             points: data.points,
             reason: data.reason,
@@ -489,6 +500,8 @@ export async function createPointsAdjustmentAction(
           entity: "PointsAdjustment",
           entityId: created.id,
           metadata: {
+            seasonId: season.id,
+            seasonName: season.name,
             teamId: team.id,
             teamName: team.name,
             points: data.points,
@@ -501,7 +514,7 @@ export async function createPointsAdjustmentAction(
       refreshAdmin();
       revalidatePath("/standings");
       const verb = adjustment.points < 0 ? "deducted from" : "awarded to";
-      return `${Math.abs(adjustment.points)} point(s) ${verb} ${team.name}.`;
+      return `${Math.abs(adjustment.points)} point(s) ${verb} ${team.name} in ${season.name}.`;
     },
   );
 }
@@ -762,6 +775,8 @@ export interface CsvPreviewRow {
   line: number;
   raw: Record<string, string>;
   error?: string;
+  /** Non-blocking observations — e.g. a club that will be created on import. */
+  notes?: string[];
   resolved?: {
     divisionId: string;
     divisionName: string;
@@ -782,6 +797,10 @@ export interface CsvImportState extends ActionState {
   validCount?: number;
   errorCount?: number;
   duplicateCount?: number;
+  /** Divisions the import will create, by name, in the order first seen. */
+  newDivisions?: string[];
+  /** Teams the import will create, as "Club (Division)". */
+  newTeams?: string[];
   committed?: boolean;
   csv?: string;
   seasonId?: string;
@@ -823,9 +842,10 @@ export async function importScheduleAction(
   }
 
   const [divisions, teams, venues, existing] = await Promise.all([
-    prisma.division.findMany({ where: { seasonId }, select: { id: true, name: true, slug: true } }),
+    // Divisions and teams belong to the league, not to a season, so the
+    // importer matches against the whole register rather than one year of it.
+    prisma.division.findMany({ select: { id: true, name: true, slug: true, sortOrder: true } }),
     prisma.team.findMany({
-      where: { division: { seasonId } },
       select: {
         id: true,
         name: true,
@@ -855,7 +875,6 @@ export async function importScheduleAction(
     teamIndex.set(key(t.slug), t);
     teamIndex.set(key(t.shortName), t);
   }
-  const teamById = new Map(teams.map((t) => [t.id, t]));
   const venueIndex = new Map<string, (typeof venues)[number]>();
   for (const v of venues) {
     venueIndex.set(key(v.name), v);
@@ -863,6 +882,128 @@ export async function importScheduleAction(
   }
   const existingKeys = new Set(
     existing.map((m) => `${m.matchweek}|${m.homeTeamId}|${m.awayTeamId}`),
+  );
+
+  // ---- auto-creation -------------------------------------------------------
+  // A schedule is usually the first thing an organiser has; demanding that
+  // every division and club be keyed in by hand first turns a 100-row paste
+  // into 100 errors. Anything unrecognised is planned here, listed in the dry
+  // run, and only written when the admin commits.
+  const pendingDivisions = new Map<
+    string,
+    { ref: string; name: string; slug: string; sortOrder: number }
+  >();
+  const pendingTeams = new Map<
+    string,
+    {
+      ref: string;
+      name: string;
+      slug: string;
+      shortName: string;
+      divisionRef: string;
+      colorPrimary: string;
+      colorAlternate: string;
+    }
+  >();
+
+  const takenDivisionSlugs = new Set(divisions.map((d) => d.slug));
+  const uniqueSlug = (base: string, taken: Set<string>) => {
+    const root = slugify(base) || "item";
+    let candidate = root;
+    let n = 2;
+    while (taken.has(candidate)) candidate = `${root}-${n++}`;
+    taken.add(candidate);
+    return candidate;
+  };
+
+  /** A division by name, planning a new one when the league has never heard of it. */
+  function resolveDivision(name: string) {
+    const found = divisionIndex.get(key(name));
+    if (found) return { ref: found.id, name: found.name, isNew: false };
+
+    const planned = pendingDivisions.get(key(name));
+    if (planned) return { ref: planned.ref, name: planned.name, isNew: true };
+
+    const created = {
+      ref: `new:division:${pendingDivisions.size}`,
+      name: name.trim(),
+      slug: uniqueSlug(name, takenDivisionSlugs),
+      sortOrder: divisions.length + pendingDivisions.size,
+    };
+    pendingDivisions.set(key(name), created);
+    return { ref: created.ref, name: created.name, isNew: true };
+  }
+
+  /** A short name for a new club: an acronym if it has several words, else a prefix. */
+  const shortNameFor = (name: string) => {
+    const words = name.trim().split(/\s+/).filter(Boolean);
+    const acronym = words.length > 1 ? words.map((w) => w[0]).join("") : (words[0] ?? name);
+    return acronym.slice(0, 4).toUpperCase();
+  };
+
+  /** A team by name, planning a new one inside `divisionRef` when unknown. */
+  function resolveTeam(name: string, divisionRef: string) {
+    const found = teamIndex.get(key(name));
+    if (found) {
+      return {
+        ref: found.id,
+        name: found.name,
+        divisionRef: found.divisionId,
+        colorPrimary: found.colorPrimary,
+        colorAlternate: found.colorAlternate,
+        isNew: false,
+      };
+    }
+
+    const planned = pendingTeams.get(key(name));
+    if (planned) {
+      return {
+        ref: planned.ref,
+        name: planned.name,
+        divisionRef: planned.divisionRef,
+        colorPrimary: planned.colorPrimary,
+        colorAlternate: planned.colorAlternate,
+        isNew: true,
+      };
+    }
+
+    // Keep new clubs visually distinct from everyone they will line up against.
+    const takenColors = [
+      ...teams.filter((t) => t.divisionId === divisionRef).map((t) => t.colorPrimary),
+      ...[...pendingTeams.values()]
+        .filter((t) => t.divisionRef === divisionRef)
+        .map((t) => t.colorPrimary),
+    ];
+    const kit = pickKitsForNewTeam(takenColors);
+
+    // Slugs are unique per division, so only siblings can collide.
+    const takenSlugs = new Set([
+      ...teams.filter((t) => t.divisionId === divisionRef).map((t) => t.slug),
+      ...[...pendingTeams.values()].filter((t) => t.divisionRef === divisionRef).map((t) => t.slug),
+    ]);
+
+    const created = {
+      ref: `new:team:${pendingTeams.size}`,
+      name: name.trim(),
+      slug: uniqueSlug(name, takenSlugs),
+      shortName: shortNameFor(name),
+      divisionRef,
+      colorPrimary: kit.primary,
+      colorAlternate: kit.alternate,
+    };
+    pendingTeams.set(key(name), created);
+    return {
+      ref: created.ref,
+      name: created.name,
+      divisionRef,
+      colorPrimary: kit.primary,
+      colorAlternate: kit.alternate,
+      isNew: true,
+    };
+  }
+
+  const colorsByRef = new Map<string, { colorPrimary: string; colorAlternate: string }>(
+    teams.map((t) => [t.id, { colorPrimary: t.colorPrimary, colorAlternate: t.colorAlternate }]),
   );
 
   const rows: CsvPreviewRow[] = [];
@@ -880,49 +1021,63 @@ export async function importScheduleAction(
       continue;
     }
 
-    const division = divisionIndex.get(key(parsed.data.division));
-    const home = teamIndex.get(key(parsed.data.home));
-    const away = teamIndex.get(key(parsed.data.away));
-    const venue = parsed.data.venue ? venueIndex.get(key(parsed.data.venue)) : undefined;
     const kickoff = parseLeagueDateTime(parsed.data.kickoff);
-
     const problems: string[] = [];
-    if (!division) problems.push(`unknown division “${parsed.data.division}”`);
-    if (!home) problems.push(`unknown home team “${parsed.data.home}”`);
-    if (!away) problems.push(`unknown away team “${parsed.data.away}”`);
-    if (home && away && home.id === away.id) problems.push("a team cannot play itself");
-    if (parsed.data.venue && !venue) problems.push(`unknown venue “${parsed.data.venue}”`);
-    if (!kickoff)
+    const notes: string[] = [];
+
+    if (!kickoff) {
       problems.push(
-        `unreadable kick-off “${parsed.data.kickoff}” — use YYYY-MM-DD HH:mm (Redmond time)`,
+        `unreadable kick-off “${parsed.data.kickoff}” — try 2026-08-05 17:30 or 8/5/2026 5:30 pm`,
       );
-    if (division && home && home.divisionId !== division.id) {
-      problems.push(`${home.name} is not in ${division.name}`);
-    }
-    if (division && away && away.divisionId !== division.id) {
-      problems.push(`${away.name} is not in ${division.name}`);
     }
 
-    if (problems.length > 0 || !division || !home || !away || !kickoff) {
-      rows.push({ line: i + 1, raw, error: problems.join("; ") });
+    const division = resolveDivision(parsed.data.division);
+    const home = resolveTeam(parsed.data.home, division.ref);
+    const away = resolveTeam(parsed.data.away, division.ref);
+
+    // Venue names are whatever the organiser calls the pitch that week, so an
+    // unfamiliar one is recorded as "not matched" rather than treated as an
+    // error. The fixture imports either way.
+    const venue = parsed.data.venue ? venueIndex.get(key(parsed.data.venue)) : undefined;
+    if (parsed.data.venue && !venue) {
+      notes.push(`venue “${parsed.data.venue}” is not on file — fixture imports without a venue`);
+    }
+
+    if (home.ref === away.ref) problems.push("a team cannot play itself");
+    if (division.isNew) notes.push(`creates division “${division.name}”`);
+    if (home.isNew) notes.push(`creates team “${home.name}”`);
+    if (away.isNew) notes.push(`creates team “${away.name}”`);
+
+    // A club recorded in another division is a promotion or a typo, and the
+    // importer cannot tell which. The fixture carries its own division, so this
+    // is reported and imported rather than blocked.
+    for (const side of [home, away]) {
+      if (!side.isNew && side.divisionRef !== division.ref) {
+        notes.push(`${side.name} is normally listed in another division`);
+      }
+    }
+
+    if (problems.length > 0 || !kickoff) {
+      rows.push({ line: i + 1, raw, error: problems.join("; "), notes });
       continue;
     }
 
     rows.push({
       line: i + 1,
       raw,
+      notes: notes.length > 0 ? notes : undefined,
       resolved: {
-        divisionId: division.id,
+        divisionId: division.ref,
         divisionName: division.name,
-        homeTeamId: home.id,
+        homeTeamId: home.ref,
         homeTeamName: home.name,
-        awayTeamId: away.id,
+        awayTeamId: away.ref,
         awayTeamName: away.name,
         venueId: venue?.id ?? null,
         venueName: venue?.name ?? null,
         kickoffAt: kickoff.toISOString(),
         matchweek: parsed.data.matchweek,
-        duplicate: existingKeys.has(`${parsed.data.matchweek}|${home.id}|${away.id}`),
+        duplicate: existingKeys.has(`${parsed.data.matchweek}|${home.ref}|${away.ref}`),
       },
     });
   }
@@ -931,19 +1086,47 @@ export async function importScheduleAction(
   const errorCount = rows.filter((r) => r.error).length;
   const duplicateCount = rows.filter((r) => r.resolved?.duplicate).length;
 
+  // Only advertise the entities the surviving rows actually need.
+  const neededRefs = new Set(
+    importable.flatMap((r) => [
+      r.resolved!.divisionId,
+      r.resolved!.homeTeamId,
+      r.resolved!.awayTeamId,
+    ]),
+  );
+  const creatingDivisions = [...pendingDivisions.values()].filter((d) => neededRefs.has(d.ref));
+  const creatingTeams = [...pendingTeams.values()].filter((t) => neededRefs.has(t.ref));
+  const divisionNameByRef = new Map<string, string>([
+    ...divisions.map((d) => [d.id, d.name] as [string, string]),
+    ...[...pendingDivisions.values()].map((d) => [d.ref, d.name] as [string, string]),
+  ]);
+
   const summary: CsvImportState = {
     rows,
     validCount: importable.length,
     errorCount,
     duplicateCount,
+    newDivisions: creatingDivisions.length > 0 ? creatingDivisions.map((d) => d.name) : undefined,
+    newTeams:
+      creatingTeams.length > 0
+        ? creatingTeams.map(
+            (t) => `${t.name} (${divisionNameByRef.get(t.divisionRef) ?? "new division"})`,
+          )
+        : undefined,
     csv,
     seasonId,
   };
 
   if (!commit) {
+    const additions = [
+      creatingDivisions.length > 0 ? `${creatingDivisions.length} new division(s)` : null,
+      creatingTeams.length > 0 ? `${creatingTeams.length} new team(s)` : null,
+    ].filter(Boolean);
     return {
       ...summary,
-      ok: `Dry run: ${importable.length} fixture(s) ready to import, ${duplicateCount} duplicate(s) skipped, ${errorCount} row(s) with errors.`,
+      ok: `Dry run: ${importable.length} fixture(s) ready to import, ${duplicateCount} duplicate(s) skipped, ${errorCount} row(s) with errors${
+        additions.length > 0 ? `. Will also create ${additions.join(" and ")}` : ""
+      }.`,
     };
   }
 
@@ -955,19 +1138,64 @@ export async function importScheduleAction(
   }
 
   await prisma.$transaction(async (tx) => {
+    // Divisions first, then teams, then fixtures: each step turns the planned
+    // refs from the step before into real ids.
+    const idByRef = new Map<string, string>();
+
+    for (const division of creatingDivisions) {
+      const created = await tx.division.create({
+        data: { name: division.name, slug: division.slug, sortOrder: division.sortOrder },
+      });
+      idByRef.set(division.ref, created.id);
+      await writeAudit(tx, {
+        actor: actorFrom(actor),
+        action: "division.create",
+        entity: "Division",
+        entityId: created.id,
+        metadata: { name: division.name, slug: division.slug, source: "schedule.import" },
+      });
+    }
+
+    for (const team of creatingTeams) {
+      const created = await tx.team.create({
+        data: {
+          divisionId: idByRef.get(team.divisionRef) ?? team.divisionRef,
+          name: team.name,
+          slug: team.slug,
+          shortName: team.shortName,
+          colorPrimary: team.colorPrimary,
+          colorAlternate: team.colorAlternate,
+        },
+      });
+      idByRef.set(team.ref, created.id);
+      colorsByRef.set(team.ref, {
+        colorPrimary: team.colorPrimary,
+        colorAlternate: team.colorAlternate,
+      });
+      await writeAudit(tx, {
+        actor: actorFrom(actor),
+        action: "team.create",
+        entity: "Team",
+        entityId: created.id,
+        metadata: { name: team.name, slug: team.slug, source: "schedule.import" },
+      });
+    }
+
+    const realId = (ref: string) => idByRef.get(ref) ?? ref;
+
     await tx.match.createMany({
       data: importable.map((row) => ({
         seasonId,
-        divisionId: row.resolved!.divisionId,
-        homeTeamId: row.resolved!.homeTeamId,
-        awayTeamId: row.resolved!.awayTeamId,
+        divisionId: realId(row.resolved!.divisionId),
+        homeTeamId: realId(row.resolved!.homeTeamId),
+        awayTeamId: realId(row.resolved!.awayTeamId),
         venueId: row.resolved!.venueId,
         kickoffAt: new Date(row.resolved!.kickoffAt),
         matchweek: row.resolved!.matchweek,
         status: "SCHEDULED",
         ...pickKitsForFixture(
-          teamById.get(row.resolved!.homeTeamId),
-          teamById.get(row.resolved!.awayTeamId),
+          colorsByRef.get(row.resolved!.homeTeamId),
+          colorsByRef.get(row.resolved!.awayTeamId),
         ),
       })),
     });
@@ -976,16 +1204,25 @@ export async function importScheduleAction(
       action: "schedule.import",
       entity: "Season",
       entityId: seasonId,
-      metadata: { imported: importable.length, skippedDuplicates: duplicateCount },
+      metadata: {
+        imported: importable.length,
+        skippedDuplicates: duplicateCount,
+        divisionsCreated: creatingDivisions.length,
+        teamsCreated: creatingTeams.length,
+      },
     });
   });
 
   refreshAdmin();
+  const created = [
+    creatingDivisions.length > 0 ? `${creatingDivisions.length} division(s)` : null,
+    creatingTeams.length > 0 ? `${creatingTeams.length} team(s)` : null,
+  ].filter(Boolean);
   return {
     ...summary,
     rows: undefined,
     csv: "",
-    ok: `Imported ${importable.length} fixture(s).`,
+    ok: `Imported ${importable.length} fixture(s)${created.length > 0 ? `, creating ${created.join(" and ")}` : ""}.`,
     committed: true,
   };
 }
