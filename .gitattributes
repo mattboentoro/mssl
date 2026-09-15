@@ -1,0 +1,16 @@
+# The team works across Windows and macOS. Normalise everything to LF in the
+# repository so a Windows editor saving CRLF does not show a whole file as
+# rewritten. Git still checks out whatever the platform prefers.
+* text=auto eol=lf
+
+# Never touch binaries.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.db binary
+*.db-journal binary

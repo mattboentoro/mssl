@@ -117,8 +117,7 @@ export function zonedToUtc(
 /** Matches an explicit UTC marker or numeric offset at the end of a string. */
 const EXPLICIT_OFFSET = /(?:Z|[+-]\d{2}:?\d{2})$/i;
 
-const WALL_CLOCK =
-  /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?\s*(?:hrs?)?$/i;
+const WALL_CLOCK = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?\s*(?:hrs?)?$/i;
 
 /**
  * Parse a date/time that an organiser typed, interpreting it as Redmond time.
