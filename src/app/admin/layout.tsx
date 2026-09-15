@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
 import { forbidden, redirect } from "next/navigation";
 
+import { AdminTabs, type AdminTab } from "@/components/admin-tabs";
 import { AuthzError, requireAdmin } from "@/lib/authz";
 
 export const dynamic = "force-dynamic";
 
-const TABS = [
+const TABS: AdminTab[] = [
   { href: "/admin", label: "Overview" },
   { href: "/admin/matches", label: "Matches" },
   { href: "/admin/league", label: "League setup" },
@@ -38,17 +38,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         <p className="text-muted mt-1 text-sm">
           Signed in as {user.name ?? user.email}. Every change here is written to the audit log.
         </p>
-        <nav aria-label="Admin sections" className="mt-4 flex flex-wrap gap-2">
-          {TABS.map((tab) => (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              className="border-subtle hover:bg-surface-muted rounded-lg border px-3 py-1.5 text-sm font-medium"
-            >
-              {tab.label}
-            </Link>
-          ))}
-        </nav>
+        <AdminTabs tabs={TABS} />
       </div>
       {children}
     </div>
