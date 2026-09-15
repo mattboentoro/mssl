@@ -24,9 +24,9 @@ export const metadata = { title: "Standings" };
 export default async function AdminStandingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ season?: string }>;
+  searchParams: Promise<{ season?: string; division?: string }>;
 }) {
-  const { season: seasonParam } = await searchParams;
+  const { season: seasonParam, division: divisionParam } = await searchParams;
   const [seasons, season] = await Promise.all([getSeasons(), resolveSeason(seasonParam)]);
 
   if (!season) {
@@ -40,15 +40,29 @@ export default async function AdminStandingsPage({
     );
   }
 
-  const [divisions, adjustments, teams] = await Promise.all([
+  const [divisions, adjustments, allTeams, seasonDivisions] = await Promise.all([
     getStandingsForSeason(season.id),
     getPointsAdjustments(season.id),
     prisma.team.findMany({
       where: { division: { seasonId: season.id } },
       orderBy: [{ division: { name: "asc" } }, { name: "asc" }],
-      select: { id: true, name: true, division: { select: { name: true } } },
+      select: { id: true, name: true, divisionId: true, division: { select: { name: true } } },
+    }),
+    prisma.division.findMany({
+      where: { seasonId: season.id },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      select: { id: true, name: true },
     }),
   ]);
+
+  // Narrow the team picker to one league so an admin deducting from a big
+  // season is not hunting through every club in a single flat list.
+  const selectedDivision = seasonDivisions.some((d) => d.id === divisionParam)
+    ? divisionParam
+    : undefined;
+  const teams = selectedDivision
+    ? allTeams.filter((team) => team.divisionId === selectedDivision)
+    : allTeams;
 
   const deducted = adjustments
     .filter((a) => a.points < 0)
@@ -84,6 +98,32 @@ export default async function AdminStandingsPage({
           never edited here &mdash; the adjustment is stored separately and shown on the public
           table, so the maths always adds up.
         </p>
+        {seasonDivisions.length > 1 ? (
+          <form method="get" className="mb-3 flex flex-wrap items-end gap-2">
+            <input type="hidden" name="season" value={season.slug} />
+            <Field label="Filter teams by league" htmlFor="adj-division">
+              <select
+                id="adj-division"
+                name="division"
+                defaultValue={selectedDivision ?? ""}
+                className={inputClass}
+              >
+                <option value="">All leagues</option>
+                {seasonDivisions.map((division) => (
+                  <option key={division.id} value={division.id}>
+                    {division.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <button
+              type="submit"
+              className="border-subtle hover:bg-surface-muted rounded-md border px-3 py-2 text-sm font-medium"
+            >
+              Apply filter
+            </button>
+          </form>
+        ) : null}
         <Card className="p-5">
           <ActionForm action={createPointsAdjustmentAction} className="grid gap-3 sm:grid-cols-2">
             <Field label="Team" htmlFor="adj-team">

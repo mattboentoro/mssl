@@ -97,8 +97,9 @@ describe("buildMonthGrid", () => {
   });
 
   it("counts the length of every month in a year", () => {
-    const lengths = Array.from({ length: 12 }, (_, i) =>
-      buildMonthGrid(2026, i + 1, today).filter((cell) => cell.inMonth).length,
+    const lengths = Array.from(
+      { length: 12 },
+      (_, i) => buildMonthGrid(2026, i + 1, today).filter((cell) => cell.inMonth).length,
     );
     expect(lengths).toEqual([31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]);
   });

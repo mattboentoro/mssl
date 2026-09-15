@@ -211,9 +211,9 @@ const FIRST_DIVISION_TEAMS: TeamSpec[] = [
     colorAlternate: "#ffffff",
   },
   {
-    name: "Atlettcopilot",
+    name: "Atleticopilot",
     shortName: "ATC",
-    slug: "atlettcopilot",
+    slug: "atleticopilot",
     colorPrimary: "#ffffff",
     colorAlternate: "#c8102e",
   },

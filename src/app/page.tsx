@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { MatchList, StandingsTable } from "@/components/match-display";
 import { Badge, ButtonLink, Card, EmptyState, SectionHeading } from "@/components/ui";
+import { getCurrentUser } from "@/lib/authz";
 import { formatLongDate } from "@/lib/dates";
 import {
   getActiveSeason,
@@ -44,6 +45,8 @@ const QUICK_LINKS = [
 
 export default async function HomePage() {
   const season = await getActiveSeason();
+  // Referee appointments are league business: only signed-in members see them.
+  const viewer = await getCurrentUser();
 
   if (!season) {
     return (
@@ -127,7 +130,7 @@ export default async function HomePage() {
         <div>
           <SectionHeading title="Next fixtures" href="/schedule" />
           {upcoming.length > 0 ? (
-            <MatchList matches={upcoming} />
+            <MatchList matches={upcoming} showReferee={Boolean(viewer)} />
           ) : (
             <EmptyState title="No upcoming fixtures scheduled." />
           )}
@@ -135,7 +138,7 @@ export default async function HomePage() {
         <div>
           <SectionHeading title="Latest results" href="/schedule?view=results" />
           {results.length > 0 ? (
-            <MatchList matches={results} />
+            <MatchList matches={results} showReferee={Boolean(viewer)} />
           ) : (
             <EmptyState
               title="No results filed yet."
