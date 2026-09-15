@@ -219,7 +219,7 @@ export default async function AdminMatchesPage({
           </Card>
         ) : (
           <Card className="overflow-x-auto">
-            <table className="w-full min-w-[52rem] text-sm">
+            <table className="w-full min-w-[46rem] text-sm">
               <caption className="sr-only">
                 Fixtures for the selected filters. Selecting a row opens its management page.
               </caption>
@@ -231,7 +231,6 @@ export default async function AdminMatchesPage({
                   <th className="px-3 py-2 text-left">Division</th>
                   <th className="px-3 py-2 text-left">Referee</th>
                   <th className="px-3 py-2 text-left">Status</th>
-                  <th className="px-3 py-2 text-right">Score</th>
                 </tr>
               </thead>
               <tbody className="divide-subtle divide-y">
@@ -249,7 +248,7 @@ export default async function AdminMatchesPage({
                       */}
                       <Link
                         href={`/admin/matches/${match.id}`}
-                        className="hover:text-brand font-medium hover:underline"
+                        className="hover:text-brand inline-flex flex-wrap items-center gap-x-2 gap-y-1 font-medium hover:underline"
                       >
                         <span className="inline-flex items-center gap-1.5">
                           <KitSwatch
@@ -259,7 +258,18 @@ export default async function AdminMatchesPage({
                           />
                           {match.homeTeam.name}
                         </span>
-                        <span className="text-muted font-normal"> v </span>
+                        {/*
+                          The result reads inline with the fixture — "Home 2–1
+                          Away" — so a separate score column is not needed and
+                          the table stays narrow enough for a laptop.
+                        */}
+                        {match.report ? (
+                          <span className="font-mono font-semibold tabular-nums">
+                            {`${match.report.homeScore}\u2013${match.report.awayScore}`}
+                          </span>
+                        ) : (
+                          <span className="text-muted text-xs font-normal">vs</span>
+                        )}
                         <span className="inline-flex items-center gap-1.5">
                           <KitSwatch
                             team={match.awayTeam}
@@ -277,11 +287,6 @@ export default async function AdminMatchesPage({
                     <td className="text-muted px-3 py-2">{match.referee?.name ?? "\u2014"}</td>
                     <td className="px-3 py-2">
                       <MatchStatusBadge status={match.status} />
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono">
-                      {match.report
-                        ? `${match.report.homeScore}\u2013${match.report.awayScore}`
-                        : "\u2014"}
                     </td>
                   </ClickableRow>
                 ))}
