@@ -417,10 +417,6 @@ const SECTIONS: FaqSection[] = [
         ),
       },
       {
-        q: "What are the requirements to be a referee?",
-        a: <p className="text-muted italic">To be added.</p>,
-      },
-      {
         q: "How many games will I referee during a season?",
         a: (
           <>
