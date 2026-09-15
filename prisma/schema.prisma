@@ -39,28 +39,28 @@ model Season {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  divisions     Division[]
   matches       Match[]
   announcements Announcement[]
   discipline    DisciplinaryAction[]
+  adjustments   PointsAdjustment[]
 }
 
-/// A competitive tier inside a season, e.g. "Premier League".
+/// A competitive tier, e.g. "Premier League".
+///
+/// Divisions and the teams inside them outlive any one season: a league's
+/// structure is a standing fact, while a season is just the window of fixtures
+/// played inside it. Deleting a season therefore removes that season's
+/// fixtures and never touches the clubs.
 model Division {
   id        String   @id @default(cuid())
-  seasonId  String
   name      String
-  slug      String
+  slug      String   @unique
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  season  Season  @relation(fields: [seasonId], references: [id], onDelete: Cascade)
   teams   Team[]
   matches Match[]
-
-  @@unique([seasonId, slug])
-  @@index([seasonId])
 }
 
 model Team {
@@ -97,20 +97,23 @@ model Team {
 /// belongs to exactly one division, and a division to exactly one season, so
 /// `teamId` alone already scopes the adjustment to a season.
 model PointsAdjustment {
-  id     String @id @default(cuid())
-  teamId String
+  id       String @id @default(cuid())
+  seasonId String
+  teamId   String
   /// Signed: negative deducts, positive awards. Never zero.
-  points Int
+  points   Int
   /// Mandatory justification, shown on the public table.
-  reason String
+  reason   String
 
   createdByEmail String?
   createdByName  String?
   createdAt      DateTime @default(now())
 
-  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  season Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
   @@index([teamId])
+  @@index([seasonId])
 }
 
 model Venue {

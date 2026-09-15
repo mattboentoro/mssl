@@ -72,7 +72,7 @@ async function createFixture(): Promise<Fixture> {
   });
 
   const division = await prisma.division.create({
-    data: { seasonId: season.id, name: "First Division", slug: "first-division" },
+    data: { name: "First Division", slug: "first-division" },
   });
 
   const venue = await prisma.venue.create({
@@ -604,7 +604,10 @@ describe("addDisciplinaryAction", () => {
     ).rejects.toMatchObject({ status: 403 });
   });
 
-  it("refuses a team that does not play in that season", async () => {
+  it("records a sanction against any season, because clubs outlive one", async () => {
+    // Divisions and teams are standing members of the league rather than
+    // entries in one year's competition, so a club can legitimately be
+    // sanctioned in a season whose fixtures it has not played yet.
     const otherSeason = await prisma.season.create({
       data: {
         name: "Other Season",
@@ -614,17 +617,19 @@ describe("addDisciplinaryAction", () => {
       },
     });
 
-    await expect(
-      addDisciplinaryAction(prisma, {
-        actor: adminActor,
-        input: {
-          seasonId: otherSeason.id,
-          teamId: fx.homeTeamId,
-          playerName: "Hugo Diaz",
-          type: "YELLOW",
-        },
-      }),
-    ).rejects.toMatchObject({ status: 400, code: "INVALID_STATE" });
+    const record = await addDisciplinaryAction(prisma, {
+      actor: adminActor,
+      input: {
+        seasonId: otherSeason.id,
+        teamId: fx.homeTeamId,
+        playerName: "Hugo Diaz",
+        type: "YELLOW",
+      },
+    });
+
+    const saved = await prisma.disciplinaryAction.findUniqueOrThrow({ where: { id: record.id } });
+    expect(saved.seasonId).toBe(otherSeason.id);
+    expect(saved.teamId).toBe(fx.homeTeamId);
   });
 });
 

@@ -43,9 +43,8 @@ export default async function SchedulePage({
   }
 
   const [divisions, teams] = await Promise.all([
-    getDivisions(season.id),
+    getDivisions(),
     prisma.team.findMany({
-      where: { division: { seasonId: season.id } },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),

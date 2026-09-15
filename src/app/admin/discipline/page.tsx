@@ -26,7 +26,6 @@ export default async function AdminDisciplinePage() {
   const [records, teams, matches] = await Promise.all([
     getDisciplinaryRecords(season.id),
     prisma.team.findMany({
-      where: { division: { seasonId: season.id } },
       orderBy: { name: "asc" },
       include: { division: { select: { name: true } } },
     }),

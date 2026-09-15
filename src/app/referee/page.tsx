@@ -58,7 +58,7 @@ export default async function RefereePage({
   }
 
   const [divisions, venues] = await Promise.all([
-    getDivisions(season.id),
+    getDivisions(),
     prisma.venue.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
 

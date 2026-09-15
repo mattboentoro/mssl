@@ -108,9 +108,9 @@ export async function resolveSeason(slugOrId?: string) {
   return getActiveSeason();
 }
 
-export async function getDivisions(seasonId: string) {
+/** Every division in the league. Divisions are not season-scoped. */
+export async function getDivisions() {
   return prisma.division.findMany({
-    where: { seasonId },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
 }
@@ -124,7 +124,6 @@ export interface DivisionStandings {
 /** The league table for every division in a season, derived only from reports. */
 export async function getStandingsForSeason(seasonId: string): Promise<DivisionStandings[]> {
   const divisions = await prisma.division.findMany({
-    where: { seasonId },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     include: {
       teams: {
@@ -145,10 +144,10 @@ export async function getStandingsForSeason(seasonId: string): Promise<DivisionS
     select: STANDINGS_MATCH_SELECT,
   });
 
-  // Deductions are scoped by team, and a team belongs to exactly one division
-  // in one season, so filtering by the season's divisions is enough.
+  // Deductions name their season outright. Teams outlive seasons, so a
+  // deduction served in one season must not follow the club into the next.
   const adjustments = await prisma.pointsAdjustment.findMany({
-    where: { team: { division: { seasonId } } },
+    where: { seasonId },
     select: { teamId: true, points: true, reason: true },
   });
 
@@ -179,7 +178,7 @@ export async function getStandingsForSeason(seasonId: string): Promise<DivisionS
 /** Every administrative points adjustment in a season, newest first. */
 export async function getPointsAdjustments(seasonId: string) {
   return prisma.pointsAdjustment.findMany({
-    where: { team: { division: { seasonId } } },
+    where: { seasonId },
     orderBy: { createdAt: "desc" },
     include: {
       team: {
@@ -381,9 +380,9 @@ export async function getWarningBoard(
 /* Teams                                                                      */
 /* -------------------------------------------------------------------------- */
 
-export async function getTeamsBySeason(seasonId: string) {
+/** Every team in the league, ordered by division. Teams are not season-scoped. */
+export async function getTeams() {
   return prisma.team.findMany({
-    where: { division: { seasonId } },
     include: { division: { select: { id: true, name: true, slug: true } } },
     orderBy: [{ division: { sortOrder: "asc" } }, { name: "asc" }],
   });
@@ -392,7 +391,7 @@ export async function getTeamsBySeason(seasonId: string) {
 export async function getTeamDetail(teamId: string) {
   return prisma.team.findUnique({
     where: { id: teamId },
-    include: { division: { select: { id: true, name: true, seasonId: true } } },
+    include: { division: { select: { id: true, name: true } } },
   });
 }
 

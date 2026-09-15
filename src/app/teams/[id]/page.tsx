@@ -8,6 +8,7 @@ import { CARD_LABELS, type CardType } from "@/lib/enums";
 import { formatDate } from "@/lib/dates";
 import { kitColorName, resolveKit } from "@/lib/kits";
 import {
+  getActiveSeason,
   getDisciplinaryRecords,
   getStandingsForSeason,
   getTeamDetail,
@@ -33,10 +34,14 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
   // Referee appointments stay behind sign-in.
   const viewer = await getCurrentUser();
 
+  // A club belongs to the league, not to a season, so its form and discipline
+  // are shown for whichever season is currently running.
+  const season = await getActiveSeason();
+
   const [matches, standings, discipline] = await Promise.all([
     getTeamMatches(team.id),
-    getStandingsForSeason(team.division.seasonId),
-    getDisciplinaryRecords(team.division.seasonId),
+    season ? getStandingsForSeason(season.id) : Promise.resolve([]),
+    season ? getDisciplinaryRecords(season.id) : Promise.resolve([]),
   ]);
 
   const row = standings

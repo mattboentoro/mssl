@@ -58,8 +58,8 @@ export default async function AdminMatchesPage({
   }
 
   const [divisions, teams, matches] = await Promise.all([
-    prisma.division.findMany({ where: { seasonId }, orderBy: { sortOrder: "asc" } }),
-    prisma.team.findMany({ where: { division: { seasonId } }, orderBy: { name: "asc" } }),
+    prisma.division.findMany({ orderBy: { sortOrder: "asc" } }),
+    prisma.team.findMany({ orderBy: { name: "asc" } }),
     prisma.match.findMany({
       where,
       orderBy: [{ kickoffAt: "asc" }],

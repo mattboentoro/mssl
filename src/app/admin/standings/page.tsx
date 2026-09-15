@@ -45,18 +45,16 @@ export default async function AdminStandingsPage({
     getStandingsForSeason(season.id),
     getPointsAdjustments(season.id),
     prisma.team.findMany({
-      where: { division: { seasonId: season.id } },
       orderBy: [{ division: { name: "asc" } }, { name: "asc" }],
       select: { id: true, name: true, divisionId: true, division: { select: { name: true } } },
     }),
     prisma.division.findMany({
-      where: { seasonId: season.id },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       select: { id: true, name: true },
     }),
   ]);
 
-  // Every team in the season goes to the browser so the league filter can
+  // Every team in the league goes to the browser so the league filter can
   // narrow the picker without a round-trip.
   const pickerTeams = allTeams.map((team) => ({
     id: team.id,
@@ -113,6 +111,7 @@ export default async function AdminStandingsPage({
             </div>
           ) : (
             <ActionForm action={createPointsAdjustmentAction} className="grid gap-3 sm:grid-cols-2">
+              <input type="hidden" name="seasonId" value={season.id} />
               <PointsTeamPicker divisions={seasonDivisions} teams={pickerTeams} />
 
               <Field

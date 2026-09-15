@@ -559,14 +559,13 @@ export async function addDisciplinaryAction(
   const { actor, input } = params;
   if (!actor.isAdmin) throw new MatchError("Admin only.", 403, "NOT_YOUR_MATCH");
 
+  // Teams are league-wide, so any club can be sanctioned in any season. The
+  // season comes from the caller and is recorded on the action itself.
   const team = await db.team.findUnique({
     where: { id: input.teamId },
-    select: { id: true, division: { select: { seasonId: true } } },
+    select: { id: true },
   });
   if (!team) throw new MatchError("Team not found.", 404, "NOT_FOUND");
-  if (team.division.seasonId !== input.seasonId) {
-    throw new MatchError("That team does not play in the selected season.", 400, "INVALID_STATE");
-  }
 
   const created = await db.disciplinaryAction.create({
     data: {

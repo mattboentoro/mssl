@@ -131,7 +131,6 @@ export const seasonSchema = z.object({
 });
 
 export const divisionSchema = z.object({
-  seasonId: z.string().min(1),
   name: trimmed(120).min(2),
   slug: trimmed(120)
     .min(1)
@@ -178,8 +177,12 @@ export const deleteTeamSchema = z.object({
  * An administrative points adjustment. The reason is mandatory and shown on the
  * public table, because an unexplained deduction is indistinguishable from a
  * mistake. Zero is rejected so that every stored row actually changes something.
+ *
+ * The season is explicit: teams outlive seasons, so a deduction served in one
+ * competition year must not follow the club into the next.
  */
 export const pointsAdjustmentSchema = z.object({
+  seasonId: z.string().min(1, "Choose a season."),
   teamId: z.string().min(1, "Choose a team."),
   points: z.coerce
     .number()

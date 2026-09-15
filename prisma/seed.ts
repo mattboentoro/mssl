@@ -355,42 +355,24 @@ function makeSquad(seedText: string): string[] {
   });
 }
 
-async function seedSeason(options: {
-  name: string;
-  slug: string;
-  isActive: boolean;
-  /** Kickoff of matchweek 1, relative to now in days. */
-  firstMatchweekOffsetDays: number;
-  venueIds: string[];
-  refereeIds: string[];
-}) {
-  const { name, slug, isActive, firstMatchweekOffsetDays, venueIds, refereeIds } = options;
-  const now = Date.now();
-  const firstKickoff = new Date(now + firstMatchweekOffsetDays * DAY);
-
-  const season = await prisma.season.create({
-    data: {
-      name,
-      slug,
-      isActive,
-      startsOn: new Date(firstKickoff.getTime() - 7 * DAY),
-      endsOn: new Date(firstKickoff.getTime() + 42 * DAY),
-    },
-  });
-
+/**
+ * The league itself: divisions and the clubs inside them.
+ *
+ * Created once, before any season, because a club is a standing member of the
+ * league rather than an entry in one year's competition. Every season then
+ * plays its fixtures between these same teams.
+ */
+async function seedLeague() {
   const divisionSpecs = [
     { name: "Premier League", slug: "premier-league", sortOrder: 1, teams: PREMIER_LEAGUE_TEAMS },
     { name: "First Division", slug: "first-division", sortOrder: 2, teams: FIRST_DIVISION_TEAMS },
   ];
 
+  const league: { id: string; name: string; teams: SeededTeam[] }[] = [];
+
   for (const spec of divisionSpecs) {
     const division = await prisma.division.create({
-      data: {
-        seasonId: season.id,
-        name: spec.name,
-        slug: spec.slug,
-        sortOrder: spec.sortOrder,
-      },
+      data: { name: spec.name, slug: spec.slug, sortOrder: spec.sortOrder },
     });
 
     const teams: SeededTeam[] = [];
@@ -416,6 +398,40 @@ async function seedSeason(options: {
         colorAlternate: team.colorAlternate,
       });
     }
+
+    league.push({ id: division.id, name: division.name, teams });
+  }
+
+  return league;
+}
+
+async function seedSeason(options: {
+  name: string;
+  slug: string;
+  isActive: boolean;
+  /** Kickoff of matchweek 1, relative to now in days. */
+  firstMatchweekOffsetDays: number;
+  venueIds: string[];
+  refereeIds: string[];
+  league: { id: string; name: string; teams: SeededTeam[] }[];
+}) {
+  const { name, slug, isActive, firstMatchweekOffsetDays, venueIds, refereeIds, league } = options;
+  const now = Date.now();
+  const firstKickoff = new Date(now + firstMatchweekOffsetDays * DAY);
+
+  const season = await prisma.season.create({
+    data: {
+      name,
+      slug,
+      isActive,
+      startsOn: new Date(firstKickoff.getTime() - 7 * DAY),
+      endsOn: new Date(firstKickoff.getTime() + 42 * DAY),
+    },
+  });
+
+  for (const entry of league) {
+    const division = { id: entry.id };
+    const teams = entry.teams;
 
     const rounds = roundRobin(teams.length);
 
@@ -784,7 +800,6 @@ async function seedContent(seasonId: string) {
  */
 async function seedPointsAdjustment(seasonId: string) {
   const division = await prisma.division.findFirst({
-    where: { seasonId },
     orderBy: { sortOrder: "asc" },
     select: { id: true },
   });
@@ -800,6 +815,7 @@ async function seedPointsAdjustment(seasonId: string) {
 
   await prisma.pointsAdjustment.create({
     data: {
+      seasonId,
       teamId: team.id,
       points: -3,
       reason: "Fielding an unregistered player in matchweek 3 (Rule 6.2).",
@@ -827,6 +843,9 @@ async function main() {
   const venueIds = venues.map((v) => v.id);
   const refereeIds = referees.map((r) => r.id);
 
+  console.log("Seeding divisions and clubs...");
+  const league = await seedLeague();
+
   console.log("Seeding previous season...");
   await seedSeason({
     name: "2026 Spring",
@@ -835,6 +854,7 @@ async function main() {
     firstMatchweekOffsetDays: -170,
     venueIds,
     refereeIds,
+    league,
   });
 
   console.log("Seeding active season...");
@@ -845,6 +865,7 @@ async function main() {
     firstMatchweekOffsetDays: -21,
     venueIds,
     refereeIds,
+    league,
   });
 
   console.log("Seeding announcements and documents...");

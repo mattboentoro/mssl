@@ -14,23 +14,18 @@ import {
 } from "@/app/admin/actions";
 import { formatDate } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
-import { getActiveSeason } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "League setup" };
 
 export default async function AdminLeaguePage() {
-  const active = await getActiveSeason();
-
   const [seasons, divisions, teams, venues] = await Promise.all([
     prisma.season.findMany({ orderBy: { startsOn: "desc" } }),
     prisma.division.findMany({
-      where: active ? { seasonId: active.id } : undefined,
       orderBy: { sortOrder: "asc" },
       include: { _count: { select: { teams: true } } },
     }),
     prisma.team.findMany({
-      where: active ? { division: { seasonId: active.id } } : undefined,
       orderBy: { name: "asc" },
       include: { division: { select: { name: true } } },
     }),
@@ -158,8 +153,12 @@ export default async function AdminLeaguePage() {
       {/* ------------------------------- Divisions -------------------------- */}
       <section aria-labelledby="divisions">
         <h2 id="divisions" className="mb-3 text-lg font-semibold">
-          Divisions in {active?.name ?? "no active season"}
+          Divisions
         </h2>
+        <p className="text-muted mb-3 text-sm">
+          Divisions and the clubs inside them belong to the league, not to a season. Deleting a
+          season removes its fixtures and leaves every team standing.
+        </p>
         <div className="grid gap-4 lg:grid-cols-2">
           <Card className="divide-subtle divide-y">
             {divisions.length === 0 ? (
@@ -176,21 +175,6 @@ export default async function AdminLeaguePage() {
           <Card className="p-5">
             <h3 className="mb-3 font-semibold">New division</h3>
             <ActionForm action={createDivisionAction} className="grid gap-3 sm:grid-cols-2">
-              <Field label="Season" htmlFor="div-season">
-                <select
-                  id="div-season"
-                  name="seasonId"
-                  defaultValue={active?.id ?? ""}
-                  className={inputClass}
-                  required
-                >
-                  {seasons.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
               <Field label="Name" htmlFor="div-name">
                 <input id="div-name" name="name" className={inputClass} required />
                 <FieldError name="name" />
