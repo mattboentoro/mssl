@@ -12,7 +12,7 @@ const COLUMNS = [
   {
     title: "Info",
     links: [
-      { href: "/rules", label: "Rules & documents" },
+      { href: "/rules", label: "Rules & regulations" },
       { href: "/faq", label: "FAQ" },
       { href: "/schedule/calendar.ics", label: "Calendar (.ics)" },
     ],

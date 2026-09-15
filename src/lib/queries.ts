@@ -233,10 +233,6 @@ export async function getAnnouncements(take = 6) {
   });
 }
 
-export async function getDocuments() {
-  return prisma.document.findMany({ orderBy: [{ sortOrder: "asc" }, { title: "asc" }] });
-}
-
 /* -------------------------------------------------------------------------- */
 /* Discipline                                                                 */
 /* -------------------------------------------------------------------------- */

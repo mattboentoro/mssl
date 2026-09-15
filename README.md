@@ -508,10 +508,14 @@ Ambiguous product decisions, resolved and recorded rather than escalated.
     and catches typos in CSV imports.
 20. **No `middleware.ts`.** Prisma needs the Node runtime; authorization lives in
     `requireReferee()` / `requireAdmin()` at every entry point instead.
-21. **Content is seeded, not migrated.** The old SharePoint site is
-    auth-protected and could not be read, so the rules and documents are
-    plausible placeholders — replace them in `/admin/content` and
-    `src/app/rules`. The FAQ at `src/app/faq` is real league copy.
+21. **Rules are a PDF, not prose.** `/rules` embeds the league's published
+    handbook straight from `public/documents/mssl-rules-and-regulations.pdf`
+    rather than restating it — the board owns that document, so mirroring it in
+    markup would only create a second version to keep in sync. Replace the file
+    to publish a new edition; the page falls back to a "not published yet"
+    notice with a SharePoint link when it is missing. The FAQ at `src/app/faq`
+    is real league copy; announcements in `/admin/content` are still seeded
+    placeholders.
 22. **Every time is Redmond time, everywhere.** `Match.kickoffAt` is stored as
     UTC, but the league has one home and nobody should have to think about
     offsets. `src/lib/timezone.ts` converts at the edges: a CSV upload and the
