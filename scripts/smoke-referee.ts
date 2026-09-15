@@ -303,6 +303,25 @@ async function main(): Promise<void> {
   const cardCount = await prisma.disciplinaryAction.count({ where: { matchId: match.id } });
   check("the report's cards were stored", cardCount === 2, `${cardCount} card(s)`);
 
+  // The assignments calendar and the assignments list must always agree. They
+  // once drifted -- the calendar ran its own query with no status filter, so a
+  // referee with one live assignment saw every match they had ever worked.
+  // Slicing the section out by its aria-labelledby keeps this honest: the
+  // fixture is still linked further down under "Your history".
+  const afterSubmit = await (await req("/referee?myView=calendar")).text();
+  const myPanel = afterSubmit.slice(
+    afterSubmit.indexOf('aria-labelledby="my-active"'),
+    afterSubmit.indexOf('aria-labelledby="available"'),
+  );
+  check(
+    "a submitted match leaves the assignments calendar",
+    myPanel.length > 0 && !myPanel.includes(`/referee/${match.id}`),
+  );
+  check(
+    "the submitted match is still reachable from the history list",
+    afterSubmit.includes(`/referee/${match.id}`),
+  );
+
   console.log("\nStandings recomputed from the report");
   const afterHome = await pointsFor(match.seasonId, match.homeTeamId);
   const afterAway = await pointsFor(match.seasonId, match.awayTeamId);

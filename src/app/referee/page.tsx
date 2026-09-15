@@ -107,11 +107,11 @@ export default async function RefereePage({
   const myMonthStart = zonedToUtc(myMonthValue.year, myMonthValue.month, 1);
   const myMonthEnd = zonedToUtc(myNext.year, myNext.month, 1);
 
-  const [calendarMatches, myCalendarMatches] = await Promise.all([
-    // Open fixtures only — the referee's own matches have their own calendar
-    // above, so showing them twice would just be noise.
+  // Open fixtures only — the referee's own matches have their own calendar
+  // above, so showing them twice would just be noise.
+  const calendarMatches =
     view === "calendar"
-      ? listMatches({
+      ? await listMatches({
           seasonId: season.id,
           refereeId: null,
           status: { in: ["SCHEDULED"] },
@@ -119,14 +119,17 @@ export default async function RefereePage({
           ...(params.division ? { divisionId: params.division } : {}),
           ...(params.venue ? { venueId: params.venue } : {}),
         })
-      : Promise.resolve([]),
+      : [];
+
+  // Derived from the same `active` array the list renders, not from a second
+  // query. A separate query drifted: it had no status filter, so the calendar
+  // showed every match the referee had ever been attached to — including
+  // submitted and confirmed ones that belong under "Your history". Sharing the
+  // source means the two views cannot disagree about what is assigned.
+  const myCalendarMatches =
     myView === "calendar"
-      ? listMatches({
-          refereeId: referee.id,
-          kickoffAt: { gte: myMonthStart, lt: myMonthEnd },
-        })
-      : Promise.resolve([]),
-  ]);
+      ? active.filter((m) => m.kickoffAt >= myMonthStart && m.kickoffAt < myMonthEnd)
+      : [];
 
   // Every link has to carry the *other* section's state, or switching one view
   // would silently reset the other.
