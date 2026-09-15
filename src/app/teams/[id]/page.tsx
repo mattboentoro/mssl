@@ -5,7 +5,7 @@ import { MatchList } from "@/components/match-display";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { CARD_LABELS, type CardType } from "@/lib/enums";
 import { formatDate } from "@/lib/dates";
-import { resolveKit } from "@/lib/kits";
+import { kitColorName, resolveKit } from "@/lib/kits";
 import {
   getDisciplinaryRecords,
   getStandingsForSeason,
@@ -83,7 +83,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
               <dt className="text-muted text-[10px] font-semibold tracking-wide uppercase">
                 Primary kit
               </dt>
-              <dd className="font-mono text-xs">{resolveKit(team, "PRIMARY")}</dd>
+              <dd className="text-xs">{kitColorName(resolveKit(team, "PRIMARY"))}</dd>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -96,7 +96,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
               <dt className="text-muted text-[10px] font-semibold tracking-wide uppercase">
                 Alternate kit
               </dt>
-              <dd className="font-mono text-xs">{resolveKit(team, "ALTERNATE")}</dd>
+              <dd className="text-xs">{kitColorName(resolveKit(team, "ALTERNATE"))}</dd>
             </div>
           </div>
         </dl>

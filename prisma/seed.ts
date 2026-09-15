@@ -113,57 +113,57 @@ const PREMIER_LEAGUE_TEAMS: TeamSpec[] = [
     name: "False 9-5",
     shortName: "F95",
     slug: "false-9-5",
-    colorPrimary: "#0f172a",
-    colorAlternate: "#f1f5f9",
+    colorPrimary: "#111111",
+    colorAlternate: "#ffffff",
   },
   {
     name: "Seaturks",
     shortName: "SEA",
     slug: "seaturks",
-    colorPrimary: "#0d9488",
-    colorAlternate: "#f0fdfa",
+    colorPrimary: "#0f766e",
+    colorAlternate: "#ffffff",
   },
   {
     name: "SMURF",
     shortName: "SMU",
     slug: "smurf",
-    colorPrimary: "#2563eb",
-    colorAlternate: "#eff6ff",
+    colorPrimary: "#1d4ed8",
+    colorAlternate: "#ffffff",
   },
   {
     name: "FFC",
     shortName: "FFC",
     slug: "ffc",
-    colorPrimary: "#dc2626",
-    colorAlternate: "#fef2f2",
+    colorPrimary: "#c8102e",
+    colorAlternate: "#ffffff",
   },
   {
     name: "SOS",
     shortName: "SOS",
     slug: "sos",
     colorPrimary: "#ea580c",
-    colorAlternate: "#1c1917",
+    colorAlternate: "#111111",
   },
   {
     name: "Chargers",
     shortName: "CHG",
     slug: "chargers",
     colorPrimary: "#facc15",
-    colorAlternate: "#1e3a8a",
+    colorAlternate: "#1e293b",
   },
   {
     name: "RCS United",
     shortName: "RCS",
     slug: "rcs-united",
-    colorPrimary: "#15803d",
-    colorAlternate: "#f0fdf4",
+    colorPrimary: "#166534",
+    colorAlternate: "#ffffff",
   },
   {
     name: "Tequileros",
     shortName: "TEQ",
     slug: "tequileros",
-    colorPrimary: "#84cc16",
-    colorAlternate: "#1a2e05",
+    colorPrimary: "#65a30d",
+    colorAlternate: "#111111",
   },
 ];
 
@@ -172,28 +172,28 @@ const FIRST_DIVISION_TEAMS: TeamSpec[] = [
     name: "The POT",
     shortName: "POT",
     slug: "the-pot",
-    colorPrimary: "#7e22ce",
-    colorAlternate: "#faf5ff",
+    colorPrimary: "#6d28d9",
+    colorAlternate: "#ffffff",
   },
   {
     name: "Free Foulin",
     shortName: "FRF",
     slug: "free-foulin",
-    colorPrimary: "#be123c",
-    colorAlternate: "#fff1f2",
+    colorPrimary: "#c8102e",
+    colorAlternate: "#ffffff",
   },
   {
     name: "Dejong United",
     shortName: "DJU",
     slug: "dejong-united",
-    colorPrimary: "#f97316",
-    colorAlternate: "#0c0a09",
+    colorPrimary: "#ea580c",
+    colorAlternate: "#111111",
   },
   {
     name: "Arsenal",
     shortName: "ARS",
     slug: "arsenal",
-    colorPrimary: "#ef4444",
+    colorPrimary: "#c8102e",
     colorAlternate: "#1e293b",
   },
   {
@@ -201,21 +201,21 @@ const FIRST_DIVISION_TEAMS: TeamSpec[] = [
     shortName: "TIM",
     slug: "tap-in-merchants-fc",
     colorPrimary: "#0ea5e9",
-    colorAlternate: "#082f49",
+    colorAlternate: "#1e293b",
   },
   {
     name: "Red Star",
     shortName: "RDS",
     slug: "red-star",
-    colorPrimary: "#991b1b",
-    colorAlternate: "#fafafa",
+    colorPrimary: "#7f1d1d",
+    colorAlternate: "#ffffff",
   },
   {
     name: "Atlettcopilot",
     shortName: "ATC",
     slug: "atlettcopilot",
-    colorPrimary: "#f8fafc",
-    colorAlternate: "#b91c1c",
+    colorPrimary: "#ffffff",
+    colorAlternate: "#c8102e",
   },
 ];
 
@@ -468,9 +468,21 @@ async function seedSeason(options: {
                   ? "POSTPONED"
                   : "SCHEDULED";
 
-        // Home always wears its first-choice kit; the away side switches only
-        // when the two primaries are too close to tell apart.
-        const awayKit = kitsClash(home.colorPrimary, away.colorPrimary) ? "ALTERNATE" : "PRIMARY";
+        // Home wears its first-choice kit and the away side switches when the
+        // two primaries are too close to tell apart. If the away alternate is
+        // no better (several sides carry a white change strip), the home team
+        // changes instead and the away side keeps its primary.
+        let homeKit: "PRIMARY" | "ALTERNATE" = "PRIMARY";
+        let awayKit: "PRIMARY" | "ALTERNATE" = "PRIMARY";
+        if (kitsClash(home.colorPrimary, away.colorPrimary)) {
+          if (!kitsClash(home.colorPrimary, away.colorAlternate)) {
+            awayKit = "ALTERNATE";
+          } else if (!kitsClash(home.colorAlternate, away.colorPrimary)) {
+            homeKit = "ALTERNATE";
+          } else {
+            awayKit = "ALTERNATE";
+          }
+        }
 
         const match = await prisma.match.create({
           data: {
@@ -482,7 +494,7 @@ async function seedSeason(options: {
             kickoffAt,
             matchweek,
             status,
-            homeKit: "PRIMARY",
+            homeKit,
             awayKit,
             refereeId,
             assignedAt: refereeId ? new Date(kickoffAt.getTime() - 3 * DAY) : null,

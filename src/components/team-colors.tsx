@@ -1,4 +1,4 @@
-import { resolveKit, type TeamColors } from "@/lib/kits";
+import { kitColorName, resolveKit, type TeamColors } from "@/lib/kits";
 import { type KitChoice } from "@/lib/enums";
 
 /**
@@ -44,14 +44,16 @@ export function KitSwatch({
   teamName: string;
 }) {
   const color = resolveKit(team, kit);
+  const colorName = kitColorName(color);
   return (
     <span
       className="inline-block h-3 w-3 shrink-0 rounded-full ring-1 ring-black/20 dark:ring-white/25"
       style={{ backgroundColor: color }}
-      title={`${teamName} wear ${color}`}
+      title={`${teamName} wear ${colorName.toLowerCase()}`}
     >
       <span className="sr-only">
-        {teamName} wear {kit === "ALTERNATE" ? "their alternate kit" : "their primary kit"}
+        {teamName} wear {kit === "ALTERNATE" ? "their alternate kit" : "their primary kit"} (
+        {colorName.toLowerCase()})
       </span>
     </span>
   );

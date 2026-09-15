@@ -157,6 +157,8 @@ export const teamSchema = z.object({
     .transform((v) => v || undefined),
 });
 
+export const updateTeamSchema = teamSchema.extend({ teamId: z.string().min(1) });
+
 /**
  * Deleting a season or a team is irreversible, so the admin has to retype the
  * name exactly. The comparison itself happens in the action, which knows the

@@ -97,7 +97,12 @@ async function submit(
   if (!hidden) return { status: 0, html: `form containing ${marker} not found` };
 
   const body = new FormData();
-  for (const [key, value] of Object.entries(hidden)) body.append(key, value);
+  // Explicit values win: a scraped hidden default (e.g. the colour picker's
+  // initial swatch) must not be appended alongside the value we are testing.
+  for (const [key, value] of Object.entries(hidden)) {
+    if (key in values) continue;
+    body.append(key, value);
+  }
   for (const [key, value] of Object.entries(values)) body.append(key, value);
 
   const res = await req(path, { method: "POST", body });
@@ -149,15 +154,15 @@ async function main(): Promise<void> {
     divisionId: division.id,
     name: teamName,
     shortName: "SMK",
-    colorPrimary: "#123456",
-    colorAlternate: "#fedcba",
+    colorPrimary: "#6d28d9",
+    colorAlternate: "#facc15",
     contactEmail: "",
   });
   const team = await prisma.team.findFirst({ where: { name: teamName } });
   check("createTeamAction writes a team", team !== null);
   check(
     "createTeamAction stores both kit colours",
-    team?.colorPrimary === "#123456" && team?.colorAlternate === "#fedcba",
+    team?.colorPrimary === "#6d28d9" && team?.colorAlternate === "#facc15",
     `${team?.colorPrimary} / ${team?.colorAlternate}`,
   );
 
@@ -174,6 +179,60 @@ async function main(): Promise<void> {
     const card = await prisma.disciplinaryAction.findFirst({ where: { teamId: team.id } });
     check("createDisciplinaryAction writes a league sanction", card !== null);
     check("the sanction is stamped ADMIN", card?.issuedBy === "ADMIN", String(card?.issuedBy));
+
+    console.log("\nTeam editing");
+    const renamed = `${teamName} Renamed`;
+    await submit("/admin/league", `id="team-${team.id}-name"`, {
+      teamId: team.id,
+      divisionId: team.divisionId,
+      name: renamed,
+      shortName: "SMR",
+      slug: team.slug,
+      colorPrimary: "#166534",
+      colorAlternate: "#cbd5e1",
+      captainName: "Smoke Captain",
+      contactEmail: "smoke@example.com",
+    });
+    const edited = await prisma.team.findUnique({ where: { id: team.id } });
+    check("updateTeamAction renames a team", edited?.name === renamed, String(edited?.name));
+    check(
+      "updateTeamAction recolours both kits",
+      edited?.colorPrimary === "#166534" && edited?.colorAlternate === "#cbd5e1",
+      `${edited?.colorPrimary} / ${edited?.colorAlternate}`,
+    );
+    check(
+      "updateTeamAction saves captain and contact",
+      edited?.captainName === "Smoke Captain" && edited?.contactEmail === "smoke@example.com",
+    );
+    check(
+      "the team edit is audited",
+      (await prisma.auditLog.count({
+        where: { action: "team.update", entityId: team.id },
+      })) === 1,
+    );
+
+    // A second team may not steal an existing slug.
+    const rival = await prisma.team.findFirst({
+      where: { divisionId: team.divisionId, id: { not: team.id } },
+    });
+    if (rival) {
+      await submit("/admin/league", `id="team-${team.id}-name"`, {
+        teamId: team.id,
+        divisionId: team.divisionId,
+        name: renamed,
+        shortName: "SMR",
+        slug: rival.slug,
+        colorPrimary: "#166534",
+        colorAlternate: "#cbd5e1",
+        captainName: "",
+        contactEmail: "",
+      });
+      const clashed = await prisma.team.findUnique({ where: { id: team.id } });
+      check("updateTeamAction refuses a duplicate slug", clashed?.slug === team.slug);
+    }
+
+    // Restore the name so the delete-confirmation check below still matches.
+    await prisma.team.update({ where: { id: team.id }, data: { name: teamName } });
   }
 
   console.log("\nContent");

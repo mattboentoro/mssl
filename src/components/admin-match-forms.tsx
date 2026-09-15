@@ -13,7 +13,7 @@ import {
   MATCH_STATUS_LABELS,
   type KitChoice,
 } from "@/lib/enums";
-import { kitsClash, resolveKit, type TeamColors } from "@/lib/kits";
+import { kitColorName, kitsClash, resolveKit, type TeamColors } from "@/lib/kits";
 
 interface Option {
   id: string;
@@ -343,7 +343,7 @@ function KitField({
           ))}
         </select>
       </div>
-      <p className="text-muted mt-1 font-mono text-[11px]">{color}</p>
+      <p className="text-muted mt-1 text-[11px]">{kitColorName(color)}</p>
     </Field>
   );
 }

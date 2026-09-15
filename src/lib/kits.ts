@@ -13,6 +13,41 @@
 export const DEFAULT_PRIMARY = "#0f766e";
 export const DEFAULT_ALTERNATE = "#ffffff";
 
+/**
+ * The palette an administrator picks from.
+ *
+ * Deliberately a fixed list of basic, well-separated colours rather than a
+ * free-form colour wheel: two teams choosing #c8102e and #c8112e helps nobody
+ * on the touchline, and a named shortlist makes the clash check meaningful.
+ * Ordered roughly around the colour wheel so the swatches read as a spectrum.
+ */
+export const KIT_PALETTE: readonly { name: string; hex: string }[] = [
+  { name: "White", hex: "#ffffff" },
+  { name: "Silver", hex: "#cbd5e1" },
+  { name: "Grey", hex: "#64748b" },
+  { name: "Black", hex: "#111111" },
+  { name: "Red", hex: "#c8102e" },
+  { name: "Maroon", hex: "#7f1d1d" },
+  { name: "Orange", hex: "#ea580c" },
+  { name: "Amber", hex: "#f59e0b" },
+  { name: "Yellow", hex: "#facc15" },
+  { name: "Lime", hex: "#65a30d" },
+  { name: "Green", hex: "#166534" },
+  { name: "Teal", hex: "#0f766e" },
+  { name: "Sky", hex: "#0ea5e9" },
+  { name: "Blue", hex: "#1d4ed8" },
+  { name: "Navy", hex: "#1e293b" },
+  { name: "Purple", hex: "#6d28d9" },
+  { name: "Pink", hex: "#db2777" },
+  { name: "Brown", hex: "#78350f" },
+];
+
+/** The palette name for a hex, or a tidied-up hex when it predates the palette. */
+export function kitColorName(hex: string): string {
+  const normalized = normalizeHex(hex);
+  return KIT_PALETTE.find((c) => c.hex === normalized)?.name ?? normalized.toUpperCase();
+}
+
 export interface TeamColors {
   colorPrimary?: string | null;
   colorAlternate?: string | null;

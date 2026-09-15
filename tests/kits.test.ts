@@ -4,13 +4,51 @@ import {
   CLASH_THRESHOLD,
   DEFAULT_ALTERNATE,
   DEFAULT_PRIMARY,
+  KIT_PALETTE,
   colorDistance,
   isHexColor,
+  kitColorName,
   kitsClash,
   normalizeHex,
   readableTextOn,
   resolveKit,
 } from "@/lib/kits";
+
+describe("KIT_PALETTE", () => {
+  it("only holds normalised six-digit hex", () => {
+    for (const { hex } of KIT_PALETTE) {
+      expect(isHexColor(hex)).toBe(true);
+      expect(normalizeHex(hex)).toBe(hex);
+    }
+  });
+
+  it("has no duplicate colours or names", () => {
+    expect(new Set(KIT_PALETTE.map((c) => c.hex)).size).toBe(KIT_PALETTE.length);
+    expect(new Set(KIT_PALETTE.map((c) => c.name)).size).toBe(KIT_PALETTE.length);
+  });
+
+  it("offers both kit defaults, so an untouched team is still on-palette", () => {
+    const hexes = KIT_PALETTE.map((c) => c.hex);
+    expect(hexes).toContain(DEFAULT_PRIMARY);
+    expect(hexes).toContain(DEFAULT_ALTERNATE);
+  });
+});
+
+describe("kitColorName", () => {
+  it("names a palette colour", () => {
+    expect(kitColorName("#c8102e")).toBe("Red");
+    expect(kitColorName("#0f766e")).toBe("Teal");
+  });
+
+  it("matches regardless of case or shorthand", () => {
+    expect(kitColorName("#FFFFFF")).toBe("White");
+    expect(kitColorName("#fff")).toBe("White");
+  });
+
+  it("falls back to the hex for a colour predating the palette", () => {
+    expect(kitColorName("#123456")).toBe("#123456");
+  });
+});
 
 describe("isHexColor", () => {
   it("accepts three- and six-digit hex, either case", () => {

@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { FieldError } from "@/components/admin-forms";
 import { Alert, Field, inputClass } from "@/components/ui";
 import { KIT_CHOICES, KIT_LABELS, type KitChoice } from "@/lib/enums";
-import { kitsClash, resolveKit } from "@/lib/kits";
+import { kitColorName, kitsClash, resolveKit } from "@/lib/kits";
 
 export interface KitPickerTeam {
   id: string;
@@ -110,8 +110,9 @@ export function MatchKitPicker({
       ) : clash ? (
         <div className="sm:col-span-2">
           <Alert tone="warning" title="Kit clash">
-            {home?.name} ({homeColor}) and {away?.name} ({awayColor}) are too close in colour to
-            tell apart. Switch one side to its other kit.
+            {home?.name} ({(homeColor ? kitColorName(homeColor) : "").toLowerCase()}) and{" "}
+            {away?.name} ({(awayColor ? kitColorName(awayColor) : "").toLowerCase()}) are too close
+            in colour to tell apart. Switch one side to its other kit.
           </Alert>
         </div>
       ) : null}
@@ -158,7 +159,7 @@ function KitSelect({
           ))}
         </select>
       </div>
-      {color ? <p className="text-muted mt-1 font-mono text-[11px]">{color}</p> : null}
+      {color ? <p className="text-muted mt-1 text-[11px]">{kitColorName(color)}</p> : null}
     </Field>
   );
 }

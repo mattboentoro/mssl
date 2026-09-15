@@ -1,4 +1,6 @@
 import { ActionForm, FieldError, SubmitButton } from "@/components/admin-forms";
+import { TeamEditor } from "@/components/admin-team-editor";
+import { ColorPalettePicker } from "@/components/color-palette-picker";
 import { TeamColorBar } from "@/components/team-colors";
 import { Card, Field, inputClass } from "@/components/ui";
 import {
@@ -8,7 +10,6 @@ import {
   createTeamAction,
   createVenueAction,
   deleteSeasonAction,
-  deleteTeamAction,
 } from "@/app/admin/actions";
 import { formatDate } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
@@ -199,39 +200,33 @@ export default async function AdminLeaguePage() {
               <p className="text-muted p-4 text-sm">No teams yet.</p>
             ) : (
               teams.map((team) => (
-                <div key={team.id} className="flex items-start justify-between gap-3 p-3 text-sm">
-                  <span className="flex min-w-0 items-center gap-2">
-                    <TeamColorBar team={team} size="sm" />
-                    <span className="min-w-0">
-                      <span className="block truncate">{team.name}</span>
-                      <span className="text-muted block text-xs">{team.division.name}</span>
+                <div key={team.id} className="p-3 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <TeamColorBar team={team} size="sm" />
+                      <span className="min-w-0">
+                        <span className="block truncate">{team.name}</span>
+                        <span className="text-muted block text-xs">{team.division.name}</span>
+                      </span>
                     </span>
-                  </span>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    <a href={`/teams/${team.id}`} className="text-muted text-xs underline">
+                    <a href={`/teams/${team.id}`} className="text-muted shrink-0 text-xs underline">
                       View
                     </a>
-                    <ActionForm
-                      action={deleteTeamAction}
-                      resetOnSuccess={false}
-                      className="flex flex-col items-end gap-1"
-                    >
-                      <input type="hidden" name="teamId" value={team.id} />
-                      <input
-                        name="confirmName"
-                        aria-label={`Type ${team.name} to confirm deletion`}
-                        placeholder={`Type “${team.name}”`}
-                        className={`${inputClass} w-40 text-xs`}
-                        required
-                      />
-                      <SubmitButton
-                        variant="danger"
-                        confirm={`Delete ${team.name} and its unplayed fixtures? This cannot be undone.`}
-                      >
-                        Delete team
-                      </SubmitButton>
-                    </ActionForm>
                   </div>
+                  <TeamEditor
+                    team={{
+                      id: team.id,
+                      name: team.name,
+                      slug: team.slug,
+                      shortName: team.shortName,
+                      divisionId: team.divisionId,
+                      colorPrimary: team.colorPrimary,
+                      colorAlternate: team.colorAlternate,
+                      captainName: team.captainName,
+                      contactEmail: team.contactEmail,
+                    }}
+                    divisions={divisions.map((d) => ({ id: d.id, name: d.name }))}
+                  />
                 </div>
               ))
             )}
@@ -261,12 +256,10 @@ export default async function AdminLeaguePage() {
                 htmlFor="team-color-primary"
                 hint="Home / first-choice kit."
               >
-                <input
-                  id="team-color-primary"
+                <ColorPalettePicker
                   name="colorPrimary"
-                  type="color"
                   defaultValue="#0f766e"
-                  className="border-subtle h-10 w-full cursor-pointer rounded-lg border bg-transparent p-1"
+                  labelledBy="team-color-primary"
                 />
                 <FieldError name="colorPrimary" />
               </Field>
@@ -275,12 +268,10 @@ export default async function AdminLeaguePage() {
                 htmlFor="team-color-alternate"
                 hint="Worn when the kits would clash."
               >
-                <input
-                  id="team-color-alternate"
+                <ColorPalettePicker
                   name="colorAlternate"
-                  type="color"
                   defaultValue="#ffffff"
-                  className="border-subtle h-10 w-full cursor-pointer rounded-lg border bg-transparent p-1"
+                  labelledBy="team-color-alternate"
                 />
                 <FieldError name="colorAlternate" />
               </Field>

@@ -21,6 +21,7 @@ import {
   matchCreateSchema,
   seasonSchema,
   teamSchema,
+  updateTeamSchema,
   venueSchema,
 } from "@/lib/validation";
 import { z } from "zod";
@@ -271,6 +272,60 @@ export async function createTeamAction(_prev: ActionState, form: FormData): Prom
       });
       refreshAdmin();
       return `Team “${data.name}” created.`;
+    },
+  );
+}
+
+/**
+ * Edit a team after creation.
+ *
+ * Everything on the team is editable, including the division — a side promoted
+ * or relegated between seasons keeps its identity and history rather than
+ * being recreated. Fixtures store a kit *choice*, not a hex, so recolouring a
+ * team here updates every fixture it appears in automatically.
+ */
+export async function updateTeamAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  const name = str(form, "name");
+  return run(
+    updateTeamSchema,
+    {
+      teamId: str(form, "teamId"),
+      divisionId: str(form, "divisionId"),
+      name,
+      slug: str(form, "slug") || slugify(name),
+      shortName: str(form, "shortName") || name.slice(0, 12),
+      colorPrimary: str(form, "colorPrimary") || "#0f766e",
+      colorAlternate: str(form, "colorAlternate") || "#ffffff",
+      captainName: optional(form, "captainName"),
+      contactEmail: str(form, "contactEmail"),
+    },
+    async ({ teamId, ...data }, actor) => {
+      const before = await prisma.team.findUnique({ where: { id: teamId } });
+      if (!before) throw new Error("That team no longer exists.");
+
+      const clash = await prisma.team.findFirst({
+        where: { slug: data.slug, id: { not: teamId } },
+        select: { name: true },
+      });
+      if (clash) throw new Error(`“${clash.name}” already uses the slug “${data.slug}”.`);
+
+      const team = await prisma.team.update({ where: { id: teamId }, data });
+      await writeAudit(prisma, {
+        actor: actorFrom(actor),
+        action: "team.update",
+        entity: "Team",
+        entityId: team.id,
+        // Record what actually moved, so the audit trail reads as a diff.
+        metadata: {
+          changed: Object.fromEntries(
+            Object.entries(data).filter(
+              ([key, value]) => (before as Record<string, unknown>)[key] !== value,
+            ),
+          ),
+        },
+      });
+      refreshAdmin();
+      return `Team “${data.name}” updated.`;
     },
   );
 }
