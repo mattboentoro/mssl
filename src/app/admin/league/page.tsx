@@ -8,7 +8,6 @@ import {
   createDivisionAction,
   createSeasonAction,
   createTeamAction,
-  createVenueAction,
   deleteSeasonAction,
   setSeasonTiebreakerAction,
 } from "@/app/admin/actions";
@@ -19,7 +18,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "League setup" };
 
 export default async function AdminLeaguePage() {
-  const [seasons, divisions, teams, venues] = await Promise.all([
+  const [seasons, divisions, teams] = await Promise.all([
     prisma.season.findMany({ orderBy: { startsOn: "desc" } }),
     prisma.division.findMany({
       orderBy: { sortOrder: "asc" },
@@ -29,7 +28,6 @@ export default async function AdminLeaguePage() {
       orderBy: { name: "asc" },
       include: { division: { select: { name: true } } },
     }),
-    prisma.venue.findMany({ orderBy: { name: "asc" } }),
   ]);
 
   return (
@@ -292,46 +290,6 @@ export default async function AdminLeaguePage() {
               </Field>
               <div className="sm:col-span-2">
                 <SubmitButton>Create team</SubmitButton>
-              </div>
-            </ActionForm>
-          </Card>
-        </div>
-      </section>
-
-      {/* --------------------------------- Venues --------------------------- */}
-      <section aria-labelledby="venues">
-        <h2 id="venues" className="mb-3 text-lg font-semibold">
-          Venues
-        </h2>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card className="divide-subtle divide-y">
-            {venues.map((venue) => (
-              <div key={venue.id} className="p-3 text-sm">
-                <p className="font-medium">{venue.name}</p>
-                <p className="text-muted text-xs">
-                  {[venue.address, venue.city].filter(Boolean).join(", ") || "No address recorded"}
-                </p>
-              </div>
-            ))}
-          </Card>
-          <Card className="p-5">
-            <h3 className="mb-3 font-semibold">New venue</h3>
-            <ActionForm action={createVenueAction} className="grid gap-3 sm:grid-cols-2">
-              <Field label="Name" htmlFor="venue-name">
-                <input id="venue-name" name="name" className={inputClass} required />
-                <FieldError name="name" />
-              </Field>
-              <Field label="City" htmlFor="venue-city">
-                <input id="venue-city" name="city" className={inputClass} />
-              </Field>
-              <Field label="Address" htmlFor="venue-address">
-                <input id="venue-address" name="address" className={inputClass} />
-              </Field>
-              <Field label="Map URL" htmlFor="venue-map">
-                <input id="venue-map" name="mapUrl" className={inputClass} />
-              </Field>
-              <div className="sm:col-span-2">
-                <SubmitButton>Create venue</SubmitButton>
               </div>
             </ActionForm>
           </Card>

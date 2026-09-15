@@ -131,27 +131,17 @@ async function main(): Promise<void> {
   await signIn("referee");
   const refAdmin = await req("/admin/league");
   check("referee gets 403 on Match Control", refAdmin.status === 403, `status ${refAdmin.status}`);
-  const refVenue = `Denied Pitch ${stamp}`;
-  await submit("/admin/league", 'id="venue-name"', { name: refVenue, city: "Nope" });
-  const leaked = await prisma.venue.findFirst({ where: { name: refVenue } });
-  check("referee cannot run createVenueAction", leaked === null);
+  const deniedTeam = `Denied FC ${stamp}`;
+  await submit("/admin/league", 'id="team-name"', {
+    divisionId: division.id,
+    name: deniedTeam,
+    shortName: "DEN",
+  });
+  const leaked = await prisma.team.findFirst({ where: { name: deniedTeam } });
+  check("referee cannot run createTeamAction", leaked === null);
 
   console.log("\nLeague setup CRUD");
   await signIn("admin");
-
-  const venueName = `Smoke Pitch ${stamp}`;
-  const venueRes = await submit("/admin/league", 'id="venue-name"', {
-    name: venueName,
-    city: "Redmond",
-    address: "1 Smoke Way",
-    mapUrl: "",
-  });
-  const venue = await prisma.venue.findFirst({ where: { name: venueName } });
-  check("createVenueAction writes a venue", venue !== null, `status ${venueRes.status}`);
-
-  await submit("/admin/league", 'id="venue-name"', { name: "", city: "" });
-  const blanks = await prisma.venue.count({ where: { name: "" } });
-  check("Zod rejects a blank venue name", blanks === 0);
 
   const teamName = `Smoke FC ${stamp}`;
   await submit("/admin/league", 'id="team-name"', {
@@ -457,7 +447,7 @@ async function main(): Promise<void> {
   const exportHeader = csvBody.split("\n")[0]?.trim() ?? "";
   check(
     "CSV export carries every column the importer requires",
-    ["matchweek", "kickoff", "division", "home", "away"].every((c) =>
+    ["matchweek", "kickoff", "division", "home", "away", "venue"].every((c) =>
       exportHeader.split(",").includes(c),
     ),
     exportHeader,
@@ -476,13 +466,13 @@ async function main(): Promise<void> {
   );
 
   console.log("\nCSV schedule import");
-  const goodRow = `${MW},2030-06-01T18:00:00Z,${division.name},${division.teams[0].name},${division.teams[1].name}`;
+  const goodRow = `${MW},2030-06-01T18:00:00Z,${division.name},${division.teams[0].name},${division.teams[1].name},Smoke Pitch`;
   // A club the register has never heard of is no longer an error: the importer
   // enrols it. Only genuinely unreadable input — a kick-off it cannot parse —
   // still fails a row.
-  const newTeamRow = `${MW},2030-06-01T20:00:00Z,${division.name},Nobody FC,${division.teams[1].name}`;
-  const brokenRow = `${MW},not-a-date,${division.name},${division.teams[2].name},${division.teams[3].name}`;
-  const header = "matchweek,kickoff,division,home,away";
+  const newTeamRow = `${MW},2030-06-01T20:00:00Z,${division.name},Nobody FC,${division.teams[1].name},Smoke Pitch`;
+  const brokenRow = `${MW},not-a-date,${division.name},${division.teams[2].name},${division.teams[3].name},Smoke Pitch`;
+  const header = "matchweek,kickoff,division,home,away,venue";
 
   const dry = await submit("/admin/import", 'id="import-csv"', {
     csv: `${header}\n${goodRow}\n${newTeamRow}`,
@@ -527,13 +517,14 @@ async function main(): Promise<void> {
   );
 
   {
-    // The three complaints that made a real admin's import unusable: a US-style
-    // kick-off, a division nobody had created, and a venue that is not on file.
-    // None of them may block an import any more.
+    // The two complaints that made a real admin's import unusable: a US-style
+    // kick-off and a division nobody had created. Neither may block an import
+    // any more. The venue column is free text: whatever is typed lands on
+    // the match verbatim, with nothing created and nothing validated.
     const tolerant = await submit("/admin/import", 'id="import-csv"', {
       csv: [
-        `${header},venue`,
-        `${MW + 1},8/5/2030 5:30 pm,Sunday Invitational,Rovers Athletic,Harbour Town,East Field`,
+        header,
+        `${MW + 1},8/5/2030 5:30 pm,Sunday Invitational,Rovers Athletic,Harbour Town,A Field Nobody Registered`,
       ].join("\n"),
       seasonId: season.id,
       mode: "dry-run",
@@ -544,11 +535,6 @@ async function main(): Promise<void> {
       "8/5/2030 5:30 pm",
     );
     check(
-      "an unknown venue is a note, not an error",
-      tolerant.html.includes("is not on file"),
-      "East Field",
-    );
-    check(
       "an unknown division is enrolled rather than rejected",
       tolerant.html.includes("Sunday Invitational") && !tolerant.html.includes("unknown division"),
     );
@@ -556,8 +542,8 @@ async function main(): Promise<void> {
 
     const committed = await submit("/admin/import", 'id="import-csv"', {
       csv: [
-        `${header},venue`,
-        `${MW + 1},8/5/2030 5:30 pm,Sunday Invitational,Rovers Athletic,Harbour Town,East Field`,
+        header,
+        `${MW + 1},8/5/2030 5:30 pm,Sunday Invitational,Rovers Athletic,Harbour Town,A Field Nobody Registered`,
       ].join("\n"),
       seasonId: season.id,
       mode: "commit",
@@ -573,7 +559,11 @@ async function main(): Promise<void> {
         enrolled?.awayTeam.name === "Harbour Town",
       `status ${committed.status} → ${enrolled?.division.name ?? "no fixture created"}`,
     );
-    check("a fixture with no known venue still imports", enrolled?.venueId === null);
+    check(
+      "an imported venue lands on the match exactly as typed",
+      enrolled?.venueName === "A Field Nobody Registered",
+      enrolled?.venueName ?? "null",
+    );
     check(
       "an enrolled club is given a kit that does not clash with its opponent",
       Boolean(enrolled) &&
@@ -718,7 +708,7 @@ async function main(): Promise<void> {
   console.log("\nAudit trail");
   const audited = await prisma.auditLog.count({
     where: {
-      action: { in: ["venue.create", "team.create", "announcement.create", "schedule.import"] },
+      action: { in: ["team.create", "announcement.create", "schedule.import"] },
       createdAt: { gte: new Date(stamp) },
     },
   });
@@ -734,7 +724,6 @@ async function main(): Promise<void> {
   if (team) await prisma.disciplinaryAction.deleteMany({ where: { teamId: team.id } });
   if (team) await prisma.team.deleteMany({ where: { id: team.id } });
   await prisma.season.deleteMany({ where: { id: doomedSeason.id } });
-  if (venue) await prisma.venue.delete({ where: { id: venue.id } });
   if (announcement) await prisma.announcement.delete({ where: { id: announcement.id } });
 
   console.log(

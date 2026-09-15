@@ -59,7 +59,14 @@ export default async function RefereePage({
 
   const [divisions, venues] = await Promise.all([
     getDivisions(),
-    prisma.venue.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    // Venues are free text on the match, so the filter options are whatever
+    // names have actually been typed onto this season's fixtures.
+    prisma.match.findMany({
+      where: { seasonId: season.id, venueName: { not: null } },
+      distinct: ["venueName"],
+      orderBy: { venueName: "asc" },
+      select: { venueName: true },
+    }),
   ]);
 
   // --- Available matches -----------------------------------------------------
@@ -69,7 +76,7 @@ export default async function RefereePage({
     status: { in: ["SCHEDULED"] },
   };
   if (params.division) availableWhere.divisionId = params.division;
-  if (params.venue) availableWhere.venueId = params.venue;
+  if (params.venue) availableWhere.venueName = params.venue;
 
   const kickoff: Record<string, Date> = {};
   if (params.from) kickoff.gte = new Date(`${params.from}T00:00:00.000Z`);
@@ -117,7 +124,7 @@ export default async function RefereePage({
           status: { in: ["SCHEDULED"] },
           kickoffAt: { gte: monthStart, lt: monthEnd },
           ...(params.division ? { divisionId: params.division } : {}),
-          ...(params.venue ? { venueId: params.venue } : {}),
+          ...(params.venue ? { venueName: params.venue } : {}),
         })
       : [];
 
@@ -207,7 +214,7 @@ export default async function RefereePage({
                     <FixtureLine className="mt-1" match={match} href={`/referee/${match.id}`} />
                     <p className="text-muted text-sm">
                       {formatDateTime(match.kickoffAt)}
-                      {match.venue ? ` \u00b7 ${match.venue.name}` : ""}
+                      {match.venueName ? ` \u00b7 ${match.venueName}` : ""}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -309,8 +316,8 @@ export default async function RefereePage({
               >
                 <option value="">All venues</option>
                 {venues.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.name}
+                  <option key={v.venueName!} value={v.venueName!}>
+                    {v.venueName}
                   </option>
                 ))}
               </select>
@@ -361,7 +368,7 @@ export default async function RefereePage({
                     <FixtureLine className="mt-0.5" match={match} href={`/referee/${match.id}`} />
                     <p className="text-muted text-sm">
                       {formatDateTime(match.kickoffAt)}
-                      {match.venue ? ` \u00b7 ${match.venue.name}, ${match.venue.city}` : ""}
+                      {match.venueName ? ` \u00b7 ${match.venueName}` : ""}
                     </p>
                   </div>
                   <ActionButton

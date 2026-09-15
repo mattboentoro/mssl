@@ -8,7 +8,7 @@ import { Alert, Card, Field, buttonClass, inputClass } from "@/components/ui";
 import { formatDateTime } from "@/lib/dates";
 
 const SAMPLE = `matchweek,kickoff,division,home,away,venue
-1,2026-03-07 18:00,Premier Division,Redmond Rangers,Bellevue Bytes,Redmond Campus Pitch 1`;
+1,2026-03-07 18:00,Premier Division,Redmond Rangers,Bellevue Bytes,Marymoor Field 3`;
 
 export function ScheduleImportForm({ seasons }: { seasons: { id: string; name: string }[] }) {
   const [state, formAction] = useActionState<CsvImportState, FormData>(importScheduleAction, {});
@@ -84,7 +84,7 @@ export function ScheduleImportForm({ seasons }: { seasons: { id: string; name: s
           <Field
             label="CSV"
             htmlFor="import-csv"
-            hint="Columns: matchweek (1-60), kickoff, division, home, away, venue (optional). Kick-off is read as Redmond time; YYYY-MM-DD HH:mm and M/D/YYYY HH:mm both work. Divisions and teams that are not on file yet are created for you, and an unrecognised venue simply imports without one."
+            hint="Columns: matchweek (1-60), kickoff, division, home, away, venue. Kick-off is read as Redmond time; YYYY-MM-DD HH:mm and M/D/YYYY HH:mm both work. Divisions and teams that are not on file yet are created for you. Venue is free text and is stored exactly as typed."
           >
             <textarea
               id="import-csv"

@@ -24,7 +24,7 @@ export function AdminMatchForms({
   matchId,
   status,
   kickoffAt,
-  venueId,
+  venueName,
   refereeId,
   hasReport,
   homeTeamName,
@@ -36,12 +36,11 @@ export function AdminMatchForms({
   currentHomeScore,
   currentAwayScore,
   referees,
-  venues,
 }: {
   matchId: string;
   status: string;
   kickoffAt: string;
-  venueId: string | null;
+  venueName: string | null;
   refereeId: string | null;
   hasReport: boolean;
   homeTeamName: string;
@@ -53,7 +52,6 @@ export function AdminMatchForms({
   currentHomeScore: number;
   currentAwayScore: number;
   referees: Option[];
-  venues: Option[];
 }) {
   const router = useRouter();
   const [result, setResult] = useState<(ApiResult & { form?: string }) | null>(null);
@@ -101,7 +99,7 @@ export function AdminMatchForms({
               // Sent as a bare wall-clock string; the server reads it as
               // league (Redmond) time regardless of where the admin is.
               kickoffAt: local || undefined,
-              venueId: (data.get("venueId") as string) || null,
+              venueName: (data.get("venueName") as string) || null,
               status: String(data.get("status") ?? ""),
               homeKit: String(data.get("homeKit") ?? ""),
               awayKit: String(data.get("awayKit") ?? ""),
@@ -118,15 +116,15 @@ export function AdminMatchForms({
               className={inputClass}
             />
           </Field>
-          <Field label="Venue" htmlFor="venueId">
-            <select id="venueId" name="venueId" defaultValue={venueId ?? ""} className={inputClass}>
-              <option value="">To be confirmed</option>
-              {venues.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.name}
-                </option>
-              ))}
-            </select>
+          <Field label="Venue" htmlFor="venueName" hint="Free text. Blank shows as TBD.">
+            <input
+              id="venueName"
+              name="venueName"
+              type="text"
+              defaultValue={venueName ?? ""}
+              placeholder="To be confirmed"
+              className={inputClass}
+            />
           </Field>
           <Field label="Status" htmlFor="status">
             <select id="status" name="status" defaultValue={status} className={inputClass}>

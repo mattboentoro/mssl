@@ -458,7 +458,7 @@ export async function updateMatchSchedule(
     matchId: string;
     actor: ActorContext;
     kickoffAt?: Date;
-    venueId?: string | null;
+    venueName?: string | null;
     status?: MatchStatus;
     homeKit?: KitChoice;
     awayKit?: KitChoice;
@@ -471,8 +471,8 @@ export async function updateMatchSchedule(
   const match = await loadMatch(db, matchId);
   const data: Prisma.MatchUpdateInput = { version: { increment: 1 } };
   if (params.kickoffAt) data.kickoffAt = params.kickoffAt;
-  if (params.venueId !== undefined) {
-    data.venue = params.venueId ? { connect: { id: params.venueId } } : { disconnect: true };
+  if (params.venueName !== undefined) {
+    data.venueName = params.venueName?.trim() || null;
   }
   if (params.status) data.status = params.status;
   if (params.homeKit) data.homeKit = params.homeKit;
@@ -490,14 +490,14 @@ export async function updateMatchSchedule(
       before: {
         kickoffAt: match.kickoffAt,
         status: match.status,
-        venueId: match.venueId,
+        venueName: match.venueName,
         homeKit: match.homeKit,
         awayKit: match.awayKit,
       },
       after: {
         kickoffAt: params.kickoffAt ?? match.kickoffAt,
         status: params.status ?? match.status,
-        venueId: params.venueId === undefined ? match.venueId : params.venueId,
+        venueName: params.venueName === undefined ? match.venueName : params.venueName,
         homeKit: params.homeKit ?? match.homeKit,
         awayKit: params.awayKit ?? match.awayKit,
       },

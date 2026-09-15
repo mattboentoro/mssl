@@ -39,7 +39,6 @@ export async function GET(request: Request) {
       division: { select: { name: true } },
       homeTeam: { select: { name: true } },
       awayTeam: { select: { name: true } },
-      venue: { select: { name: true } },
     },
   });
 
@@ -52,7 +51,7 @@ export async function GET(request: Request) {
         match.division.name,
         match.homeTeam.name,
         match.awayTeam.name,
-        match.venue?.name ?? "",
+        match.venueName ?? "",
       ]),
     );
   }

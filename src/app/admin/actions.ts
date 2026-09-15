@@ -25,7 +25,6 @@ import {
   seasonSchema,
   teamSchema,
   updateTeamSchema,
-  venueSchema,
 } from "@/lib/validation";
 import { z } from "zod";
 
@@ -595,33 +594,6 @@ export async function deleteDisciplinaryActionAction(
   });
 }
 
-export async function createVenueAction(_prev: ActionState, form: FormData): Promise<ActionState> {
-  const name = str(form, "name");
-  return run(
-    venueSchema,
-    {
-      name,
-      slug: str(form, "slug") || slugify(name),
-      address: optional(form, "address"),
-      city: optional(form, "city"),
-      mapUrl: optional(form, "mapUrl"),
-      notes: optional(form, "notes"),
-    },
-    async (data, actor) => {
-      const venue = await prisma.venue.create({ data });
-      await writeAudit(prisma, {
-        actor: actorFrom(actor),
-        action: "venue.create",
-        entity: "Venue",
-        entityId: venue.id,
-        metadata: data,
-      });
-      refreshAdmin();
-      return `Venue “${data.name}” created.`;
-    },
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Matches
 // ---------------------------------------------------------------------------
@@ -634,7 +606,7 @@ export async function createMatchAction(_prev: ActionState, form: FormData): Pro
       divisionId: str(form, "divisionId"),
       homeTeamId: str(form, "homeTeamId"),
       awayTeamId: str(form, "awayTeamId"),
-      venueId: optional(form, "venueId") ?? null,
+      venueName: optional(form, "venueName") ?? null,
       kickoffAt: str(form, "kickoffAt"),
       matchweek: num(form, "matchweek") ?? 1,
       homeKit: str(form, "homeKit") || "PRIMARY",
@@ -654,7 +626,7 @@ export async function createMatchAction(_prev: ActionState, form: FormData): Pro
           divisionId: data.divisionId,
           homeTeamId: data.homeTeamId,
           awayTeamId: data.awayTeamId,
-          venueId: data.venueId ?? null,
+          venueName: data.venueName ?? null,
           kickoffAt: kickoff,
           matchweek: data.matchweek,
           homeKit: data.homeKit,
@@ -784,7 +756,7 @@ export interface CsvPreviewRow {
     homeTeamName: string;
     awayTeamId: string;
     awayTeamName: string;
-    venueId: string | null;
+    /** Whatever the CSV said, stored verbatim. Never looked up, never created. */
     venueName: string | null;
     kickoffAt: string;
     matchweek: number;
@@ -835,13 +807,13 @@ export async function importScheduleAction(
   const missing = required.filter((key) => !header.includes(key));
   if (missing.length > 0) {
     return {
-      error: `CSV header is missing: ${missing.join(", ")}. Expected columns: matchweek, kickoff, division, home, away, venue.`,
+      error: `CSV header is missing: ${missing.join(", ")}. Expected columns: matchweek, kickoff, division, home, away.`,
       csv,
       seasonId,
     };
   }
 
-  const [divisions, teams, venues, existing] = await Promise.all([
+  const [divisions, teams, existing] = await Promise.all([
     // Divisions and teams belong to the league, not to a season, so the
     // importer matches against the whole register rather than one year of it.
     prisma.division.findMany({ select: { id: true, name: true, slug: true, sortOrder: true } }),
@@ -856,7 +828,6 @@ export async function importScheduleAction(
         colorAlternate: true,
       },
     }),
-    prisma.venue.findMany({ select: { id: true, name: true, slug: true } }),
     prisma.match.findMany({
       where: { seasonId },
       select: { homeTeamId: true, awayTeamId: true, matchweek: true },
@@ -875,11 +846,6 @@ export async function importScheduleAction(
     teamIndex.set(key(t.slug), t);
     teamIndex.set(key(t.shortName), t);
   }
-  const venueIndex = new Map<string, (typeof venues)[number]>();
-  for (const v of venues) {
-    venueIndex.set(key(v.name), v);
-    venueIndex.set(key(v.slug), v);
-  }
   const existingKeys = new Set(
     existing.map((m) => `${m.matchweek}|${m.homeTeamId}|${m.awayTeamId}`),
   );
@@ -889,6 +855,9 @@ export async function importScheduleAction(
   // every division and club be keyed in by hand first turns a 100-row paste
   // into 100 errors. Anything unrecognised is planned here, listed in the dry
   // run, and only written when the admin commits.
+  //
+  // Venues are deliberately absent from this: they are free text on the
+  // fixture, copied across exactly as typed.
   const pendingDivisions = new Map<
     string,
     { ref: string; name: string; slug: string; sortOrder: number }
@@ -1035,14 +1004,6 @@ export async function importScheduleAction(
     const home = resolveTeam(parsed.data.home, division.ref);
     const away = resolveTeam(parsed.data.away, division.ref);
 
-    // Venue names are whatever the organiser calls the pitch that week, so an
-    // unfamiliar one is recorded as "not matched" rather than treated as an
-    // error. The fixture imports either way.
-    const venue = parsed.data.venue ? venueIndex.get(key(parsed.data.venue)) : undefined;
-    if (parsed.data.venue && !venue) {
-      notes.push(`venue “${parsed.data.venue}” is not on file — fixture imports without a venue`);
-    }
-
     if (home.ref === away.ref) problems.push("a team cannot play itself");
     if (division.isNew) notes.push(`creates division “${division.name}”`);
     if (home.isNew) notes.push(`creates team “${home.name}”`);
@@ -1073,8 +1034,7 @@ export async function importScheduleAction(
         homeTeamName: home.name,
         awayTeamId: away.ref,
         awayTeamName: away.name,
-        venueId: venue?.id ?? null,
-        venueName: venue?.name ?? null,
+        venueName: parsed.data.venue?.trim() || null,
         kickoffAt: kickoff.toISOString(),
         matchweek: parsed.data.matchweek,
         duplicate: existingKeys.has(`${parsed.data.matchweek}|${home.ref}|${away.ref}`),
@@ -1189,7 +1149,7 @@ export async function importScheduleAction(
         divisionId: realId(row.resolved!.divisionId),
         homeTeamId: realId(row.resolved!.homeTeamId),
         awayTeamId: realId(row.resolved!.awayTeamId),
-        venueId: row.resolved!.venueId,
+        venueName: row.resolved!.venueName,
         kickoffAt: new Date(row.resolved!.kickoffAt),
         matchweek: row.resolved!.matchweek,
         status: "SCHEDULED",

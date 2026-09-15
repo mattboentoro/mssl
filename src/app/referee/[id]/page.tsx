@@ -36,7 +36,6 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
     where: { id },
     include: {
       division: { select: { name: true } },
-      venue: { select: { name: true, city: true } },
       referee: { select: { id: true, name: true } },
       homeTeam: { select: { id: true, name: true, colorPrimary: true, colorAlternate: true } },
       awayTeam: { select: { id: true, name: true, colorPrimary: true, colorAlternate: true } },
@@ -74,7 +73,7 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
         description={
           <>
             {formatDateTime(match.kickoffAt)}
-            {match.venue ? ` \u00b7 ${match.venue.name}, ${match.venue.city}` : ""}
+            {match.venueName ? ` \u00b7 ${match.venueName}` : ""}
             <span className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
               <span className="flex items-center gap-1.5">
                 <KitSwatch

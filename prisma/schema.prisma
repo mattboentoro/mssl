@@ -116,20 +116,6 @@ model PointsAdjustment {
   @@index([seasonId])
 }
 
-model Venue {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  address   String?
-  city      String?
-  mapUrl    String?
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  matches Match[]
-}
-
 /// A league referee. `entraObjectId` / `email` link the record to the signed-in
 /// Microsoft identity; membership of the `msslrefs` distribution list is checked
 /// live against Microsoft Graph and is not stored here.
@@ -161,7 +147,10 @@ model Match {
   divisionId String
   homeTeamId String
   awayTeamId String
-  venueId    String?
+  /// Where the fixture is played, as free text. Deliberately not a relation:
+  /// organisers name pitches however they like week to week, and a schedule
+  /// import must never be blocked because a pitch is not on a register.
+  venueName  String?
   kickoffAt  DateTime
   matchweek  Int
   status     String    @default("SCHEDULED")
@@ -181,7 +170,6 @@ model Match {
   division   Division             @relation(fields: [divisionId], references: [id], onDelete: Cascade)
   homeTeam   Team                 @relation("HomeTeam", fields: [homeTeamId], references: [id], onDelete: Cascade)
   awayTeam   Team                 @relation("AwayTeam", fields: [awayTeamId], references: [id], onDelete: Cascade)
-  venue      Venue?               @relation(fields: [venueId], references: [id], onDelete: SetNull)
   referee    Referee?             @relation(fields: [refereeId], references: [id], onDelete: SetNull)
   report     GameReport?
   discipline DisciplinaryAction[]

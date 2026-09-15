@@ -108,7 +108,8 @@ export const overrideSchema = reasonSchema.extend({
 
 export const matchUpdateSchema = z.object({
   kickoffAt: z.string().datetime({ offset: true }).optional(),
-  venueId: z.string().nullable().optional(),
+  /** Free text, shown on the fixture exactly as typed. Never validated. */
+  venueName: z.string().max(200).nullable().optional(),
   status: z.enum(MATCH_STATUSES).optional(),
   homeKit: z.enum(KIT_CHOICES).optional(),
   awayKit: z.enum(KIT_CHOICES).optional(),
@@ -197,23 +198,13 @@ export const deletePointsAdjustmentSchema = z.object({
   adjustmentId: z.string().min(1),
 });
 
-export const venueSchema = z.object({
-  name: trimmed(120).min(2),
-  slug: trimmed(120)
-    .min(1)
-    .regex(/^[a-z0-9-]+$/),
-  address: optionalText(240).optional(),
-  city: optionalText(120).optional(),
-  mapUrl: optionalText(500).optional(),
-  notes: optionalText(500).optional(),
-});
-
 export const matchCreateSchema = z.object({
   seasonId: z.string().min(1),
   divisionId: z.string().min(1),
   homeTeamId: z.string().min(1),
   awayTeamId: z.string().min(1),
-  venueId: z.string().nullable().optional(),
+  /** Free text, shown on the fixture exactly as typed. Never validated. */
+  venueName: z.string().max(200).nullable().optional(),
   kickoffAt: z.string().min(4),
   matchweek: z.number().int().min(1).max(60),
   homeKit: z.enum(KIT_CHOICES).default("PRIMARY"),
@@ -241,13 +232,24 @@ export const announcementSchema = z.object({
   seasonId: z.string().nullable().optional(),
 });
 
-/** One row of the admin CSV schedule import. */
+/**
+ * One row of the admin CSV schedule import.
+ *
+ * Nothing here is checked against the league register. Divisions and clubs that
+ * are not on file are created on import rather than rejected, so a schedule can
+ * be loaded before any of them have been keyed in by hand. The venue is not
+ * even that — it is simply text copied onto the fixture.
+ */
 export const csvMatchRowSchema = z.object({
   matchweek: z.coerce.number().int().min(1).max(60),
   kickoff: z.string().min(4),
   division: z.string().min(1),
   home: z.string().min(1),
   away: z.string().min(1),
+  /**
+   * Free text, stored on the fixture exactly as typed. There is no venue
+   * register to check it against and nothing is ever created from it.
+   */
   venue: z.string().optional().default(""),
 });
 

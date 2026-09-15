@@ -48,7 +48,7 @@ export function MatchRow({
       </div>
 
       <div className="text-muted mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-        {match.venue ? <span>&#128205; {match.venue.name}</span> : <span>&#128205; TBD</span>}
+        {match.venueName ? <span>&#128205; {match.venueName}</span> : <span>&#128205; TBD</span>}
         {/*
           Who is refereeing is league business, not public information — the
           caller decides, so this component never has to reach for the session.

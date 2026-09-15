@@ -83,7 +83,7 @@ export async function GET(request: Request) {
       fold(`DESCRIPTION:${escapeText(description)}`),
       fold(
         `LOCATION:${escapeText(
-          match.venue ? [match.venue.name, match.venue.city].filter(Boolean).join(", ") : "TBD",
+          match.venueName || "TBD",
         )}`,
       ),
       `STATUS:${match.status === "POSTPONED" ? "TENTATIVE" : "CONFIRMED"}`,

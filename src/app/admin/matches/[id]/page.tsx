@@ -20,12 +20,11 @@ export default async function AdminMatchDetailPage({
 }) {
   const { id } = await params;
 
-  const [match, referees, venues] = await Promise.all([
+  const [match, referees] = await Promise.all([
     prisma.match.findUnique({
       where: { id },
       include: {
         division: { select: { name: true } },
-        venue: { select: { id: true, name: true } },
         referee: { select: { id: true, name: true, email: true } },
         homeTeam: { select: { id: true, name: true, colorPrimary: true, colorAlternate: true } },
         awayTeam: { select: { id: true, name: true, colorPrimary: true, colorAlternate: true } },
@@ -41,7 +40,6 @@ export default async function AdminMatchDetailPage({
       },
     }),
     prisma.referee.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
-    prisma.venue.findMany({ orderBy: { name: "asc" } }),
   ]);
 
   if (!match) notFound();
@@ -75,7 +73,7 @@ export default async function AdminMatchDetailPage({
             </h2>
             <p className="text-muted mt-1 text-sm">
               {formatDateTime(match.kickoffAt)}
-              {match.venue ? ` \u00b7 ${match.venue.name}` : ""}
+              {match.venueName ? ` \u00b7 ${match.venueName}` : ""}
             </p>
             <p className="text-muted mt-1 text-xs">
               Referee: {match.referee?.name ?? "unassigned"}
@@ -177,7 +175,7 @@ export default async function AdminMatchDetailPage({
         matchId={match.id}
         status={match.status}
         kickoffAt={match.kickoffAt.toISOString()}
-        venueId={match.venueId}
+        venueName={match.venueName}
         refereeId={match.refereeId}
         hasReport={Boolean(match.report)}
         homeTeamName={match.homeTeam.name}
@@ -195,7 +193,6 @@ export default async function AdminMatchDetailPage({
         currentHomeScore={match.report?.homeScore ?? 0}
         currentAwayScore={match.report?.awayScore ?? 0}
         referees={referees.map((r) => ({ id: r.id, name: r.name }))}
-        venues={venues.map((v) => ({ id: v.id, name: v.name }))}
       />
 
       {!match.report ? (

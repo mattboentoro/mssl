@@ -113,14 +113,14 @@ const PREMIER_LEAGUE_TEAMS: TeamSpec[] = [
     name: "False 9-5",
     shortName: "F95",
     slug: "false-9-5",
-    colorPrimary: "#111111",
+    colorPrimary: "#1d4ed8",
     colorAlternate: "#ffffff",
   },
   {
     name: "Seaturks",
     shortName: "SEA",
     slug: "seaturks",
-    colorPrimary: "#0f766e",
+    colorPrimary: "#c8102e",
     colorAlternate: "#ffffff",
   },
   {
@@ -135,35 +135,35 @@ const PREMIER_LEAGUE_TEAMS: TeamSpec[] = [
     shortName: "FFC",
     slug: "ffc",
     colorPrimary: "#c8102e",
-    colorAlternate: "#ffffff",
+    colorAlternate: "#111111",
   },
   {
     name: "SOS",
     shortName: "SOS",
     slug: "sos",
-    colorPrimary: "#ea580c",
-    colorAlternate: "#111111",
+    colorPrimary: "#ffffff",
+    colorAlternate: "#1d4ed8",
   },
   {
     name: "Chargers",
     shortName: "CHG",
     slug: "chargers",
-    colorPrimary: "#facc15",
-    colorAlternate: "#1e293b",
+    colorPrimary: "#c8102e",
+    colorAlternate: "#ffffff",
   },
   {
     name: "RCS United",
     shortName: "RCS",
     slug: "rcs-united",
-    colorPrimary: "#166534",
+    colorPrimary: "#1d4ed8",
     colorAlternate: "#ffffff",
   },
   {
     name: "Tequileros",
     shortName: "TEQ",
     slug: "tequileros",
-    colorPrimary: "#65a30d",
-    colorAlternate: "#111111",
+    colorPrimary: "#111111",
+    colorAlternate: "#c8102e",
   },
 ];
 
@@ -172,21 +172,21 @@ const FIRST_DIVISION_TEAMS: TeamSpec[] = [
     name: "The POT",
     shortName: "POT",
     slug: "the-pot",
-    colorPrimary: "#6d28d9",
-    colorAlternate: "#ffffff",
+    colorPrimary: "#facc15",
+    colorAlternate: "#111111",
   },
   {
     name: "Free Foulin",
     shortName: "FRF",
     slug: "free-foulin",
-    colorPrimary: "#c8102e",
-    colorAlternate: "#ffffff",
+    colorPrimary: "#ffffff",
+    colorAlternate: "#111111",
   },
   {
-    name: "Dejong United",
+    name: "DeJong United",
     shortName: "DJU",
     slug: "dejong-united",
-    colorPrimary: "#ea580c",
+    colorPrimary: "#ffffff",
     colorAlternate: "#111111",
   },
   {
@@ -194,20 +194,20 @@ const FIRST_DIVISION_TEAMS: TeamSpec[] = [
     shortName: "ARS",
     slug: "arsenal",
     colorPrimary: "#c8102e",
-    colorAlternate: "#1e293b",
+    colorAlternate: "#ffffff",
   },
   {
     name: "Tap-in Merchants FC",
     shortName: "TIM",
     slug: "tap-in-merchants-fc",
-    colorPrimary: "#0ea5e9",
-    colorAlternate: "#1e293b",
+    colorPrimary: "#c8102e",
+    colorAlternate: "#111111",
   },
   {
     name: "Red Star",
     shortName: "RDS",
     slug: "red-star",
-    colorPrimary: "#7f1d1d",
+    colorPrimary: "#c8102e",
     colorAlternate: "#ffffff",
   },
   {
@@ -215,43 +215,20 @@ const FIRST_DIVISION_TEAMS: TeamSpec[] = [
     shortName: "ATC",
     slug: "atleticopilot",
     colorPrimary: "#ffffff",
-    colorAlternate: "#c8102e",
+    colorAlternate: "#111111",
   },
 ];
 
-const VENUES = [
-  {
-    name: "Microsoft Soccer Field 1",
-    slug: "ms-field-1",
-    address: "15255 NE 40th St",
-    city: "Redmond, WA",
-    notes: "Full-size turf, lights until 22:00. Parking in the East garage.",
-    mapUrl: "https://www.bing.com/maps?q=Microsoft+Redmond+Campus",
-  },
-  {
-    name: "Microsoft Soccer Field 2",
-    slug: "ms-field-2",
-    address: "15255 NE 40th St",
-    city: "Redmond, WA",
-    notes: "Shares lights with Field 1. No spectator seating.",
-    mapUrl: "https://www.bing.com/maps?q=Microsoft+Redmond+Campus",
-  },
-  {
-    name: "Marymoor Turf A",
-    slug: "marymoor-turf-a",
-    address: "6046 W Lake Sammamish Pkwy NE",
-    city: "Redmond, WA",
-    notes: "County park — arrive 20 minutes early, gate closes at 21:30.",
-    mapUrl: "https://www.bing.com/maps?q=Marymoor+Park",
-  },
-  {
-    name: "Bellevue Indoor Arena",
-    slug: "bellevue-indoor-arena",
-    address: "14200 SE Eastgate Way",
-    city: "Bellevue, WA",
-    notes: "Used for winter and rain-out reschedules.",
-    mapUrl: "https://www.bing.com/maps?q=Bellevue+WA",
-  },
+/**
+ * Venues are free text on the match, not records — organisers type whatever the
+ * fixture list says. These are just the strings the seeded fixtures cycle
+ * through.
+ */
+const VENUE_NAMES = [
+  "Microsoft Soccer Field 1",
+  "Microsoft Soccer Field 2",
+  "Marymoor Turf A",
+  "Bellevue Indoor Arena",
 ];
 
 /**
@@ -328,7 +305,6 @@ async function reset() {
   await prisma.division.deleteMany();
   await prisma.announcement.deleteMany();
   await prisma.season.deleteMany();
-  await prisma.venue.deleteMany();
   await prisma.referee.deleteMany();
   await prisma.document.deleteMany();
 }
@@ -411,11 +387,12 @@ async function seedSeason(options: {
   isActive: boolean;
   /** Kickoff of matchweek 1, relative to now in days. */
   firstMatchweekOffsetDays: number;
-  venueIds: string[];
+  venueNames: string[];
   refereeIds: string[];
   league: { id: string; name: string; teams: SeededTeam[] }[];
 }) {
-  const { name, slug, isActive, firstMatchweekOffsetDays, venueIds, refereeIds, league } = options;
+  const { name, slug, isActive, firstMatchweekOffsetDays, venueNames, refereeIds, league } =
+    options;
   const now = Date.now();
   const firstKickoff = new Date(now + firstMatchweekOffsetDays * DAY);
 
@@ -507,7 +484,7 @@ async function seedSeason(options: {
             divisionId: division.id,
             homeTeamId: home.id,
             awayTeamId: away.id,
-            venueId: venueIds[(roundIndex + slotIndex) % venueIds.length],
+            venueName: venueNames[(roundIndex + slotIndex) % venueNames.length],
             kickoffAt,
             matchweek,
             status,
@@ -829,18 +806,12 @@ async function main() {
   console.log("Resetting database...");
   await reset();
 
-  console.log("Creating venues and referees...");
-  const venues = [];
-  for (const venue of VENUES) {
-    venues.push(await prisma.venue.create({ data: venue }));
-  }
-
+  console.log("Creating referees...");
   const referees = [];
   for (const referee of REFEREES) {
     referees.push(await prisma.referee.create({ data: referee }));
   }
 
-  const venueIds = venues.map((v) => v.id);
   const refereeIds = referees.map((r) => r.id);
 
   console.log("Seeding divisions and clubs...");
@@ -852,7 +823,7 @@ async function main() {
     slug: "2026-spring",
     isActive: false,
     firstMatchweekOffsetDays: -170,
-    venueIds,
+    venueNames: VENUE_NAMES,
     refereeIds,
     league,
   });
@@ -863,7 +834,7 @@ async function main() {
     slug: "2026-fall",
     isActive: true,
     firstMatchweekOffsetDays: -21,
-    venueIds,
+    venueNames: VENUE_NAMES,
     refereeIds,
     league,
   });
@@ -881,7 +852,6 @@ async function main() {
     seasons: await prisma.season.count(),
     divisions: await prisma.division.count(),
     teams: await prisma.team.count(),
-    venues: await prisma.venue.count(),
     referees: await prisma.referee.count(),
     matches: await prisma.match.count(),
     openMatches: await prisma.match.count({ where: { refereeId: null, status: "SCHEDULED" } }),

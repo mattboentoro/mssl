@@ -68,7 +68,6 @@ export default async function AdminMatchesPage({
         homeTeam: { select: { name: true, colorPrimary: true, colorAlternate: true } },
         awayTeam: { select: { name: true, colorPrimary: true, colorAlternate: true } },
         division: { select: { name: true } },
-        venue: { select: { name: true } },
         referee: { select: { name: true } },
         report: { select: { homeScore: true, awayScore: true, status: true } },
       },
@@ -279,8 +278,8 @@ export default async function AdminMatchesPage({
                           {match.awayTeam.name}
                         </span>
                       </Link>
-                      {match.venue ? (
-                        <span className="text-muted block text-xs">{match.venue.name}</span>
+                      {match.venueName ? (
+                        <span className="text-muted block text-xs">{match.venueName}</span>
                       ) : null}
                     </td>
                     <td className="text-muted px-3 py-2">{match.division.name}</td>

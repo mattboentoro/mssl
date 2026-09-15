@@ -56,7 +56,6 @@ async function resetDatabase() {
   await prisma.division.deleteMany();
   await prisma.announcement.deleteMany();
   await prisma.season.deleteMany();
-  await prisma.venue.deleteMany();
   await prisma.referee.deleteMany();
 }
 
@@ -73,10 +72,6 @@ async function createFixture(): Promise<Fixture> {
 
   const division = await prisma.division.create({
     data: { name: "First Division", slug: "first-division" },
-  });
-
-  const venue = await prisma.venue.create({
-    data: { name: "Redmond Pitch", slug: "redmond-pitch" },
   });
 
   const home = await prisma.team.create({
@@ -108,7 +103,7 @@ async function createFixture(): Promise<Fixture> {
       divisionId: division.id,
       homeTeamId: home.id,
       awayTeamId: away.id,
-      venueId: venue.id,
+      venueName: "Redmond Pitch",
       kickoffAt: new Date("2026-02-01T18:00:00Z"),
       matchweek: 1,
       status: "SCHEDULED",

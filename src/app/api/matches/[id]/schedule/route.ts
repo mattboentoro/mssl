@@ -23,7 +23,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       matchId: id,
       actor: actorFrom(user),
       kickoffAt: kickoffAt ?? undefined,
-      venueId: body.venueId,
+      venueName: body.venueName,
       status: body.status,
       homeKit: body.homeKit,
       awayKit: body.awayKit,

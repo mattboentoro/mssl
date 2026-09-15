@@ -60,7 +60,6 @@ export const MATCH_LIST_INCLUDE = {
     },
   },
   division: { select: { id: true, name: true, slug: true } },
-  venue: { select: { id: true, name: true, city: true } },
   referee: { select: { id: true, name: true } },
   report: {
     select: {
