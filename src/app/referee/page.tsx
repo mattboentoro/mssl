@@ -4,8 +4,8 @@ import { forbidden, redirect } from "next/navigation";
 
 import { ActionButton } from "@/components/match-actions";
 import { CalendarViewToggle, FixtureCalendar, parseView } from "@/components/fixture-calendar";
+import { FixtureLine } from "@/components/match-display";
 import { Alert, Card, EmptyState, PageHeader, inputClass, labelClass } from "@/components/ui";
-import { KitLine } from "@/components/team-colors";
 import { MatchStatusBadge } from "@/components/ui";
 import { AuthzError, requireReferee } from "@/lib/authz";
 import { formatDateTime, parseMonthValue, shiftMonth } from "@/lib/dates";
@@ -24,6 +24,8 @@ interface RefereeParams {
   venue?: string;
   view?: string;
   month?: string;
+  myView?: string;
+  myMonth?: string;
 }
 
 export default async function RefereePage({
@@ -82,36 +84,70 @@ export default async function RefereePage({
   const active = mine.filter((m) => m.status === "ASSIGNED");
   const history = mine.filter((m) => m.status !== "ASSIGNED");
 
-  // --- Calendar --------------------------------------------------------------
-  // The month view answers a different question from the filtered list: "what
-  // is my weekend actually like?". So it deliberately ignores the date filters
-  // and shows the whole month, covering both open fixtures and the referee's
-  // own commitments.
+  // --- Calendars -------------------------------------------------------------
+  // The two sections answer different questions — "when am I working?" versus
+  // "what could I pick up?" — so each carries its own view and month. A referee
+  // can hold their commitments as a month grid while still scanning open
+  // fixtures as a filtered list.
+  //
+  // The month views deliberately ignore the date filters and show the whole
+  // month, because the question they answer is "what does my weekend look
+  // like?".
   const view = parseView(params.view);
+  const myView = parseView(params.myView);
   const { year, month } = parseMonthValue(params.month);
+  const myMonthValue = parseMonthValue(params.myMonth);
   // Month boundaries are league-time midnights: a 16:30 Redmond kickoff on 31
   // January is 00:30 UTC on 1 February, and belongs to January's grid.
   const next = shiftMonth(year, month, 1);
   const monthStart = zonedToUtc(year, month, 1);
   const monthEnd = zonedToUtc(next.year, next.month, 1);
 
-  const calendarMatches =
+  const myNext = shiftMonth(myMonthValue.year, myMonthValue.month, 1);
+  const myMonthStart = zonedToUtc(myMonthValue.year, myMonthValue.month, 1);
+  const myMonthEnd = zonedToUtc(myNext.year, myNext.month, 1);
+
+  const [calendarMatches, myCalendarMatches] = await Promise.all([
+    // Open fixtures only — the referee's own matches have their own calendar
+    // above, so showing them twice would just be noise.
     view === "calendar"
-      ? await listMatches({
+      ? listMatches({
           seasonId: season.id,
+          refereeId: null,
+          status: { in: ["SCHEDULED"] },
           kickoffAt: { gte: monthStart, lt: monthEnd },
-          OR: [{ refereeId: null }, { refereeId: referee.id }],
           ...(params.division ? { divisionId: params.division } : {}),
           ...(params.venue ? { venueId: params.venue } : {}),
         })
-      : [];
+      : Promise.resolve([]),
+    myView === "calendar"
+      ? listMatches({
+          refereeId: referee.id,
+          kickoffAt: { gte: myMonthStart, lt: myMonthEnd },
+        })
+      : Promise.resolve([]),
+  ]);
 
+  // Every link has to carry the *other* section's state, or switching one view
+  // would silently reset the other.
   const carried = {
     from: params.from,
     to: params.to,
     division: params.division,
     venue: params.venue,
     month: params.month,
+    myView: params.myView,
+    myMonth: params.myMonth,
+  };
+
+  const myCarried = {
+    from: params.from,
+    to: params.to,
+    division: params.division,
+    venue: params.venue,
+    view: params.view,
+    month: params.month,
+    myMonth: params.myMonth,
   };
 
   return (
@@ -131,10 +167,24 @@ export default async function RefereePage({
 
       {/* ------------------------------ My matches --------------------------- */}
       <section aria-labelledby="my-active" className="mt-8">
-        <h2 id="my-active" className="mb-3 text-lg font-semibold">
-          Your current assignments
-        </h2>
-        {active.length === 0 ? (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h2 id="my-active" className="text-lg font-semibold">
+            {myView === "calendar" ? "Your calendar" : "Your current assignments"}
+          </h2>
+          <CalendarViewToggle view={myView} basePath="/referee" query={myCarried} param="myView" />
+        </div>
+        {myView === "calendar" ? (
+          <FixtureCalendar
+            matches={myCalendarMatches}
+            year={myMonthValue.year}
+            month={myMonthValue.month}
+            basePath="/referee"
+            query={{ ...myCarried, myMonth: undefined, myView: "calendar" }}
+            monthParam="myMonth"
+            hrefForMatch={(match) => `/referee/${match.id}`}
+            emptyHint="Matches you have claimed appear here. Use the arrows to look ahead."
+          />
+        ) : active.length === 0 ? (
           <Card className="p-6">
             <EmptyState
               title="Nothing assigned to you right now"
@@ -151,20 +201,11 @@ export default async function RefereePage({
                       <MatchStatusBadge status={match.status} />
                       <span className="text-muted text-xs">{match.division.name}</span>
                     </div>
-                    <p className="mt-1 font-semibold">
-                      {match.homeTeam.name} v {match.awayTeam.name}
-                    </p>
+                    <FixtureLine className="mt-1" match={match} href={`/referee/${match.id}`} />
                     <p className="text-muted text-sm">
                       {formatDateTime(match.kickoffAt)}
                       {match.venue ? ` \u00b7 ${match.venue.name}` : ""}
                     </p>
-                    <KitLine
-                      className="mt-1.5"
-                      homeTeam={match.homeTeam}
-                      homeKit={match.homeKit}
-                      awayTeam={match.awayTeam}
-                      awayKit={match.awayKit}
-                    />
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     {match.status === "ASSIGNED" ? (
@@ -193,7 +234,7 @@ export default async function RefereePage({
       <section aria-labelledby="available" className="mt-10">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 id="available" className="text-lg font-semibold">
-            {view === "calendar" ? "Fixture calendar" : "Available matches"}
+            {view === "calendar" ? "Open fixtures calendar" : "Available matches"}
           </h2>
           <CalendarViewToggle view={view} basePath="/referee" query={carried} />
         </div>
@@ -203,6 +244,10 @@ export default async function RefereePage({
             {/* Keep the current view and month when the filters are applied. */}
             <input type="hidden" name="view" value={view} />
             {params.month ? <input type="hidden" name="month" value={params.month} /> : null}
+            {/* Filtering open fixtures must not reset how the referee is
+                looking at their own assignments. */}
+            {params.myView ? <input type="hidden" name="myView" value={params.myView} /> : null}
+            {params.myMonth ? <input type="hidden" name="myMonth" value={params.myMonth} /> : null}
             {view === "calendar" ? null : (
               <>
                 <div>
@@ -275,7 +320,7 @@ export default async function RefereePage({
                 Filter
               </button>
               <Link
-                href={`/referee?view=${view}`}
+                href={`/referee?view=${view}${params.myView ? `&myView=${params.myView}` : ""}`}
                 className="text-muted px-2 py-2 text-sm hover:underline"
               >
                 Reset
@@ -292,7 +337,7 @@ export default async function RefereePage({
             basePath="/referee"
             query={{ ...carried, month: undefined, view: "calendar" }}
             hrefForMatch={(match) => `/referee/${match.id}`}
-            emptyHint="Open fixtures and your own assignments appear here. Use the arrows to look ahead."
+            emptyHint="Open fixtures appear here. Use the arrows to look ahead."
           />
         ) : available.length === 0 ? (
           <Card className="p-6">
@@ -310,26 +355,11 @@ export default async function RefereePage({
                     <p className="text-muted text-xs">
                       {match.division.name} &middot; MW {match.matchweek}
                     </p>
-                    <p className="mt-0.5 font-semibold">
-                      {match.homeTeam.name} v {match.awayTeam.name}
-                    </p>
+                    <FixtureLine className="mt-0.5" match={match} href={`/referee/${match.id}`} />
                     <p className="text-muted text-sm">
                       {formatDateTime(match.kickoffAt)}
                       {match.venue ? ` \u00b7 ${match.venue.name}, ${match.venue.city}` : ""}
                     </p>
-                    <KitLine
-                      className="mt-1.5"
-                      homeTeam={match.homeTeam}
-                      homeKit={match.homeKit}
-                      awayTeam={match.awayTeam}
-                      awayKit={match.awayKit}
-                    />
-                    <Link
-                      href={`/referee/${match.id}`}
-                      className="text-brand mt-1.5 inline-block text-xs font-medium hover:underline"
-                    >
-                      View match details
-                    </Link>
                   </div>
                   <ActionButton
                     url={`/api/matches/${match.id}/assign`}

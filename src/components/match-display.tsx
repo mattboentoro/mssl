@@ -3,6 +3,7 @@ import Link from "next/link";
 import { KitSwatch, TeamColorBar } from "@/components/team-colors";
 import { Badge, Card, FormGuide, MatchStatusBadge } from "@/components/ui";
 import { formatDateTime } from "@/lib/dates";
+import { kitColorName, resolveKit } from "@/lib/kits";
 import type { MatchListItem } from "@/lib/queries";
 import type { StandingsRow } from "@/lib/standings";
 
@@ -87,6 +88,56 @@ export function MatchList({
         <MatchRow key={match.id} match={match} showReferee={showReferee} />
       ))}
     </ul>
+  );
+}
+
+/**
+ * One fixture written as a single line: "&#9679; Home (black) v &#9679; Away (red)".
+ *
+ * Referee screens previously carried the kit colours on their own row below the
+ * fixture, which repeated both team names. Naming the colour beside the team it
+ * belongs to says the same thing in half the space, and a swatch on its own is
+ * hard to read on a phone in daylight.
+ */
+export function FixtureLine({
+  match,
+  href,
+  className = "",
+}: {
+  match: MatchListItem;
+  /** Where the fixture name points. Omit to render plain text. */
+  href?: string;
+  className?: string;
+}) {
+  const sides = [
+    { team: match.homeTeam, kit: match.homeKit },
+    { team: match.awayTeam, kit: match.awayKit },
+  ];
+
+  const body = (
+    <>
+      {sides.map(({ team, kit }, index) => (
+        <span key={team.id} className="inline-flex items-center gap-1.5">
+          {index === 1 ? <span className="text-muted mr-1 text-xs font-normal">v</span> : null}
+          <KitSwatch team={team} kit={kit} teamName={team.name} />
+          {/*
+            One interpolation so the name and its colour stay a single text
+            node — React separates adjacent JSX text with an HTML comment.
+          */}
+          <span>{`${team.name} (${kitColorName(resolveKit(team, kit)).toLowerCase()})`}</span>
+        </span>
+      ))}
+    </>
+  );
+
+  const shell = `inline-flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold ${className}`;
+
+  return href ? (
+    <Link href={href} className={`${shell} hover:underline`}>
+      {body}
+    </Link>
+  ) : (
+    <p className={shell}>{body}</p>
   );
 }
 

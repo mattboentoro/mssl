@@ -178,19 +178,31 @@ async function main(): Promise<void> {
     "the referee calendar links every fixture, not just their own",
     calendar.includes(`/referee/${match.id}`),
   );
+  // Assignments and open fixtures are separate questions -- "when am I
+  // working?" versus "what could I pick up?" -- so each section carries its own
+  // view, and switching one must not reset the other.
+  const splitViews = await (await req("/referee?view=list&myView=calendar")).text();
+  check(
+    "the assignments section has its own calendar view",
+    splitViews.includes("Your calendar") && splitViews.includes("Available matches"),
+  );
+  check(
+    "switching the assignments view keeps the open-fixture view",
+    calendar.includes("myView=calendar") && splitViews.includes("view=calendar"),
+  );
   // The open-match list has to name the kit colours too, not just show a
   // swatch: a phone screen in daylight makes two dark circles look identical.
   const openList = await (await req("/referee")).text();
-  const homeKitText = `${match.homeTeam.name} in ${kitColorName(resolveKit(match.homeTeam, match.homeKit)).toLowerCase()}`;
-  const awayKitText = `${match.awayTeam.name} in ${kitColorName(resolveKit(match.awayTeam, match.awayKit)).toLowerCase()}`;
+  const homeKitText = `${match.homeTeam.name} (${kitColorName(resolveKit(match.homeTeam, match.homeKit)).toLowerCase()})`;
+  const awayKitText = `${match.awayTeam.name} (${kitColorName(resolveKit(match.awayTeam, match.awayKit)).toLowerCase()})`;
   check(
-    "the open-match list names each side's kit colour",
+    "the open-match list names each side's kit colour inline",
     openList.includes(homeKitText) && openList.includes(awayKitText),
     `${homeKitText} / ${awayKitText}`,
   );
   check(
-    "an open fixture can be opened before it is claimed",
-    openList.includes(`/referee/${match.id}`),
+    "the fixture name itself links to the match detail",
+    openList.includes(`/referee/${match.id}`) && !openList.includes("View match details"),
   );
   const preview = await (await req(`/referee/${match.id}`)).text();
   check("an unclaimed fixture is previewable", preview.includes(match.homeTeam.name));
