@@ -125,58 +125,71 @@ export default async function AdminStandingsPage({
           </form>
         ) : null}
         <Card className="p-5">
-          <ActionForm action={createPointsAdjustmentAction} className="grid gap-3 sm:grid-cols-2">
-            <Field label="Team" htmlFor="adj-team">
-              <select id="adj-team" name="teamId" className={inputClass} required>
-                {teams.map((team) => (
-                  <option key={team.id} value={team.id}>
-                    {team.name} &mdash; {team.division.name}
-                  </option>
-                ))}
-              </select>
-              <FieldError name="teamId" />
-            </Field>
+          {teams.length === 0 ? (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">No teams in this league yet.</p>
+              <p className="text-muted text-sm">
+                There is nothing to adjust here. Pick another league above, or add teams to it in{" "}
+                <Link href="/admin/league" className="underline underline-offset-2">
+                  Seasons &amp; teams
+                </Link>
+                .
+              </p>
+            </div>
+          ) : (
+            <ActionForm action={createPointsAdjustmentAction} className="grid gap-3 sm:grid-cols-2">
+              <Field label="Team" htmlFor="adj-team">
+                <select id="adj-team" name="teamId" className={inputClass} required>
+                  {teams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name} &mdash; {team.division.name}
+                    </option>
+                  ))}
+                </select>
+                <FieldError name="teamId" />
+              </Field>
 
-            <Field
-              label="Points"
-              htmlFor="adj-points"
-              hint="Negative deducts, e.g. &minus;3. Zero is not allowed."
-            >
-              <input
-                id="adj-points"
-                name="points"
-                type="number"
-                min={-50}
-                max={50}
-                step={1}
-                defaultValue={-3}
-                className={inputClass}
-                required
-              />
-              <FieldError name="points" />
-            </Field>
-
-            <div className="sm:col-span-2">
               <Field
-                label="Reason"
-                htmlFor="adj-reason"
-                hint="Shown to the public alongside the adjustment."
+                label="Points"
+                htmlFor="adj-points"
+                hint="Negative deducts, e.g. &minus;3. Zero is not allowed."
               >
                 <input
-                  id="adj-reason"
-                  name="reason"
+                  id="adj-points"
+                  name="points"
+                  type="number"
+                  min={-50}
+                  max={50}
+                  step={1}
+                  defaultValue={-3}
                   className={inputClass}
-                  placeholder="Fielding an ineligible player in matchweek 4"
                   required
                 />
-                <FieldError name="reason" />
+                <FieldError name="points" />
               </Field>
-            </div>
 
-            <div className="sm:col-span-2">
-              <SubmitButton>Apply adjustment</SubmitButton>
-            </div>
-          </ActionForm>
+              <div className="sm:col-span-2">
+                <Field
+                  label="Reason"
+                  htmlFor="adj-reason"
+                  hint="Shown to the public alongside the adjustment."
+                >
+                  <input
+                    id="adj-reason"
+                    name="reason"
+                    className={inputClass}
+                    placeholder="Fielding an ineligible player in matchweek 4"
+                    required
+                  />
+                  <FieldError name="reason" />
+                </Field>
+              </div>
+
+              <div className="sm:col-span-2">
+                <SubmitButton>Apply adjustment</SubmitButton>
+              </div>
+            </ActionForm>
+          )}
         </Card>
       </section>
 
