@@ -414,6 +414,35 @@ async function main(): Promise<void> {
     "standings still points at a database id",
   );
 
+  console.log("\nThe FAQ replaces the old contact page");
+  const faq = await req("/faq");
+  const faqHtml = await faq.text();
+  check("/faq returns 200", faq.status === 200, `status ${faq.status}`);
+  for (const heading of [
+    "General Questions",
+    "League Questions",
+    "Game-Related Questions",
+    "Team Manager Questions",
+  ]) {
+    check(`/faq shows "${heading}"`, faqHtml.includes(heading), "heading missing");
+  }
+  check(
+    "/faq answers an actual question",
+    faqHtml.includes("Am I eligible to play in the MSSL?") &&
+      faqHtml.includes("How much are referees paid?"),
+    "a question is missing",
+  );
+  // "Section:" delimited the source copy; it must never reach the page.
+  check("/faq never prints the word Section:", !faqHtml.includes("Section:"), "delimiter leaked");
+  const contact = await req("/contact");
+  check("/contact is gone", contact.status === 404, `status ${contact.status}`);
+  const home404 = await (await req("/")).text();
+  check(
+    "nothing still links to /contact",
+    !home404.includes('href="/contact"') && !faqHtml.includes('href="/contact"'),
+    "a dead contact link survives",
+  );
+
   console.log("\nAdmin confirmation");
   await signIn("admin");
   const adminPage = await req("/admin/matches");

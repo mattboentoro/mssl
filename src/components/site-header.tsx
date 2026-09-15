@@ -25,7 +25,7 @@ const PUBLIC_LINKS: NavLink[] = [
   { href: "/standings", label: "Standings" },
   { href: "/teams", label: "Teams" },
   { href: "/rules", label: "Rules" },
-  { href: "/contact", label: "Contact" },
+  { href: "/faq", label: "FAQ" },
 ];
 
 export function SiteHeader({ user }: { user: HeaderUser | null }) {

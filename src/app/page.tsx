@@ -29,10 +29,10 @@ const QUICK_LINKS = [
   { href: "/teams", label: "Teams", emoji: "\uD83D\uDC65", hint: "Clubs, fixtures & results" },
   { href: "/rules", label: "Rules", emoji: "\uD83D\uDCD8", hint: "Laws, conduct & forms" },
   {
-    href: "/contact",
-    label: "Contact",
-    emoji: "\u2709\uFE0F",
-    hint: "League officers & FAQ",
+    href: "/faq",
+    label: "FAQ",
+    emoji: "\u2753",
+    hint: "Eligibility, gear & rescheduling",
   },
   {
     href: "/referee",

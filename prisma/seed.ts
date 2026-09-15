@@ -734,7 +734,7 @@ async function seedContent(seasonId: string) {
     {
       title: "Player Registration Form",
       category: "FORMS",
-      url: "/contact",
+      url: "/faq",
       description: "Register a new player with the league office (captain approval required).",
       fileType: "Form",
       sortOrder: 3,
@@ -750,7 +750,7 @@ async function seedContent(seasonId: string) {
     {
       title: "Field Locations & Parking",
       category: "OTHER",
-      url: "/contact#venues",
+      url: "/faq#league",
       description: "Directions and parking notes for every MSSL venue.",
       fileType: "Page",
       sortOrder: 5,

@@ -156,8 +156,8 @@ export default async function RulesPage() {
           )}
           <p className="text-muted mt-4 text-xs">
             Something missing or out of date?{" "}
-            <Link href="/contact" className="underline">
-              Contact the league board
+            <Link href="/faq" className="underline">
+              Check the FAQ
             </Link>
             .
           </p>

@@ -74,7 +74,7 @@ register, CSV dry run/commit, audit trail).
 Next.js 16 App Router (React 19, TypeScript strict, Tailwind v4)
 ├── src/app/                    routes — RSC by default
 │   ├── (public)                /, /schedule, /standings, /teams, /rules,
-│   │                           /contact
+│   │                           /faq
 │   ├── referee/                Referee Control (referee role)
 │   ├── admin/                  Match Control + audit (admin role)
 │   └── api/                    route handlers, all runtime = "nodejs"
@@ -509,9 +509,9 @@ Ambiguous product decisions, resolved and recorded rather than escalated.
 20. **No `middleware.ts`.** Prisma needs the Node runtime; authorization lives in
     `requireReferee()` / `requireAdmin()` at every entry point instead.
 21. **Content is seeded, not migrated.** The old SharePoint site is
-    auth-protected and could not be read, so rules, officers, FAQ and contact
-    details are plausible placeholders — replace them in `/admin/content` and
-    `src/app/rules` / `src/app/contact`.
+    auth-protected and could not be read, so the rules and documents are
+    plausible placeholders — replace them in `/admin/content` and
+    `src/app/rules`. The FAQ at `src/app/faq` is real league copy.
 22. **Every time is Redmond time, everywhere.** `Match.kickoffAt` is stored as
     UTC, but the league has one home and nobody should have to think about
     offsets. `src/lib/timezone.ts` converts at the edges: a CSV upload and the
