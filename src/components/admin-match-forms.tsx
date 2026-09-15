@@ -20,6 +20,10 @@ interface Option {
   name: string;
 }
 
+interface FixtureTeam extends Option {
+  divisionId: string;
+}
+
 export function AdminMatchForms({
   matchId,
   status,
@@ -29,6 +33,11 @@ export function AdminMatchForms({
   countsForStandings,
   refereeId,
   hasReport,
+  divisionId,
+  homeTeamId,
+  awayTeamId,
+  divisions,
+  teams,
   homeTeamName,
   awayTeamName,
   homeTeam,
@@ -47,6 +56,11 @@ export function AdminMatchForms({
   countsForStandings: boolean;
   refereeId: string | null;
   hasReport: boolean;
+  divisionId: string;
+  homeTeamId: string;
+  awayTeamId: string;
+  divisions: Option[];
+  teams: FixtureTeam[];
   homeTeamName: string;
   awayTeamName: string;
   homeTeam: TeamColors;
@@ -62,6 +76,15 @@ export function AdminMatchForms({
   const [busy, setBusy] = useState<string | null>(null);
   const [home, setHome] = useState<KitChoice>(homeKit);
   const [away, setAway] = useState<KitChoice>(awayKit);
+  const [division, setDivision] = useState(divisionId);
+
+  const eligible = teams.filter((team) => team.divisionId === division);
+  const pick = (preferred: string, exclude?: string): string => {
+    if (preferred !== exclude && eligible.some((team) => team.id === preferred)) return preferred;
+    return eligible.find((team) => team.id !== exclude)?.id ?? "";
+  };
+  const fixtureHome = pick(homeTeamId);
+  const fixtureAway = pick(awayTeamId, fixtureHome);
 
   const homeColor = resolveKit(homeTeam, home);
   const awayColor = resolveKit(awayTeam, away);
@@ -216,6 +239,105 @@ export function AdminMatchForms({
           </button>
           {feedback("schedule")}
         </form>
+      </Card>
+
+      {/* -------------------------- Who is playing -------------------------- */}
+      <Card className="p-5">
+        <h3 className="font-semibold">Teams &amp; league</h3>
+        <p className="text-muted mt-1 text-xs">
+          Correct a fixture entered against the wrong clubs or the wrong league. Changing the league
+          re-filters both team lists.
+        </p>
+        {hasReport ? (
+          <Alert tone="warning" className="mt-4">
+            A report has been filed, so the teams are fixed &mdash; every goal and card names one of
+            them. Override the result above, or delete and re-create the fixture.
+          </Alert>
+        ) : (
+          <form
+            className="mt-4 space-y-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const data = new FormData(event.currentTarget);
+              void send("fixture", `/api/matches/${matchId}/schedule`, {
+                divisionId: String(data.get("divisionId") ?? ""),
+                homeTeamId: String(data.get("homeTeamId") ?? ""),
+                awayTeamId: String(data.get("awayTeamId") ?? ""),
+                reason: String(data.get("reason") ?? ""),
+              });
+            }}
+          >
+            <Field label="League" htmlFor="fixture-division">
+              <select
+                id="fixture-division"
+                name="divisionId"
+                value={division}
+                onChange={(event) => setDivision(event.target.value)}
+                className={inputClass}
+              >
+                {divisions.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {eligible.length < 2 ? (
+              <Alert tone="warning">
+                This league has fewer than two clubs, so no fixture can be built from it yet.
+              </Alert>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Home team" htmlFor="fixture-home">
+                  <select
+                    id="fixture-home"
+                    name="homeTeamId"
+                    defaultValue={fixtureHome}
+                    key={`home-${division}`}
+                    className={inputClass}
+                  >
+                    {eligible.map((team) => (
+                      <option key={team.id} value={team.id}>
+                        {team.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Away team" htmlFor="fixture-away">
+                  <select
+                    id="fixture-away"
+                    name="awayTeamId"
+                    defaultValue={fixtureAway}
+                    key={`away-${division}`}
+                    className={inputClass}
+                  >
+                    {eligible.map((team) => (
+                      <option key={team.id} value={team.id}>
+                        {team.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+            )}
+            <Field label="Reason" htmlFor="fixture-reason" hint="Shown in the audit log.">
+              <input
+                id="fixture-reason"
+                name="reason"
+                className={inputClass}
+                placeholder="Entered against the wrong club"
+              />
+            </Field>
+            <button
+              type="submit"
+              disabled={busy === "fixture" || eligible.length < 2}
+              className={buttonClass("primary")}
+            >
+              {busy === "fixture" ? "Saving\u2026" : "Save teams"}
+            </button>
+            {feedback("fixture")}
+          </form>
+        )}
       </Card>
 
       {/* ------------------------------ Officials --------------------------- */}

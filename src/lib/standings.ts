@@ -44,6 +44,8 @@ export interface StandingsTeamInput {
   id: string;
   name: string;
   divisionId: string;
+  /** Public URL segment. Falls back to the id so tests can omit it. */
+  slug?: string;
   shortName?: string;
   colorPrimary?: string | null;
   colorAlternate?: string | null;
@@ -53,6 +55,7 @@ export type FormResult = "W" | "D" | "L";
 
 export interface StandingsRow {
   teamId: string;
+  teamSlug: string;
   teamName: string;
   shortName: string;
   colorPrimary: string;
@@ -96,6 +99,18 @@ export type Tiebreaker =
  * of fixtures, which matters in a workplace league where games get rearranged.
  */
 export type PrimaryMetric = "points" | "pointsPerGame";
+
+/**
+ * Points per game, with an unplayed team pinned at zero.
+ *
+ * A team with no fixtures behind it has no average at all, but 0/0 is NaN and
+ * NaN loses every comparison it takes part in, so such a team would drift to a
+ * random place in the table. Zero keeps it bottom, which is where an unplayed
+ * team belongs.
+ */
+export function pointsPerGame(row: { points: number; played: number }): number {
+  return row.played === 0 ? 0 : row.points / row.played;
+}
 
 export interface StandingsAdjustmentInput {
   teamId: string;
@@ -215,6 +230,7 @@ export function calculateStandings(
   for (const team of teams) {
     table.set(team.id, {
       teamId: team.id,
+      teamSlug: team.slug ?? team.id,
       teamName: team.name,
       shortName: team.shortName ?? team.name,
       colorPrimary: team.colorPrimary?.trim() || DEFAULT_PRIMARY,

@@ -469,7 +469,7 @@ export async function overrideGameReport(
   });
 }
 
-/** Admin reschedule / postpone / cancel, and kit selection. */
+/** Admin reschedule / postpone / cancel, fixture correction, and kit selection. */
 export async function updateMatchSchedule(
   db: DbClient,
   params: {
@@ -480,6 +480,9 @@ export async function updateMatchSchedule(
     status?: MatchStatus;
     matchweek?: string;
     countsForStandings?: boolean;
+    divisionId?: string;
+    homeTeamId?: string;
+    awayTeamId?: string;
     homeKit?: KitChoice;
     awayKit?: KitChoice;
     reason?: string;
@@ -502,6 +505,36 @@ export async function updateMatchSchedule(
   if (params.homeKit) data.homeKit = params.homeKit;
   if (params.awayKit) data.awayKit = params.awayKit;
 
+  /*
+    Who is playing whom can still be corrected after the fixture is created,
+    but never once a report exists: every goal and card names a team, so
+    swapping the teams underneath would leave the report pointing at clubs
+    that are no longer in the match.
+  */
+  const homeTeamId = params.homeTeamId ?? match.homeTeamId;
+  const awayTeamId = params.awayTeamId ?? match.awayTeamId;
+  const movingFixture =
+    (params.homeTeamId !== undefined && params.homeTeamId !== match.homeTeamId) ||
+    (params.awayTeamId !== undefined && params.awayTeamId !== match.awayTeamId) ||
+    (params.divisionId !== undefined && params.divisionId !== match.divisionId);
+
+  if (movingFixture) {
+    const report = await db.gameReport.findUnique({ where: { matchId }, select: { id: true } });
+    if (report) {
+      throw new MatchError(
+        "A report has been filed for this fixture, so the teams can no longer be changed. Override the result instead, or delete and re-create the fixture.",
+        409,
+        "INVALID_STATE",
+      );
+    }
+    if (homeTeamId === awayTeamId) {
+      throw new MatchError("A team cannot play itself.", 400, "INVALID_STATE");
+    }
+    if (params.divisionId) data.division = { connect: { id: params.divisionId } };
+    if (params.homeTeamId) data.homeTeam = { connect: { id: params.homeTeamId } };
+    if (params.awayTeamId) data.awayTeam = { connect: { id: params.awayTeamId } };
+  }
+
   await db.match.update({ where: { id: matchId }, data });
 
   await writeAudit(db, {
@@ -517,6 +550,9 @@ export async function updateMatchSchedule(
         venueName: match.venueName,
         matchweek: match.matchweek,
         countsForStandings: match.countsForStandings,
+        divisionId: match.divisionId,
+        homeTeamId: match.homeTeamId,
+        awayTeamId: match.awayTeamId,
         homeKit: match.homeKit,
         awayKit: match.awayKit,
       },
@@ -526,6 +562,9 @@ export async function updateMatchSchedule(
         venueName: params.venueName === undefined ? match.venueName : params.venueName,
         matchweek: params.matchweek ?? match.matchweek,
         countsForStandings: params.countsForStandings ?? match.countsForStandings,
+        divisionId: movingFixture ? (params.divisionId ?? match.divisionId) : match.divisionId,
+        homeTeamId: movingFixture ? homeTeamId : match.homeTeamId,
+        awayTeamId: movingFixture ? awayTeamId : match.awayTeamId,
         homeKit: params.homeKit ?? match.homeKit,
         awayKit: params.awayKit ?? match.awayKit,
       },

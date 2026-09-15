@@ -14,6 +14,7 @@
  * and cleans up after itself.
  */
 import { prisma } from "../src/lib/prisma";
+import { toDateTimeInputValue } from "../src/lib/dates";
 import { kitsClash, resolveKit } from "../src/lib/kits";
 import { getStandingsForSeason } from "../src/lib/queries";
 
@@ -159,6 +160,23 @@ async function main(): Promise<void> {
     team?.colorPrimary === "#6d28d9" && team?.colorAlternate === "#facc15",
     `${team?.colorPrimary} / ${team?.colorAlternate}`,
   );
+
+  // A club's address is league-wide now, so the same name in a different
+  // division has to be refused rather than quietly shadowing the first club.
+  const rivalDivision = await prisma.division.findFirst({ where: { id: { not: division.id } } });
+  if (rivalDivision) {
+    const clash = await submit("/admin/league", 'id="team-name"', {
+      divisionId: rivalDivision.id,
+      name: teamName,
+      shortName: "SMK",
+    });
+    const clones = await prisma.team.count({ where: { name: teamName } });
+    check(
+      "the same club name cannot be reused in another division",
+      clones === 1 && clash.html.includes("already uses the web address"),
+      `${clones} team(s) named ${teamName}`,
+    );
+  }
 
   if (team) {
     await submit("/admin/discipline", 'id="disc-player"', {
@@ -360,6 +378,13 @@ async function main(): Promise<void> {
       otherDivision.name,
     );
     check("the league filter is not a separate submit step", !adjHtml.includes("Apply filter"));
+    // The filter sits directly above the picker, so naming the league on every
+    // option just repeated it back at the admin.
+    check(
+      "team options are not suffixed with their league",
+      !adjHtml.includes(`${otherDivision.teams[0].name} &#x2014; ${otherDivision.name}`) &&
+        !adjHtml.includes(`${otherDivision.teams[0].name} — ${otherDivision.name}`),
+    );
   }
 
   console.log("\nSeason ranking rule");
@@ -386,10 +411,28 @@ async function main(): Promise<void> {
       where: { action: "season.tiebreaker", entityId: season.id },
     })) > 0,
   );
+
+  // The number a season ranks on has to be on screen. Anything else asks the
+  // reader to take the order on faith.
+  const ppgPublic = await (await req("/standings")).text();
+  const ppgHome = await (await req("/")).text();
+  const ppgAdmin = await (await req("/admin/standings")).text();
+  check("a points-per-game season shows a PPG column publicly", ppgPublic.includes(">PPG<"));
+  check("the home page snapshot shows it too", ppgHome.includes(">PPG<"));
+  check("and the admin table shows it", ppgAdmin.includes(">PPG<"));
+  check(
+    "the tiebreaker note does not repeat the ranking metric",
+    !ppgPublic.includes("separated by points per game"),
+  );
+
   await submit("/admin/league", `id="tiebreak-${season.id}"`, {
     seasonId: season.id,
     tiebreakerMode: tbBefore.tiebreakerMode,
   });
+  check(
+    "a points-ranked season carries no PPG column",
+    !(await (await req("/standings")).text()).includes(">PPG<"),
+  );
 
   const headline = `Smoke news ${stamp}`;
   await submit("/admin/content", 'id="ann-title"', {
@@ -416,7 +459,34 @@ async function main(): Promise<void> {
     "upcoming-only is the default filter",
     /<option value="upcoming"[^>]*selected/.test(matchesHtml),
   );
-  check("the venue picker is gone from Add a fixture", !matchesHtml.includes('id="new-venue"'));
+  check(
+    "Add a fixture takes a free-text venue, not a registry lookup",
+    matchesHtml.includes('id="new-venue"') && !matchesHtml.includes('<select id="new-venue"'),
+  );
+  {
+    // Offering the whole league in the team pickers made it trivial to schedule
+    // a cross-division fixture by accident. The division select now lives
+    // inside the picker so it can narrow both lists. Only the first render is
+    // observable over HTTP -- the narrowing itself is client-side.
+    const other = await prisma.division.findFirst({
+      where: { id: { not: division.id } },
+      include: { teams: { orderBy: { name: "asc" }, take: 1 } },
+    });
+    const form = matchesHtml.slice(matchesHtml.indexOf('id="new-division"'));
+    const picker = form.slice(0, form.indexOf("</form>"));
+    check("the division select sits inside the fixture picker", picker.includes('id="new-home"'));
+    check(
+      "Add a fixture takes a venue",
+      form.includes('id="new-venue"') && form.includes('name="venueName"'),
+    );
+    if (other?.teams[0]) {
+      check(
+        "team pickers only offer clubs from the chosen division",
+        !picker.includes(`value="${other.teams[0].id}"`),
+        other.teams[0].name,
+      );
+    }
+  }
   check("the fixture table has no separate score column", !matchesHtml.includes(">Score<"));
   {
     // A played fixture reads as "Home 2–1 Away" on one line; an unplayed one
@@ -654,6 +724,74 @@ async function main(): Promise<void> {
     });
     check("Zod rejects an unknown kit choice", bogus.status === 422, `status ${bogus.status}`);
 
+    // The panel posts the raw datetime-local value so the server can read it as
+    // Redmond wall-clock time. Demanding an ISO offset here made every single
+    // "Save schedule" 422 before the route ever ran.
+    const WALL = "2031-03-09T19:45";
+    const rescheduled = await req(`/api/matches/${importedMatch.id}/schedule`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kickoffAt: WALL,
+        venueName: "Smoke Field 3",
+        reason: "Smoke reschedule",
+      }),
+    });
+    const moved = await prisma.match.findUnique({ where: { id: importedMatch.id } });
+    check(
+      "admin can reschedule using a wall-clock kick-off",
+      rescheduled.status === 200 &&
+        toDateTimeInputValue(moved?.kickoffAt ?? new Date(0)) === WALL &&
+        moved?.venueName === "Smoke Field 3",
+      `status ${rescheduled.status} \u2192 ${toDateTimeInputValue(moved?.kickoffAt ?? new Date(0))} @ ${moved?.venueName}`,
+    );
+    const unreadable = await req(`/api/matches/${importedMatch.id}/schedule`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kickoffAt: "next tuesday" }),
+    });
+    check(
+      "an unreadable kick-off is still refused",
+      unreadable.status === 400,
+      `status ${unreadable.status}`,
+    );
+
+    // Fixtures entered against the wrong club must be correctable while no
+    // report exists.
+    const swapTo = await prisma.team.findFirst({
+      where: {
+        divisionId: importedMatch.divisionId,
+        id: { notIn: [importedMatch.homeTeamId, importedMatch.awayTeamId] },
+      },
+    });
+    if (swapTo) {
+      const corrected = await req(`/api/matches/${importedMatch.id}/schedule`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          homeTeamId: swapTo.id,
+          awayTeamId: importedMatch.awayTeamId,
+          reason: "Entered against the wrong club",
+        }),
+      });
+      const fixed = await prisma.match.findUnique({ where: { id: importedMatch.id } });
+      check(
+        "admin can correct which clubs are playing",
+        corrected.status === 200 && fixed?.homeTeamId === swapTo.id,
+        `status ${corrected.status}`,
+      );
+      const selfPlay = await req(`/api/matches/${importedMatch.id}/schedule`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ homeTeamId: swapTo.id, awayTeamId: swapTo.id }),
+      });
+      check(
+        "a club cannot be set to play itself",
+        selfPlay.status === 400,
+        `status ${selfPlay.status}`,
+      );
+    }
+
     await signIn("referee");
     const denied = await req(`/api/matches/${importedMatch.id}/schedule`, {
       method: "POST",
@@ -695,6 +833,24 @@ async function main(): Promise<void> {
       where: { action: "report.enter", metadata: { contains: importedMatch.id } },
     });
     check("entering a result is audited separately from an override", Boolean(enterAudit));
+
+    // Once a report names the clubs, moving them underneath it would orphan
+    // every goal and card.
+    const lateSwap = await req(`/api/matches/${importedMatch.id}/schedule`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ homeTeamId: importedMatch.awayTeamId }),
+    });
+    check(
+      "clubs cannot be changed once a report exists",
+      lateSwap.status === 409,
+      `status ${lateSwap.status}`,
+    );
+    const guarded = await (await req(`/admin/matches/${importedMatch.id}`)).text();
+    check(
+      "the delete card explains itself when deletion is blocked",
+      guarded.includes("Delete fixture") && guarded.includes("cannot be deleted"),
+    );
 
     const flagged = await req(`/api/matches/${importedMatch.id}/schedule`, {
       method: "POST",

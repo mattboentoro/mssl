@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 
 import { MatchList } from "@/components/match-display";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
-import { getCurrentUser } from "@/lib/authz";
 import { CARD_LABELS, type CardType } from "@/lib/enums";
 import { formatDate } from "@/lib/dates";
 import { kitColorName, resolveKit } from "@/lib/kits";
@@ -32,7 +31,6 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
   const team = await getTeamDetail(id);
   if (!team) notFound();
   // Referee appointments stay behind sign-in.
-  const viewer = await getCurrentUser();
 
   // A club belongs to the league, not to a season, so its form and discipline
   // are shown for whichever season is currently running.
@@ -132,7 +130,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
             {played.length === 0 ? (
               <EmptyState title="No results yet" />
             ) : (
-              <MatchList matches={[...played].reverse()} showReferee={Boolean(viewer)} />
+              <MatchList matches={[...played].reverse()} />
             )}
           </section>
 
@@ -143,7 +141,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
             {upcoming.length === 0 ? (
               <EmptyState title="No fixtures scheduled" />
             ) : (
-              <MatchList matches={upcoming} showReferee={Boolean(viewer)} />
+              <MatchList matches={upcoming} />
             )}
           </section>
         </div>

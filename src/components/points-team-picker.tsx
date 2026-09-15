@@ -9,7 +9,6 @@ export interface PickerTeam {
   id: string;
   name: string;
   divisionId: string;
-  divisionName: string;
 }
 
 interface Props {
@@ -67,7 +66,7 @@ export function PointsTeamPicker({ divisions, teams }: Props) {
           >
             {visible.map((team) => (
               <option key={team.id} value={team.id}>
-                {team.name} &mdash; {team.divisionName}
+                {team.name}
               </option>
             ))}
           </select>

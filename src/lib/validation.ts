@@ -107,12 +107,26 @@ export const overrideSchema = reasonSchema.extend({
 });
 
 export const matchUpdateSchema = z.object({
-  kickoffAt: z.string().datetime({ offset: true }).optional(),
+  /*
+    A bare wall-clock string from the admin form ("2026-10-01T19:30"), read as
+    league time by the route. Demanding an ISO offset here rejected every save
+    the form could make, so the only rule is that it is short and non-empty —
+    the route returns 400 on anything it cannot parse.
+  */
+  kickoffAt: z.string().min(1).max(40).optional(),
   /** Free text, shown on the fixture exactly as typed. Never validated. */
   venueName: z.string().max(200).nullable().optional(),
   status: z.enum(MATCH_STATUSES).optional(),
   matchweek: trimmed(40).min(1, "Give the fixture a matchweek, such as 7 or Final.").optional(),
   countsForStandings: z.boolean().optional(),
+  /*
+    Correcting a mis-entered fixture. Only accepted while no report exists —
+    goals and cards point at a team, so moving the teams underneath a filed
+    report would silently corrupt it.
+  */
+  divisionId: z.string().min(1).optional(),
+  homeTeamId: z.string().min(1).optional(),
+  awayTeamId: z.string().min(1).optional(),
   homeKit: z.enum(KIT_CHOICES).optional(),
   awayKit: z.enum(KIT_CHOICES).optional(),
   reason: optionalText(500).optional(),

@@ -84,9 +84,9 @@ export function TeamEditor({
           </Field>
 
           <Field
-            label="Slug"
+            label="Web address"
             htmlFor={`team-${team.id}-slug`}
-            hint="Used in the team's URL. Changing it breaks existing links."
+            hint="The club's page lives at /teams/<this>. Unique league-wide; changing it breaks existing links."
           >
             <input
               id={`team-${team.id}-slug`}

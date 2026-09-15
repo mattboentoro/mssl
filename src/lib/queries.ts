@@ -3,6 +3,7 @@ import { config } from "@/lib/config";
 import { prisma } from "@/lib/prisma";
 import {
   calculateStandingsByDivision,
+  type PrimaryMetric,
   type StandingsMatchInput,
   type StandingsOptions,
   type StandingsRow,
@@ -47,6 +48,7 @@ export const MATCH_LIST_INCLUDE = {
   homeTeam: {
     select: {
       id: true,
+      slug: true,
       name: true,
       shortName: true,
       colorPrimary: true,
@@ -56,6 +58,7 @@ export const MATCH_LIST_INCLUDE = {
   awayTeam: {
     select: {
       id: true,
+      slug: true,
       name: true,
       shortName: true,
       colorPrimary: true,
@@ -121,6 +124,8 @@ export interface DivisionStandings {
   divisionId: string;
   divisionName: string;
   rows: StandingsRow[];
+  /** How the season ranks teams. Drives whether the table shows a PPG column. */
+  primaryMetric: PrimaryMetric;
 }
 
 /** The league table for every division in a season, derived only from reports. */
@@ -131,6 +136,7 @@ export async function getStandingsForSeason(seasonId: string): Promise<DivisionS
       teams: {
         select: {
           id: true,
+          slug: true,
           name: true,
           divisionId: true,
           shortName: true,
@@ -160,13 +166,15 @@ export async function getStandingsForSeason(seasonId: string): Promise<DivisionS
     where: { id: seasonId },
     select: { tiebreakerMode: true },
   });
+  const primaryMetric: PrimaryMetric =
+    season?.tiebreakerMode === "POINTS_PER_GAME" ? "pointsPerGame" : "points";
   const byDivision = calculateStandingsByDivision(
     teams,
     matches as unknown as StandingsMatchInput[],
     {
       ...standingsOptionsFromConfig(),
       adjustments,
-      primaryMetric: season?.tiebreakerMode === "POINTS_PER_GAME" ? "pointsPerGame" : "points",
+      primaryMetric,
     },
   );
 
@@ -174,6 +182,7 @@ export async function getStandingsForSeason(seasonId: string): Promise<DivisionS
     divisionId: division.id,
     divisionName: division.name,
     rows: byDivision.get(division.id) ?? [],
+    primaryMetric,
   }));
 }
 
@@ -390,9 +399,15 @@ export async function getTeams() {
   });
 }
 
-export async function getTeamDetail(teamId: string) {
-  return prisma.team.findUnique({
-    where: { id: teamId },
+/**
+ * A team by its public slug (`/teams/arsenal`).
+ *
+ * Also accepts the row id so older links, audit-log references and anything
+ * holding a cuid keep resolving.
+ */
+export async function getTeamDetail(slugOrId: string) {
+  return prisma.team.findFirst({
+    where: { OR: [{ slug: slugOrId }, { id: slugOrId }] },
     include: { division: { select: { id: true, name: true } } },
   });
 }

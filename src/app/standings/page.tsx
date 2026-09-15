@@ -103,6 +103,7 @@ export default async function StandingsPage({
               ) : (
                 <StandingsTable
                   rows={division.rows}
+                  primaryMetric={division.primaryMetric}
                   caption={`${division.divisionName} table for ${season.name}`}
                 />
               )}

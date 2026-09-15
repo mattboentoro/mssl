@@ -323,16 +323,6 @@ export default async function AdminMatchesPage({
         <Card className="p-5">
           <ActionForm action={createMatchAction} className="grid gap-4 sm:grid-cols-2">
             <input type="hidden" name="seasonId" value={seasonId} />
-            <Field label="Division" htmlFor="new-division">
-              <select id="new-division" name="divisionId" className={inputClass} required>
-                {divisions.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
-              <FieldError name="divisionId" />
-            </Field>
             <Field label="Matchweek" htmlFor="new-mw">
               <input
                 id="new-mw"
@@ -364,9 +354,11 @@ export default async function AdminMatchesPage({
               <FieldError name="countsForStandings" />
             </Field>
             <MatchKitPicker
+              divisions={divisions.map((d) => ({ id: d.id, name: d.name }))}
               teams={teams.map((t) => ({
                 id: t.id,
                 name: t.name,
+                divisionId: t.divisionId,
                 colorPrimary: t.colorPrimary,
                 colorAlternate: t.colorAlternate,
               }))}
@@ -381,6 +373,21 @@ export default async function AdminMatchesPage({
                 required
               />
               <FieldError name="kickoffAt" />
+            </Field>
+            <Field
+              label="Venue"
+              htmlFor="new-venue"
+              hint="Free text, shown exactly as typed. Blank shows as TBD."
+            >
+              <input
+                id="new-venue"
+                name="venueName"
+                type="text"
+                maxLength={200}
+                placeholder="To be confirmed"
+                className={inputClass}
+              />
+              <FieldError name="venueName" />
             </Field>
             <div className="sm:col-span-2">
               <SubmitButton>Create fixture</SubmitButton>

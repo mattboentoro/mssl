@@ -364,14 +364,14 @@ export async function createTeamAction(_prev: ActionState, form: FormData): Prom
       contactEmail: str(form, "contactEmail"),
     },
     async (data, actor) => {
-      // Same division-scoped rule as the editor, so a duplicate surfaces as a
-      // sentence rather than a raw unique-constraint violation.
+      // Slugs are the public team URL (/teams/arsenal), so they must be unique
+      // across the whole league, not just inside a division.
       const clash = await prisma.team.findFirst({
-        where: { divisionId: data.divisionId, slug: data.slug },
+        where: { slug: data.slug },
         select: { name: true },
       });
       if (clash) {
-        throw new Error(`“${clash.name}” already uses the slug “${data.slug}” in that division.`);
+        throw new Error(`“${clash.name}” already uses the web address “/teams/${data.slug}”.`);
       }
 
       const team = await prisma.team.create({ data });
@@ -415,16 +415,15 @@ export async function updateTeamAction(_prev: ActionState, form: FormData): Prom
       const before = await prisma.team.findUnique({ where: { id: teamId } });
       if (!before) throw new Error("That team no longer exists.");
 
-      // Slugs only have to be unique inside a division — that is what the
-      // database enforces, and the same club legitimately appears in several
-      // seasons. Checking globally rejected a team for clashing with itself in
-      // last season's copy of the division.
+      // The slug is the team's public web address, so it has to be unique
+      // league-wide. Excluding this team means re-saving without touching the
+      // name is never treated as a clash with itself.
       const clash = await prisma.team.findFirst({
-        where: { divisionId: data.divisionId, slug: data.slug, id: { not: teamId } },
+        where: { slug: data.slug, id: { not: teamId } },
         select: { name: true },
       });
       if (clash) {
-        throw new Error(`“${clash.name}” already uses the slug “${data.slug}” in that division.`);
+        throw new Error(`“${clash.name}” already uses the web address “/teams/${data.slug}”.`);
       }
 
       const team = await prisma.team.update({ where: { id: teamId }, data });
@@ -952,6 +951,10 @@ export async function importScheduleAction(
   >();
 
   const takenDivisionSlugs = new Set(divisions.map((d) => d.slug));
+  // Team slugs are the public /teams/<slug> address, so they are reserved
+  // league-wide. One set for the whole import: each planned club adds to it, so
+  // two same-named newcomers in different leagues still get distinct addresses.
+  const takenTeamSlugs = new Set(teams.map((t) => t.slug));
   const uniqueSlug = (base: string, taken: Set<string>) => {
     const root = slugify(base) || "item";
     let candidate = root;
@@ -1021,16 +1024,10 @@ export async function importScheduleAction(
     ];
     const kit = pickKitsForNewTeam(takenColors);
 
-    // Slugs are unique per division, so only siblings can collide.
-    const takenSlugs = new Set([
-      ...teams.filter((t) => t.divisionId === divisionRef).map((t) => t.slug),
-      ...[...pendingTeams.values()].filter((t) => t.divisionRef === divisionRef).map((t) => t.slug),
-    ]);
-
     const created = {
       ref: `new:team:${pendingTeams.size}`,
       name: name.trim(),
-      slug: uniqueSlug(name, takenSlugs),
+      slug: uniqueSlug(name, takenTeamSlugs),
       shortName: shortNameFor(name),
       divisionRef,
       colorPrimary: kit.primary,

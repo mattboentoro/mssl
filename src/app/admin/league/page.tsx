@@ -245,7 +245,10 @@ export default async function AdminLeaguePage() {
                         <span className="text-muted block text-xs">{team.division.name}</span>
                       </span>
                     </span>
-                    <a href={`/teams/${team.id}`} className="text-muted shrink-0 text-xs underline">
+                    <a
+                      href={`/teams/${team.slug}`}
+                      className="text-muted shrink-0 text-xs underline"
+                    >
                       View
                     </a>
                   </div>

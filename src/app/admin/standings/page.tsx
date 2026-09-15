@@ -46,7 +46,7 @@ export default async function AdminStandingsPage({
     getPointsAdjustments(season.id),
     prisma.team.findMany({
       orderBy: [{ division: { name: "asc" } }, { name: "asc" }],
-      select: { id: true, name: true, divisionId: true, division: { select: { name: true } } },
+      select: { id: true, name: true, divisionId: true },
     }),
     prisma.division.findMany({
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
@@ -60,7 +60,6 @@ export default async function AdminStandingsPage({
     id: team.id,
     name: team.name,
     divisionId: team.divisionId,
-    divisionName: team.division.name,
   }));
 
   const deducted = adjustments
@@ -237,6 +236,7 @@ export default async function AdminStandingsPage({
               ) : (
                 <StandingsTable
                   rows={division.rows}
+                  primaryMetric={division.primaryMetric}
                   caption={`${division.divisionName} table for ${season.name}`}
                 />
               )}

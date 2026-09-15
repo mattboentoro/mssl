@@ -67,7 +67,7 @@ model Team {
   id             String   @id @default(cuid())
   divisionId     String
   name           String
-  slug           String
+  slug           String   @unique
   shortName      String
   /// Home/first-choice kit colour as a `#rrggbb` hex string.
   colorPrimary   String   @default("#0f766e")
@@ -84,7 +84,6 @@ model Team {
   discipline  DisciplinaryAction[]
   adjustments PointsAdjustment[]
 
-  @@unique([divisionId, slug])
   @@index([divisionId])
 }
 

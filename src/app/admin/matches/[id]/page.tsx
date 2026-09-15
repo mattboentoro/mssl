@@ -20,7 +20,7 @@ export default async function AdminMatchDetailPage({
 }) {
   const { id } = await params;
 
-  const [match, referees] = await Promise.all([
+  const [match, referees, divisions, teams] = await Promise.all([
     prisma.match.findUnique({
       where: { id },
       include: {
@@ -40,6 +40,11 @@ export default async function AdminMatchDetailPage({
       },
     }),
     prisma.referee.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
+    prisma.division.findMany({ orderBy: { sortOrder: "asc" } }),
+    prisma.team.findMany({
+      select: { id: true, name: true, divisionId: true },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   if (!match) notFound();
@@ -182,6 +187,11 @@ export default async function AdminMatchDetailPage({
         countsForStandings={match.countsForStandings}
         refereeId={match.refereeId}
         hasReport={Boolean(match.report)}
+        divisionId={match.divisionId}
+        homeTeamId={match.homeTeamId}
+        awayTeamId={match.awayTeamId}
+        divisions={divisions.map((d) => ({ id: d.id, name: d.name }))}
+        teams={teams}
         homeTeamName={match.homeTeam.name}
         awayTeamName={match.awayTeam.name}
         homeTeam={{
@@ -199,25 +209,35 @@ export default async function AdminMatchDetailPage({
         referees={referees.map((r) => ({ id: r.id, name: r.name }))}
       />
 
-      {!match.report ? (
-        <section aria-labelledby="danger-zone">
-          <h2 id="danger-zone" className="mb-3 text-lg font-semibold">
-            Delete fixture
-          </h2>
-          <Card className="p-5">
+      {/*
+        Always shown, even when deletion is blocked: an admin looking for the
+        control should find out why it is unavailable rather than wonder
+        whether the feature exists at all.
+      */}
+      <section aria-labelledby="danger-zone">
+        <h2 id="danger-zone" className="mb-3 text-lg font-semibold">
+          Delete fixture
+        </h2>
+        <Card className="p-5">
+          {match.report ? (
+            <p className="text-muted text-sm">
+              This fixture has a game report, so it cannot be deleted &mdash; results are never
+              removed silently. Dispute or override the result above if it is wrong.
+            </p>
+          ) : (
             <ActionForm action={deleteMatchAction}>
               <input type="hidden" name="matchId" value={match.id} />
               <p className="text-muted mb-3 text-sm">
-                Only fixtures without a game report can be deleted. Results are never removed
-                silently.
+                Removes the fixture from the schedule for good. Only fixtures without a game report
+                can be deleted.
               </p>
               <SubmitButton variant="danger" confirm="Delete this fixture permanently?">
                 Delete fixture
               </SubmitButton>
             </ActionForm>
-          </Card>
-        </section>
-      ) : null}
+          )}
+        </Card>
+      </section>
 
       <section aria-labelledby="match-audit">
         <h2 id="match-audit" className="mb-3 text-lg font-semibold">

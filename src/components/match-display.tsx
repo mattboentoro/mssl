@@ -5,7 +5,7 @@ import { Badge, Card, FormGuide, MatchStatusBadge } from "@/components/ui";
 import { formatDateTime } from "@/lib/dates";
 import { kitColorName, resolveKit } from "@/lib/kits";
 import type { MatchListItem } from "@/lib/queries";
-import type { StandingsRow } from "@/lib/standings";
+import { pointsPerGame, type PrimaryMetric, type StandingsRow } from "@/lib/standings";
 
 /** Score if a report exists, otherwise the kickoff time. */
 function scoreLabel(match: MatchListItem): string | null {
@@ -13,13 +13,13 @@ function scoreLabel(match: MatchListItem): string | null {
   return `${match.report.homeScore} \u2013 ${match.report.awayScore}`;
 }
 
-export function MatchRow({
-  match,
-  showReferee = false,
-}: {
-  match: MatchListItem;
-  showReferee?: boolean;
-}) {
+/*
+  Whether a fixture has a referee yet is league business, not fixture news, so
+  the two statuses that only describe the assignment stay off the public card.
+*/
+const ASSIGNMENT_ONLY_STATUSES: readonly MatchListItem["status"][] = ["SCHEDULED", "ASSIGNED"];
+
+export function MatchRow({ match }: { match: MatchListItem }) {
   const score = scoreLabel(match);
 
   return (
@@ -28,8 +28,9 @@ export function MatchRow({
         <span className="text-muted">{formatDateTime(match.kickoffAt)}</span>
         <Badge tone="neutral">{match.division.name}</Badge>
         <Badge tone="neutral">MW {match.matchweek}</Badge>
-        <MatchStatusBadge status={match.status} />
-        {match.countsForStandings === false ? <Badge tone="warning">Non-league</Badge> : null}
+        {ASSIGNMENT_ONLY_STATUSES.includes(match.status) ? null : (
+          <MatchStatusBadge status={match.status} />
+        )}
         {match.report?.status === "DISPUTED" ? <Badge tone="danger">Disputed</Badge> : null}
       </div>
 
@@ -50,13 +51,6 @@ export function MatchRow({
 
       <div className="text-muted mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
         {match.venueName ? <span>&#128205; {match.venueName}</span> : <span>&#128205; TBD</span>}
-        {/*
-          Who is refereeing is league business, not public information — the
-          caller decides, so this component never has to reach for the session.
-        */}
-        {showReferee ? (
-          <span>&#128100; {match.referee ? match.referee.name : <em>Referee needed</em>}</span>
-        ) : null}
       </div>
     </Card>
   );
@@ -67,7 +61,7 @@ type TeamCellTeam = MatchListItem["homeTeam"];
 function TeamCell({ team, kit }: { team: TeamCellTeam; kit: string }) {
   return (
     <Link
-      href={`/teams/${team.id}`}
+      href={`/teams/${team.slug}`}
       className="flex min-w-0 items-center gap-1.5 text-left font-semibold hover:underline"
     >
       <KitSwatch team={team} kit={kit} teamName={team.name} />
@@ -76,17 +70,11 @@ function TeamCell({ team, kit }: { team: TeamCellTeam; kit: string }) {
   );
 }
 
-export function MatchList({
-  matches,
-  showReferee = false,
-}: {
-  matches: MatchListItem[];
-  showReferee?: boolean;
-}) {
+export function MatchList({ matches }: { matches: MatchListItem[] }) {
   return (
     <ul className="grid gap-3">
       {matches.map((match) => (
-        <MatchRow key={match.id} match={match} showReferee={showReferee} />
+        <MatchRow key={match.id} match={match} />
       ))}
     </ul>
   );
@@ -160,11 +148,17 @@ export function StandingsTable({
   rows,
   caption,
   compact = false,
+  primaryMetric = "points",
 }: {
   rows: StandingsRow[];
   caption: string;
   compact?: boolean;
+  primaryMetric?: PrimaryMetric;
 }) {
+  // When the season ranks on points per game, the number doing the ranking has
+  // to be on screen -- otherwise the order looks arbitrary to anyone reading
+  // the points column and finding it out of sequence.
+  const showPpg = primaryMetric === "pointsPerGame";
   return (
     <div className="border-subtle overflow-x-auto rounded-xl border">
       <table className="w-full min-w-[36rem] text-sm">
@@ -205,6 +199,11 @@ export function StandingsTable({
             <th scope="col" className="px-2 py-2 text-right" title="Points">
               Pts
             </th>
+            {showPpg ? (
+              <th scope="col" className="px-2 py-2 text-right" title="Points per game">
+                PPG
+              </th>
+            ) : null}
             {compact ? null : (
               <th scope="col" className="px-3 py-2 text-left">
                 Form
@@ -218,13 +217,20 @@ export function StandingsTable({
               <td className="text-muted px-3 py-2 tabular-nums">{row.rank}</td>
               <th scope="row" className="px-3 py-2 text-left font-medium">
                 <Link
-                  href={`/teams/${row.teamId}`}
+                  href={`/teams/${row.teamSlug}`}
                   className="flex items-center gap-2 hover:underline"
                 >
                   <TeamColorBar team={row} />
                   <span className="truncate">{row.teamName}</span>
                 </Link>
-                {row.separatedBy && row.separatedBy !== "points" ? (
+                {/*
+                  A tiebreaker note only tells the reader something they cannot
+                  already see. The season's ranking metric has its own visible
+                  column, so naming it here just repeats the number next to it.
+                */}
+                {row.separatedBy &&
+                row.separatedBy !== "points" &&
+                row.separatedBy !== primaryMetric ? (
                   <span className="text-muted block text-[10px]">
                     separated by {TIEBREAKER_LABELS[row.separatedBy] ?? row.separatedBy}
                   </span>
@@ -259,6 +265,11 @@ export function StandingsTable({
                   </span>
                 ) : null}
               </td>
+              {showPpg ? (
+                <td className="px-2 py-2 text-right font-semibold tabular-nums">
+                  {pointsPerGame(row).toFixed(2)}
+                </td>
+              ) : null}
               {compact ? null : (
                 <td className="px-3 py-2">
                   <FormGuide form={row.form} />

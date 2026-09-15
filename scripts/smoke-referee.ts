@@ -381,6 +381,39 @@ async function main(): Promise<void> {
     check(`${path} returns 200`, res.status === 200, `status ${res.status}`);
   }
 
+  console.log("\nClub pages are addressed by name, not by database id");
+  const home = await prisma.team.findUniqueOrThrow({
+    where: { id: match.homeTeamId },
+    select: { slug: true, name: true },
+  });
+  const bySlug = await req(`/teams/${home.slug}`);
+  const bySlugHtml = await bySlug.text();
+  check(
+    `/teams/${home.slug} returns 200`,
+    bySlug.status === 200 && bySlugHtml.includes(home.name),
+    `status ${bySlug.status}`,
+  );
+  // Audit rows and old bookmarks still hold cuids, so those must keep resolving.
+  const byId = await req(`/teams/${match.homeTeamId}`);
+  check(
+    "an existing /teams/<id> link still resolves",
+    byId.status === 200,
+    `status ${byId.status}`,
+  );
+  const teamsIndex = await (await req("/teams")).text();
+  check(
+    "the team index links by name",
+    teamsIndex.includes(`href="/teams/${home.slug}"`),
+    `no href="/teams/${home.slug}"`,
+  );
+  const standingsHtml = await (await req("/standings")).text();
+  check(
+    "the standings table links by name",
+    standingsHtml.includes(`href="/teams/${home.slug}"`) &&
+      !standingsHtml.includes(`href="/teams/${match.homeTeamId}"`),
+    "standings still points at a database id",
+  );
+
   console.log("\nAdmin confirmation");
   await signIn("admin");
   const adminPage = await req("/admin/matches");

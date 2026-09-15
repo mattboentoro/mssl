@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateStandings,
   calculateStandingsByDivision,
+  pointsPerGame,
   resolveResult,
   DEFAULT_STANDINGS_OPTIONS,
   type StandingsMatchInput,
@@ -451,6 +452,36 @@ describe("calculateStandingsByDivision", () => {
     expect(byDivision.get("d1")?.map((r) => r.teamId)).toEqual(["a", "b"]);
     expect(byDivision.get("d2")?.[0]).toMatchObject({ teamId: "c", goalsFor: 4 });
     expect(byDivision.get("d2")?.every((r) => r.divisionId === "d2")).toBe(true);
+  });
+});
+
+describe("pointsPerGame", () => {
+  it("is zero for a team that has not played", () => {
+    const rows = calculateStandings([team("a"), team("b")], [], DEFAULT_STANDINGS_OPTIONS);
+    // 0/0 is NaN in JavaScript, and NaN loses every comparison it takes part
+    // in, so an unplayed team would sort to an arbitrary position. Zero is both
+    // the honest answer and a stable one.
+    expect(pointsPerGame(rowFor(rows, "a"))).toBe(0);
+  });
+
+  it("divides points by games played", () => {
+    const rows = calculateStandings(
+      [team("a"), team("b")],
+      [match("a", 2, 0, "b"), match("a", 1, 1, "b")],
+      DEFAULT_STANDINGS_OPTIONS,
+    );
+    // A: a win and a draw from two games = 4 points.
+    expect(pointsPerGame(rowFor(rows, "a"))).toBe(2);
+    expect(pointsPerGame(rowFor(rows, "b"))).toBe(0.5);
+  });
+
+  it("reflects a points deduction", () => {
+    const rows = calculateStandings([team("a"), team("b")], [match("a", 2, 0, "b")], {
+      ...DEFAULT_STANDINGS_OPTIONS,
+      adjustments: [{ teamId: "a", points: -3, reason: "Ineligible player" }],
+    });
+    // 3 points earned minus a 3 point deduction over one game.
+    expect(pointsPerGame(rowFor(rows, "a"))).toBe(0);
   });
 });
 
