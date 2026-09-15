@@ -4,12 +4,13 @@
  *   npm run dev          # in one terminal
  *   npm run smoke        # in another
  *
- * Exercises: dev sign-in -> self-assign (with a losing concurrent claim) -> lock ->
- * reject an inconsistent report -> submit a valid report -> confirm the report is
- * immutable -> confirm standings recomputed from that report.
+ * Exercises: dev sign-in -> preview a fixture -> self-assign (with a losing concurrent
+ * claim) -> reject an inconsistent report -> submit a valid report -> confirm the report
+ * is immutable -> confirm standings recomputed from that report.
  *
  * Requires DEV_AUTH_BYPASS=true and seeded data. It mutates the dev database.
  */
+import { kitColorName, resolveKit } from "../src/lib/kits";
 import { prisma } from "../src/lib/prisma";
 import { getStandingsForSeason } from "../src/lib/queries";
 
@@ -123,6 +124,21 @@ async function main(): Promise<void> {
     `status ${anonAdmin.status}`,
   );
 
+  // Who is refereeing is league-internal: a signed-out visitor sees the fixture
+  // but not the official's name.
+  const assigned = await prisma.match.findFirst({
+    where: { referee: { isNot: null } },
+    include: { referee: { select: { name: true } } },
+  });
+  if (assigned?.referee) {
+    const anonSchedule = await (await req("/schedule")).text();
+    check(
+      "signed-out schedule hides the assigned referee",
+      !anonSchedule.includes(assigned.referee.name),
+      assigned.referee.name,
+    );
+  }
+
   console.log("\nSign-in (dev bypass)");
   const user = await signIn("referee");
   check("dev sign-in returns a session", Boolean(user?.email), String(user?.email ?? "none"));
@@ -141,8 +157,8 @@ async function main(): Promise<void> {
     where: { refereeId: null, status: "SCHEDULED" },
     orderBy: { kickoffAt: "asc" },
     include: {
-      homeTeam: { select: { id: true, name: true } },
-      awayTeam: { select: { id: true, name: true } },
+      homeTeam: { select: { id: true, name: true, colorPrimary: true, colorAlternate: true } },
+      awayTeam: { select: { id: true, name: true, colorPrimary: true, colorAlternate: true } },
     },
   });
 
@@ -155,6 +171,22 @@ async function main(): Promise<void> {
   console.log(`\nFixture: ${match.homeTeam.name} v ${match.awayTeam.name} (${match.id})`);
   const beforeHome = await pointsFor(match.seasonId, match.homeTeamId);
   const beforeAway = await pointsFor(match.seasonId, match.awayTeamId);
+
+  console.log("\nPreview before claiming");
+  const calendar = await (await req("/referee?view=calendar")).text();
+  check(
+    "the referee calendar links every fixture, not just their own",
+    calendar.includes(`/referee/${match.id}`),
+  );
+  const preview = await (await req(`/referee/${match.id}`)).text();
+  check("an unclaimed fixture is previewable", preview.includes(match.homeTeam.name));
+  check("the preview offers a claim action", preview.includes("Claim this match"));
+  check(
+    "the preview shows what colour each side wears",
+    preview.includes(kitColorName(resolveKit(match.homeTeam, match.homeKit))) &&
+      preview.includes(kitColorName(resolveKit(match.awayTeam, match.awayKit))),
+    `${kitColorName(resolveKit(match.homeTeam, match.homeKit))} / ${kitColorName(resolveKit(match.awayTeam, match.awayKit))}`,
+  );
 
   console.log("\nSelf-assign (claiming is the lock)");
   const assign = await postJson(`/api/matches/${match.id}/assign`, {

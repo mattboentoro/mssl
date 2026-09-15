@@ -14,6 +14,7 @@
  * and cleans up after itself.
  */
 import { prisma } from "../src/lib/prisma";
+import { kitsClash, resolveKit } from "../src/lib/kits";
 import { getStandingsForSeason } from "../src/lib/queries";
 
 const BASE = process.env.SMOKE_BASE_URL ?? "http://localhost:3000";
@@ -311,6 +312,52 @@ async function main(): Promise<void> {
   }
 
   console.log("\nContent");
+  const adjHtml = await (await req("/admin/standings")).text();
+  check("the deduction console can be filtered by league", adjHtml.includes('id="adj-division"'));
+  const filtered = await (
+    await req(`/admin/standings?season=${division.seasonId}&division=${division.id}`)
+  ).text();
+  const otherDivision = await prisma.division.findFirst({
+    where: { seasonId: division.seasonId, id: { not: division.id } },
+    include: { teams: { take: 1 } },
+  });
+  if (otherDivision?.teams[0]) {
+    check(
+      "filtering to one league hides the other league's teams",
+      !filtered.includes(`value="${otherDivision.teams[0].id}"`),
+      otherDivision.name,
+    );
+  }
+
+  console.log("\nSeason ranking rule");
+  const tbBefore = await prisma.season.findUniqueOrThrow({
+    where: { id: division.seasonId },
+    select: { tiebreakerMode: true },
+  });
+  await submit("/admin/league", `id="tiebreak-${division.seasonId}"`, {
+    seasonId: division.seasonId,
+    tiebreakerMode: "POINTS_PER_GAME",
+  });
+  const tbAfter = await prisma.season.findUniqueOrThrow({
+    where: { id: division.seasonId },
+    select: { tiebreakerMode: true },
+  });
+  check(
+    "an admin can rank a season on points per game",
+    tbAfter.tiebreakerMode === "POINTS_PER_GAME",
+    tbAfter.tiebreakerMode,
+  );
+  check(
+    "the ranking change is audited",
+    (await prisma.auditLog.count({
+      where: { action: "season.tiebreaker", entityId: division.seasonId },
+    })) > 0,
+  );
+  await submit("/admin/league", `id="tiebreak-${division.seasonId}"`, {
+    seasonId: division.seasonId,
+    tiebreakerMode: tbBefore.tiebreakerMode,
+  });
+
   const headline = `Smoke news ${stamp}`;
   await submit("/admin/content", 'id="ann-title"', {
     title: headline,
@@ -320,6 +367,47 @@ async function main(): Promise<void> {
   });
   const announcement = await prisma.announcement.findFirst({ where: { title: headline } });
   check("createAnnouncementAction publishes", announcement !== null);
+
+  console.log("\nMatch Control shell");
+  const matchesHtml = await (await req("/admin/matches")).text();
+  check(
+    "the active admin tab is flagged for assistive tech",
+    matchesHtml.includes('aria-current="page"'),
+  );
+  check(
+    "fixtures list matchweek before kick-off",
+    matchesHtml.includes(">MW<") && matchesHtml.indexOf(">MW<") < matchesHtml.indexOf("Kick-off"),
+  );
+  check("the fixture list offers a CSV export", matchesHtml.includes("/admin/schedule.csv"));
+  check(
+    "upcoming-only is the default filter",
+    /<option value="upcoming"[^>]*selected/.test(matchesHtml),
+  );
+  check("the venue picker is gone from Add a fixture", !matchesHtml.includes('id="new-venue"'));
+
+  const csv = await req(`/admin/schedule.csv?season=${division.seasonId}`);
+  const csvBody = await csv.text();
+  check("CSV export downloads", csv.status === 200, `status ${csv.status}`);
+  const exportHeader = csvBody.split("\n")[0]?.trim() ?? "";
+  check(
+    "CSV export carries every column the importer requires",
+    ["matchweek", "kickoff", "division", "home", "away"].every((c) =>
+      exportHeader.split(",").includes(c),
+    ),
+    exportHeader,
+  );
+  // The real claim is "the export is a valid import template", so feed the
+  // exported file straight back through the importer's dry run.
+  const roundTrip = await submit("/admin/import", 'id="import-csv"', {
+    csv: csvBody.split("\n").slice(0, 4).join("\n"),
+    seasonId: division.seasonId,
+    mode: "dry-run",
+  });
+  const roundTripHtml = roundTrip.html;
+  check(
+    "the exported file re-imports without header errors",
+    !roundTripHtml.includes("CSV header is missing"),
+  );
 
   console.log("\nCSV schedule import");
   const goodRow = `${MW},2030-06-01T18:00:00Z,${division.name},${division.teams[0].name},${division.teams[1].name}`;
@@ -368,6 +456,30 @@ async function main(): Promise<void> {
   console.log("\nKit selection");
   const importedMatch = await prisma.match.findFirst({ where: { matchweek: MW } });
   if (importedMatch) {
+    // The importer picks kits itself, so a CSV that carries no colour column
+    // still produces a playable, non-clashing fixture.
+    const homeTeam = await prisma.team.findUniqueOrThrow({
+      where: { id: importedMatch.homeTeamId },
+      select: { colorPrimary: true, colorAlternate: true },
+    });
+    const awayTeam = await prisma.team.findUniqueOrThrow({
+      where: { id: importedMatch.awayTeamId },
+      select: { colorPrimary: true, colorAlternate: true },
+    });
+    check(
+      "CSV import puts the home side in its own primary kit",
+      importedMatch.homeKit === "PRIMARY",
+      `${importedMatch.homeKit}`,
+    );
+    check(
+      "CSV import picks an away kit that does not clash",
+      !kitsClash(
+        resolveKit(homeTeam, importedMatch.homeKit),
+        resolveKit(awayTeam, importedMatch.awayKit),
+      ),
+      `${importedMatch.homeKit} vs ${importedMatch.awayKit}`,
+    );
+
     // The schedule panel posts JSON to the API rather than running a server
     // action, so drive the route directly.
     const rekit = await req(`/api/matches/${importedMatch.id}/schedule`, {
