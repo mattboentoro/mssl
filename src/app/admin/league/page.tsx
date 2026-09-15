@@ -8,6 +8,7 @@ import {
   createDivisionAction,
   createSeasonAction,
   createTeamAction,
+  deleteDivisionAction,
   deleteSeasonAction,
   setSeasonTiebreakerAction,
 } from "@/app/admin/actions";
@@ -22,7 +23,7 @@ export default async function AdminLeaguePage() {
     prisma.season.findMany({ orderBy: { startsOn: "desc" } }),
     prisma.division.findMany({
       orderBy: { sortOrder: "asc" },
-      include: { _count: { select: { teams: true } } },
+      include: { _count: { select: { teams: true, matches: true } } },
     }),
     prisma.team.findMany({
       orderBy: { name: "asc" },
@@ -163,9 +164,38 @@ export default async function AdminLeaguePage() {
               <p className="text-muted p-4 text-sm">No divisions yet.</p>
             ) : (
               divisions.map((d) => (
-                <div key={d.id} className="flex items-center justify-between p-3 text-sm">
-                  <span>{d.name}</span>
-                  <span className="text-muted text-xs">{d._count.teams} team(s)</span>
+                <div key={d.id} className="flex items-start justify-between gap-3 p-3 text-sm">
+                  <div>
+                    <p>{d.name}</p>
+                    <p className="text-muted text-xs">
+                      {d._count.teams} team(s), {d._count.matches} fixture(s)
+                    </p>
+                  </div>
+                  {/*
+                    Deleting a division takes its clubs and their fixtures with
+                    it, so the name has to be retyped. The action refuses
+                    outright once any of those fixtures has a filed report.
+                  */}
+                  <ActionForm
+                    action={deleteDivisionAction}
+                    resetOnSuccess={false}
+                    className="flex flex-col items-end gap-1"
+                  >
+                    <input type="hidden" name="divisionId" value={d.id} />
+                    <input
+                      name="confirmName"
+                      aria-label={`Type ${d.name} to confirm deletion`}
+                      placeholder={`Type “${d.name}”`}
+                      className={`${inputClass} w-44 text-xs`}
+                      required
+                    />
+                    <SubmitButton
+                      variant="danger"
+                      confirm={`Delete ${d.name}, its ${d._count.teams} club(s) and ${d._count.matches} fixture(s)? This cannot be undone.`}
+                    >
+                      Delete division
+                    </SubmitButton>
+                  </ActionForm>
                 </div>
               ))
             )}

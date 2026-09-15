@@ -32,6 +32,7 @@ export function FixtureCalendar({
   basePath,
   query,
   hrefForMatch,
+  markFor,
   monthParam = "month",
   emptyHint,
 }: {
@@ -44,6 +45,11 @@ export function FixtureCalendar({
   query?: Record<string, string | undefined>;
   /** Where a fixture chip links to. Return undefined to render plain text. */
   hrefForMatch?: (match: MatchListItem) => string | undefined;
+  /**
+   * Flag a fixture with a tick. Return a short label describing *why* it is
+   * ticked; it is read out to screen readers and shown as a tooltip.
+   */
+  markFor?: (match: MatchListItem) => string | undefined;
   monthParam?: string;
   emptyHint?: string;
 }) {
@@ -146,7 +152,11 @@ export function FixtureCalendar({
                         <ul className="mt-0.5 space-y-0.5">
                           {dayMatches.map((match) => (
                             <li key={match.id}>
-                              <FixtureChip match={match} href={hrefForMatch?.(match)} />
+                              <FixtureChip
+                                match={match}
+                                href={hrefForMatch?.(match)}
+                                mark={markFor?.(match)}
+                              />
                             </li>
                           ))}
                         </ul>
@@ -171,14 +181,23 @@ export function FixtureCalendar({
   );
 }
 
-function FixtureChip({ match, href }: { match: MatchListItem; href?: string }) {
+function FixtureChip({
+  match,
+  href,
+  mark,
+}: {
+  match: MatchListItem;
+  href?: string;
+  mark?: string;
+}) {
   const label = `${match.homeTeam.shortName} v ${match.awayTeam.shortName}`;
   // The swatches are tiny, so the tooltip spells the kits out in words. It is
   // the only place a referee can check the strip without opening the fixture.
   const detail =
     `${formatTime(match.kickoffAt)} ${label} \u2014 ` +
     `${match.homeTeam.name} in ${kitColorName(resolveKit(match.homeTeam, match.homeKit))}, ` +
-    `${match.awayTeam.name} in ${kitColorName(resolveKit(match.awayTeam, match.awayKit))}`;
+    `${match.awayTeam.name} in ${kitColorName(resolveKit(match.awayTeam, match.awayKit))}` +
+    (mark ? ` \u2014 ${mark}` : "");
 
   const body = (
     <>
@@ -186,22 +205,41 @@ function FixtureChip({ match, href }: { match: MatchListItem; href?: string }) {
       <KitSwatch team={match.homeTeam} kit={match.homeKit} teamName={match.homeTeam.name} />
       <KitSwatch team={match.awayTeam} kit={match.awayKit} teamName={match.awayTeam.name} />
       <span className="truncate">{label}</span>
+      {/*
+        The tick trails the fixture so the columns of times and swatches stay
+        aligned down the week. `ml-auto` pins it to the right edge of the chip.
+      */}
+      {mark ? (
+        <span className="ml-auto shrink-0 font-semibold text-emerald-600 dark:text-emerald-400">
+          <span className="sr-only">{mark}</span>
+          <span aria-hidden="true">&#10003;</span>
+        </span>
+      ) : null}
     </>
   );
+
+  // A marked fixture is tinted green as well as ticked, so the distinction
+  // survives for anyone who cannot pick the glyph out at 11px.
+  const tone = mark
+    ? "bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/40"
+    : "bg-surface-muted hover:bg-brand/10";
 
   const shared =
     "flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-[11px] leading-tight";
 
   if (!href) {
     return (
-      <span className={`${shared} bg-surface-muted`} title={detail}>
+      <span
+        className={`${shared} ${mark ? "bg-emerald-50 dark:bg-emerald-950/40" : "bg-surface-muted"}`}
+        title={detail}
+      >
         {body}
       </span>
     );
   }
 
   return (
-    <Link href={href} className={`${shared} bg-surface-muted hover:bg-brand/10`} title={detail}>
+    <Link href={href} className={`${shared} ${tone}`} title={detail}>
       {body}
     </Link>
   );

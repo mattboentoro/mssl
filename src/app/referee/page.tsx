@@ -114,15 +114,19 @@ export default async function RefereePage({
   const myMonthStart = zonedToUtc(myMonthValue.year, myMonthValue.month, 1);
   const myMonthEnd = zonedToUtc(myNext.year, myNext.month, 1);
 
-  // Open fixtures only — the referee's own matches have their own calendar
-  // above, so showing them twice would just be noise.
+  // Open fixtures *plus* the referee's own assignments for the same month.
+  // Seeing only the open ones answered "what could I take?" but not "am I
+  // already busy that day?" — the two questions are always asked together, so
+  // the assignments are drawn in alongside, ticked and tinted green.
   const calendarMatches =
     view === "calendar"
       ? await listMatches({
           seasonId: season.id,
-          refereeId: null,
-          status: { in: ["SCHEDULED"] },
           kickoffAt: { gte: monthStart, lt: monthEnd },
+          OR: [
+            { refereeId: null, status: { in: ["SCHEDULED"] } },
+            { refereeId: referee.id, status: { in: ["ASSIGNED", "LOCKED"] } },
+          ],
           ...(params.division ? { divisionId: params.division } : {}),
           ...(params.venue ? { venueName: params.venue } : {}),
         })
@@ -249,6 +253,20 @@ export default async function RefereePage({
           <CalendarViewToggle view={view} basePath="/referee" query={carried} />
         </div>
 
+        {/*
+          The calendar mixes open fixtures with the referee's own, so it says
+          which is which. The list below has no such ambiguity.
+        */}
+        {view === "calendar" ? (
+          <p className="text-muted mb-3 text-sm">
+            Open fixtures, plus your own assignments marked{" "}
+            <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+              <span aria-hidden="true">&#10003;</span>
+            </span>{" "}
+            so you can spot a clash before claiming.
+          </p>
+        ) : null}
+
         <Card className="mb-4 p-4">
           <form method="get" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {/* Keep the current view and month when the filters are applied. */}
@@ -347,6 +365,9 @@ export default async function RefereePage({
             basePath="/referee"
             query={{ ...carried, month: undefined, view: "calendar" }}
             hrefForMatch={(match) => `/referee/${match.id}`}
+            markFor={(match) =>
+              match.refereeId === referee.id ? "Already assigned to you" : undefined
+            }
             emptyHint="Open fixtures appear here. Use the arrows to look ahead."
           />
         ) : available.length === 0 ? (

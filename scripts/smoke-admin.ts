@@ -705,6 +705,55 @@ async function main(): Promise<void> {
     !activeLeague.includes(`Type ${activeSeason.name} to confirm deletion`),
   );
 
+  // A division that has already been played cannot be deleted: the standings
+  // are derived from its reports, so losing it would silently rewrite history.
+  const playedDivision = await prisma.division.findFirst({
+    where: { matches: { some: { report: { isNot: null } } } },
+  });
+  if (playedDivision) {
+    await submit("/admin/league", `Type ${playedDivision.name} to confirm deletion`, {
+      confirmName: playedDivision.name,
+    });
+    check(
+      "a division with filed reports refuses deletion",
+      (await prisma.division.count({ where: { id: playedDivision.id } })) === 1,
+    );
+  }
+
+  // The CSV import above enrolled a whole division on the fly. Deleting it
+  // exercises the cascade *and* leaves the development database as the seed
+  // left it, so a run of the smoke suite is not visible in the admin UI.
+  const importedDivision = await prisma.division.findFirst({
+    where: { name: "Sunday Invitational" },
+    include: { _count: { select: { teams: true } } },
+  });
+  if (importedDivision) {
+    await submit("/admin/league", `Type ${importedDivision.name} to confirm deletion`, {
+      confirmName: "Not The Division",
+    });
+    check(
+      "deleting a division refuses a mistyped name",
+      (await prisma.division.count({ where: { id: importedDivision.id } })) === 1,
+    );
+
+    await submit("/admin/league", `Type ${importedDivision.name} to confirm deletion`, {
+      confirmName: importedDivision.name,
+    });
+    check(
+      "deleteDivisionAction removes the division",
+      (await prisma.division.count({ where: { id: importedDivision.id } })) === 0,
+    );
+    check(
+      "deleting a division takes its clubs with it",
+      (await prisma.team.count({ where: { divisionId: importedDivision.id } })) === 0,
+      `${importedDivision._count.teams} club(s) removed`,
+    );
+    check(
+      "deleting a division takes its fixtures with it",
+      (await prisma.match.count({ where: { divisionId: importedDivision.id } })) === 0,
+    );
+  }
+
   console.log("\nAudit trail");
   const audited = await prisma.auditLog.count({
     where: {

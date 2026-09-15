@@ -174,6 +174,11 @@ export const deleteTeamSchema = z.object({
   confirmName: trimmed(120).min(1, "Type the team name to confirm."),
 });
 
+export const deleteDivisionSchema = z.object({
+  divisionId: z.string().min(1),
+  confirmName: trimmed(120).min(1, "Type the division name to confirm."),
+});
+
 /**
  * An administrative points adjustment. The reason is mandatory and shown on the
  * public table, because an unexplained deduction is indistinguishable from a

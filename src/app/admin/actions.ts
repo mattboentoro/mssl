@@ -15,6 +15,7 @@ import {
   csvMatchRowSchema,
   deleteSeasonSchema,
   deleteTeamSchema,
+  deleteDivisionSchema,
   deletePointsAdjustmentSchema,
   disciplinaryActionSchema,
   divisionSchema,
@@ -284,6 +285,66 @@ export async function createDivisionAction(
       });
       refreshAdmin();
       return `Division “${data.name}” created.`;
+    },
+  );
+}
+
+/**
+ * Delete a division, the clubs inside it and their fixtures.
+ *
+ * A division is the container for its clubs, so removing one cannot leave them
+ * orphaned — `onDelete: Cascade` on both `Team.division` and `Match.division`
+ * does the work in a single statement.
+ *
+ * Refused outright when any of those fixtures already has a filed game report,
+ * matching `deleteTeamAction`: a played result must never vanish from the
+ * standings without a trace. The admin retypes the division name, which is the
+ * only confirmation step that survives a mis-click.
+ */
+export async function deleteDivisionAction(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  return run(
+    deleteDivisionSchema,
+    { divisionId: str(form, "divisionId"), confirmName: str(form, "confirmName") },
+    async (data, actor) => {
+      const division = await prisma.division.findUnique({
+        where: { id: data.divisionId },
+        include: { _count: { select: { teams: true, matches: true } } },
+      });
+      if (!division) throw new Error("That division no longer exists.");
+
+      if (data.confirmName.toLowerCase() !== division.name.toLowerCase()) {
+        throw new Error(`Type “${division.name}” exactly to confirm the deletion.`);
+      }
+
+      const reported = await prisma.gameReport.count({
+        where: { match: { divisionId: division.id } },
+      });
+      if (reported > 0) {
+        throw new Error(
+          `${division.name} has ${reported} fixture(s) with a filed game report. Results are never deleted — retire the division instead.`,
+        );
+      }
+
+      await prisma.$transaction(async (tx) => {
+        await tx.division.delete({ where: { id: division.id } });
+        await writeAudit(tx, {
+          actor: actorFrom(actor),
+          action: "division.delete",
+          entity: "Division",
+          entityId: division.id,
+          metadata: {
+            name: division.name,
+            teamsRemoved: division._count.teams,
+            fixturesRemoved: division._count.matches,
+          },
+        });
+      });
+
+      refreshAdmin();
+      return `Division “${division.name}” deleted along with ${division._count.teams} club(s) and ${division._count.matches} fixture(s).`;
     },
   );
 }

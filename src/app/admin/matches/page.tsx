@@ -249,6 +249,16 @@ export default async function AdminMatchesPage({
                         href={`/admin/matches/${match.id}`}
                         className="hover:text-brand inline-flex flex-wrap items-center gap-x-2 gap-y-1 font-medium hover:underline"
                       >
+                        {/*
+                          "FT" leads the line so a scanned column of fixtures
+                          separates played from scheduled at a glance, without
+                          reading the status badge at the far right.
+                        */}
+                        {match.report ? (
+                          <span className="rounded bg-emerald-100 px-1 py-px text-[10px] font-semibold tracking-wide text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
+                            <span className="sr-only">Full time, </span>FT
+                          </span>
+                        ) : null}
                         <span className="inline-flex items-center gap-1.5">
                           <KitSwatch
                             team={match.homeTeam}

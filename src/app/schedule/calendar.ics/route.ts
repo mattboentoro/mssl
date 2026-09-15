@@ -81,11 +81,7 @@ export async function GET(request: Request) {
       `DTEND:${stamp(end)}`,
       fold(`SUMMARY:${escapeText(title)}`),
       fold(`DESCRIPTION:${escapeText(description)}`),
-      fold(
-        `LOCATION:${escapeText(
-          match.venueName || "TBD",
-        )}`,
-      ),
+      fold(`LOCATION:${escapeText(match.venueName || "TBD")}`),
       `STATUS:${match.status === "POSTPONED" ? "TENTATIVE" : "CONFIRMED"}`,
       "END:VEVENT",
     );
