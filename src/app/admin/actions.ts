@@ -6,6 +6,7 @@ import { writeAudit } from "@/lib/audit";
 import { actorFrom } from "@/lib/api";
 import { parseCsv } from "@/lib/csv";
 import { AuthzError, requireAdmin } from "@/lib/authz";
+import { pickKitsForFixture } from "@/lib/kits";
 import { addDisciplinaryAction, deleteDisciplinaryAction } from "@/lib/matches";
 import { prisma } from "@/lib/prisma";
 import { parseLeagueDateTime } from "@/lib/timezone";
@@ -162,6 +163,43 @@ export async function activateSeasonAction(
       });
       refreshAdmin();
       return "Active season updated.";
+    },
+  );
+}
+
+/**
+ * Choose how a season's tables are ranked. Total points is the normal rule;
+ * points per game is the fair one while teams have played unequal numbers of
+ * fixtures. Stored on the season so every table for it agrees.
+ */
+export async function setSeasonTiebreakerAction(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  return run(
+    z.object({
+      seasonId: z.string().min(1),
+      tiebreakerMode: z.enum(["POINTS", "POINTS_PER_GAME"]),
+    }),
+    { seasonId: str(form, "seasonId"), tiebreakerMode: str(form, "tiebreakerMode") },
+    async (data, actor) => {
+      await prisma.$transaction(async (tx) => {
+        await tx.season.update({
+          where: { id: data.seasonId },
+          data: { tiebreakerMode: data.tiebreakerMode },
+        });
+        await writeAudit(tx, {
+          actor: actorFrom(actor),
+          action: "season.tiebreaker",
+          entity: "Season",
+          entityId: data.seasonId,
+          metadata: { tiebreakerMode: data.tiebreakerMode },
+        });
+      });
+      refreshAdmin();
+      return data.tiebreakerMode === "POINTS_PER_GAME"
+        ? "Tables for this season now rank on points per game."
+        : "Tables for this season now rank on total points.";
     },
   );
 }
@@ -772,7 +810,15 @@ export async function importScheduleAction(
     prisma.division.findMany({ where: { seasonId }, select: { id: true, name: true, slug: true } }),
     prisma.team.findMany({
       where: { division: { seasonId } },
-      select: { id: true, name: true, slug: true, shortName: true, divisionId: true },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        shortName: true,
+        divisionId: true,
+        colorPrimary: true,
+        colorAlternate: true,
+      },
     }),
     prisma.venue.findMany({ select: { id: true, name: true, slug: true } }),
     prisma.match.findMany({
@@ -793,6 +839,7 @@ export async function importScheduleAction(
     teamIndex.set(key(t.slug), t);
     teamIndex.set(key(t.shortName), t);
   }
+  const teamById = new Map(teams.map((t) => [t.id, t]));
   const venueIndex = new Map<string, (typeof venues)[number]>();
   for (const v of venues) {
     venueIndex.set(key(v.name), v);
@@ -902,6 +949,10 @@ export async function importScheduleAction(
         kickoffAt: new Date(row.resolved!.kickoffAt),
         matchweek: row.resolved!.matchweek,
         status: "SCHEDULED",
+        ...pickKitsForFixture(
+          teamById.get(row.resolved!.homeTeamId),
+          teamById.get(row.resolved!.awayTeamId),
+        ),
       })),
     });
     await writeAudit(tx, {

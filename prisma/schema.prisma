@@ -27,14 +27,17 @@ datasource db {
 
 /// A competition year, e.g. "2026 Spring".
 model Season {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  startsOn  DateTime
-  endsOn    DateTime
-  isActive  Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(cuid())
+  name           String
+  slug           String   @unique
+  startsOn       DateTime
+  endsOn         DateTime
+  isActive       Boolean  @default(false)
+  /// First sort key for this season's tables: POINTS or POINTS_PER_GAME.
+  /// Points per game keeps a table fair while fixtures are unevenly played.
+  tiebreakerMode String   @default("POINTS")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   divisions     Division[]
   matches       Match[]

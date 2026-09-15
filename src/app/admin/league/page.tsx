@@ -10,6 +10,7 @@ import {
   createTeamAction,
   createVenueAction,
   deleteSeasonAction,
+  setSeasonTiebreakerAction,
 } from "@/app/admin/actions";
 import { formatDate } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
@@ -57,6 +58,29 @@ export default async function AdminLeaguePage() {
                   <p className="text-muted text-xs">
                     {formatDate(season.startsOn)} &ndash; {formatDate(season.endsOn)}
                   </p>
+                  <ActionForm
+                    action={setSeasonTiebreakerAction}
+                    resetOnSuccess={false}
+                    className="mt-2 flex flex-wrap items-center gap-2"
+                  >
+                    <input type="hidden" name="seasonId" value={season.id} />
+                    <label
+                      htmlFor={`tiebreak-${season.id}`}
+                      className="text-muted text-[11px] font-medium"
+                    >
+                      Ranked on
+                    </label>
+                    <select
+                      id={`tiebreak-${season.id}`}
+                      name="tiebreakerMode"
+                      defaultValue={season.tiebreakerMode}
+                      className={`${inputClass} w-auto py-1 text-xs`}
+                    >
+                      <option value="POINTS">Total points</option>
+                      <option value="POINTS_PER_GAME">Points per game</option>
+                    </select>
+                    <SubmitButton variant="ghost">Save</SubmitButton>
+                  </ActionForm>
                 </div>
                 {season.isActive ? (
                   <p className="text-muted max-w-40 text-right text-[11px]">

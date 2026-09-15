@@ -77,7 +77,20 @@ export interface StandingsRow {
 }
 
 export type Tiebreaker =
-  "points" | "goalDifference" | "goalsFor" | "headToHead" | "disciplinaryPoints" | "alphabetical";
+  | "points"
+  | "pointsPerGame"
+  | "goalDifference"
+  | "goalsFor"
+  | "headToHead"
+  | "disciplinaryPoints"
+  | "alphabetical";
+
+/**
+ * What the table is primarily ranked on. `points` is the normal league rule;
+ * `pointsPerGame` keeps a table fair while teams have played an unequal number
+ * of fixtures, which matters in a workplace league where games get rearranged.
+ */
+export type PrimaryMetric = "points" | "pointsPerGame";
 
 export interface StandingsAdjustmentInput {
   teamId: string;
@@ -99,6 +112,8 @@ export interface StandingsOptions {
   formLength?: number;
   /** Administrative points deductions/awards, applied after every match. */
   adjustments?: StandingsAdjustmentInput[];
+  /** First sort key. Defaults to total points. */
+  primaryMetric?: PrimaryMetric;
 }
 
 export const DEFAULT_STANDINGS_OPTIONS: Required<StandingsOptions> = {
@@ -110,6 +125,7 @@ export const DEFAULT_STANDINGS_OPTIONS: Required<StandingsOptions> = {
   disciplinary: { yellow: 1, red: 3 },
   formLength: 5,
   adjustments: [],
+  primaryMetric: "points",
 };
 
 /** Statuses whose fixture never contributes to the table. */
@@ -320,9 +336,10 @@ export function calculateStandings(
   }
 
   const rows = [...table.values()];
+  const metric = opts.primaryMetric;
 
-  // Stage 1: points -> goal difference -> goals for.
-  rows.sort(comparePrimary);
+  // Stage 1: points (or points per game) -> goal difference -> goals for.
+  rows.sort((a, b) => comparePrimary(a, b, metric));
 
   // Stage 2: within each block that is level on all three, apply head-to-head,
   // then disciplinary points, then alphabetical order for stability.
@@ -330,7 +347,7 @@ export function calculateStandings(
   let index = 0;
   while (index < rows.length) {
     let end = index + 1;
-    while (end < rows.length && comparePrimary(rows[index], rows[end]) === 0) end += 1;
+    while (end < rows.length && comparePrimary(rows[index], rows[end], metric) === 0) end += 1;
 
     const block = rows.slice(index, end);
     if (block.length > 1) {
@@ -352,20 +369,42 @@ export function calculateStandings(
   }
 
   for (let i = 1; i < result.length; i += 1) {
-    result[i].separatedBy = whichTiebreaker(result[i - 1], result[i], rows, h2h);
+    result[i].separatedBy = whichTiebreaker(result[i - 1], result[i], rows, h2h, metric);
   }
 
   return result;
 }
 
 function comparePrimary(
-  a: Pick<StandingsRow, "points" | "goalDifference" | "goalsFor">,
-  b: Pick<StandingsRow, "points" | "goalDifference" | "goalsFor">,
+  a: Pick<StandingsRow, "points" | "played" | "goalDifference" | "goalsFor">,
+  b: Pick<StandingsRow, "points" | "played" | "goalDifference" | "goalsFor">,
+  metric: PrimaryMetric,
 ): number {
-  if (a.points !== b.points) return b.points - a.points;
+  const primary = compareByMetric(a, b, metric);
+  if (primary !== 0) return primary;
   if (a.goalDifference !== b.goalDifference) return b.goalDifference - a.goalDifference;
   if (a.goalsFor !== b.goalsFor) return b.goalsFor - a.goalsFor;
   return 0;
+}
+
+/**
+ * Descending comparison on the configured primary metric.
+ *
+ * Points-per-game is compared by cross-multiplication rather than by dividing,
+ * so the ordering is exact integer arithmetic. Dividing would compare floats
+ * like 4/3 and 8/6 as unequal and let rounding noise decide a league position.
+ * A team with no games played has no rate at all, so it is treated as zero.
+ */
+function compareByMetric(
+  a: Pick<StandingsRow, "points" | "played">,
+  b: Pick<StandingsRow, "points" | "played">,
+  metric: PrimaryMetric,
+): number {
+  if (metric === "points") return b.points - a.points;
+  if (a.played === 0 && b.played === 0) return 0;
+  if (a.played === 0) return b.points > 0 ? 1 : b.points < 0 ? -1 : 0;
+  if (b.played === 0) return a.points > 0 ? -1 : a.points < 0 ? 1 : 0;
+  return b.points * a.played - a.points * b.played;
 }
 
 /**
@@ -409,8 +448,9 @@ function whichTiebreaker(
   below: StandingsRow,
   allRows: { teamId: string }[],
   h2h: Map<string, { points: number; gf: number; ga: number }>,
+  metric: PrimaryMetric,
 ): Tiebreaker {
-  if (above.points !== below.points) return "points";
+  if (compareByMetric(above, below, metric) !== 0) return metric;
   if (above.goalDifference !== below.goalDifference) return "goalDifference";
   if (above.goalsFor !== below.goalsFor) return "goalsFor";
   const pair = new Set([above.teamId, below.teamId]);

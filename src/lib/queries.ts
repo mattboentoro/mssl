@@ -153,10 +153,20 @@ export async function getStandingsForSeason(seasonId: string): Promise<DivisionS
   });
 
   const teams: StandingsTeamInput[] = divisions.flatMap((division) => division.teams);
+  // The season owns its ranking rule, so every table for that season -- public,
+  // admin, mini-snippet -- agrees without the caller having to remember.
+  const season = await prisma.season.findUnique({
+    where: { id: seasonId },
+    select: { tiebreakerMode: true },
+  });
   const byDivision = calculateStandingsByDivision(
     teams,
     matches as unknown as StandingsMatchInput[],
-    { ...standingsOptionsFromConfig(), adjustments },
+    {
+      ...standingsOptionsFromConfig(),
+      adjustments,
+      primaryMetric: season?.tiebreakerMode === "POINTS_PER_GAME" ? "pointsPerGame" : "points",
+    },
   );
 
   return divisions.map((division) => ({

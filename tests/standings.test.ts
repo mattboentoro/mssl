@@ -406,6 +406,108 @@ describe("calculateStandingsByDivision", () => {
   });
 });
 
+describe("calculateStandings — points-per-game primary metric", () => {
+  const trio = [team("a"), team("b"), team("c")];
+
+  it("ranks on total points by default even when games played differ", () => {
+    // A: 6 pts from 4 games. B: 6 pts from 2 games. Level on points, and A is
+    // ahead on goal difference, so the default metric puts A first.
+    const rows = calculateStandings(
+      trio,
+      [
+        match("a", 3, 0, "c"),
+        match("a", 1, 0, "c"),
+        match("a", 0, 1, "c"),
+        match("a", 0, 1, "c"),
+        match("b", 1, 0, "c"),
+        match("b", 1, 0, "c"),
+      ],
+      DEFAULT_STANDINGS_OPTIONS,
+    );
+
+    expect(rows.map((r) => r.teamId)).toEqual(["a", "b", "c"]);
+    expect(rowFor(rows, "a").points).toBe(6);
+    expect(rowFor(rows, "b").points).toBe(6);
+  });
+
+  it("ranks on points per game when the season asks for it", () => {
+    // Same fixtures: B's 3.0 per game beats A's 1.5 per game.
+    const rows = calculateStandings(
+      trio,
+      [
+        match("a", 3, 0, "c"),
+        match("a", 1, 0, "c"),
+        match("a", 0, 1, "c"),
+        match("a", 0, 1, "c"),
+        match("b", 1, 0, "c"),
+        match("b", 1, 0, "c"),
+      ],
+      { ...DEFAULT_STANDINGS_OPTIONS, primaryMetric: "pointsPerGame" },
+    );
+
+    expect(rows.map((r) => r.teamId)).toEqual(["b", "a", "c"]);
+    expect(rows[1].separatedBy).toBe("pointsPerGame");
+  });
+
+  it("compares rates exactly rather than through floating point", () => {
+    // A takes 4 points from 3 games; B takes 8 from 6. Identical rates, but
+    // dividing would compare 4/3 against 8/6 as floats and risk splitting them
+    // on rounding noise. Cross-multiplying leaves them level so the next
+    // tiebreaker (goal difference) decides.
+    const rows = calculateStandings(
+      trio,
+      [
+        match("a", 2, 0, "c"),
+        match("a", 1, 1, "c"),
+        match("a", 0, 1, "c"),
+        match("b", 1, 0, "c"),
+        match("b", 1, 0, "c"),
+        match("b", 0, 0, "c"),
+        match("b", 0, 0, "c"),
+        match("b", 0, 1, "c"),
+        match("b", 0, 1, "c"),
+      ],
+      { ...DEFAULT_STANDINGS_OPTIONS, primaryMetric: "pointsPerGame" },
+    );
+
+    expect(rowFor(rows, "a").points).toBe(4);
+    expect(rowFor(rows, "a").played).toBe(3);
+    expect(rowFor(rows, "b").points).toBe(8);
+    expect(rowFor(rows, "b").played).toBe(6);
+    // Level on rate, so goal difference separates them: A is +1, B is level.
+    expect(rowFor(rows, "a").goalDifference).toBe(1);
+    expect(rowFor(rows, "b").goalDifference).toBe(0);
+    expect(rows.map((r) => r.teamId)).toEqual(["a", "b", "c"]);
+    expect(rows[1].separatedBy).toBe("goalDifference");
+  });
+
+  it("sorts a team with no games played below anyone with points", () => {
+    const rows = calculateStandings(trio, [match("a", 2, 0, "c")], {
+      ...DEFAULT_STANDINGS_OPTIONS,
+      primaryMetric: "pointsPerGame",
+    });
+
+    expect(rowFor(rows, "b").played).toBe(0);
+    expect(rows.map((r) => r.teamId)).toEqual(["a", "b", "c"]);
+  });
+
+  it("still applies points adjustments before ranking on rate", () => {
+    const rows = calculateStandings(
+      trio,
+      [match("a", 1, 0, "c"), match("b", 1, 0, "c"), match("b", 1, 0, "c")],
+      {
+        ...DEFAULT_STANDINGS_OPTIONS,
+        primaryMetric: "pointsPerGame",
+        adjustments: [{ teamId: "a", points: -3, reason: "Ineligible player" }],
+      },
+    );
+
+    expect(rowFor(rows, "a").points).toBe(0);
+    expect(rowFor(rows, "b").points).toBe(6);
+    expect(rows[0].teamId).toBe("b");
+  });
+});
+
 describe("calculateStandings — points adjustments", () => {
   const pair = [team("a"), team("b")];
 
