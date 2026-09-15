@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { ActionForm, FieldError, SubmitButton } from "@/components/admin-forms";
 import { StandingsTable } from "@/components/match-display";
+import { PointsTeamPicker } from "@/components/points-team-picker";
 import { Alert, Card, EmptyState, Field, inputClass } from "@/components/ui";
 import { createPointsAdjustmentAction, deletePointsAdjustmentAction } from "@/app/admin/actions";
 import { formatDate } from "@/lib/dates";
@@ -24,9 +25,9 @@ export const metadata = { title: "Standings" };
 export default async function AdminStandingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ season?: string; division?: string }>;
+  searchParams: Promise<{ season?: string }>;
 }) {
-  const { season: seasonParam, division: divisionParam } = await searchParams;
+  const { season: seasonParam } = await searchParams;
   const [seasons, season] = await Promise.all([getSeasons(), resolveSeason(seasonParam)]);
 
   if (!season) {
@@ -55,14 +56,14 @@ export default async function AdminStandingsPage({
     }),
   ]);
 
-  // Narrow the team picker to one league so an admin deducting from a big
-  // season is not hunting through every club in a single flat list.
-  const selectedDivision = seasonDivisions.some((d) => d.id === divisionParam)
-    ? divisionParam
-    : undefined;
-  const teams = selectedDivision
-    ? allTeams.filter((team) => team.divisionId === selectedDivision)
-    : allTeams;
+  // Every team in the season goes to the browser so the league filter can
+  // narrow the picker without a round-trip.
+  const pickerTeams = allTeams.map((team) => ({
+    id: team.id,
+    name: team.name,
+    divisionId: team.divisionId,
+    divisionName: team.division.name,
+  }));
 
   const deducted = adjustments
     .filter((a) => a.points < 0)
@@ -98,38 +99,12 @@ export default async function AdminStandingsPage({
           never edited here &mdash; the adjustment is stored separately and shown on the public
           table, so the maths always adds up.
         </p>
-        {seasonDivisions.length > 1 ? (
-          <form method="get" className="mb-3 flex flex-wrap items-end gap-2">
-            <input type="hidden" name="season" value={season.slug} />
-            <Field label="Filter teams by league" htmlFor="adj-division">
-              <select
-                id="adj-division"
-                name="division"
-                defaultValue={selectedDivision ?? ""}
-                className={inputClass}
-              >
-                <option value="">All leagues</option>
-                {seasonDivisions.map((division) => (
-                  <option key={division.id} value={division.id}>
-                    {division.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <button
-              type="submit"
-              className="border-subtle hover:bg-surface-muted rounded-md border px-3 py-2 text-sm font-medium"
-            >
-              Apply filter
-            </button>
-          </form>
-        ) : null}
         <Card className="p-5">
-          {teams.length === 0 ? (
+          {pickerTeams.length === 0 ? (
             <div className="space-y-2">
-              <p className="text-sm font-medium">No teams in this league yet.</p>
+              <p className="text-sm font-medium">No teams in this season yet.</p>
               <p className="text-muted text-sm">
-                There is nothing to adjust here. Pick another league above, or add teams to it in{" "}
+                There is nothing to adjust here. Add teams in{" "}
                 <Link href="/admin/league" className="underline underline-offset-2">
                   Seasons &amp; teams
                 </Link>
@@ -138,16 +113,7 @@ export default async function AdminStandingsPage({
             </div>
           ) : (
             <ActionForm action={createPointsAdjustmentAction} className="grid gap-3 sm:grid-cols-2">
-              <Field label="Team" htmlFor="adj-team">
-                <select id="adj-team" name="teamId" className={inputClass} required>
-                  {teams.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {team.name} &mdash; {team.division.name}
-                    </option>
-                  ))}
-                </select>
-                <FieldError name="teamId" />
-              </Field>
+              <PointsTeamPicker divisions={seasonDivisions} teams={pickerTeams} />
 
               <Field
                 label="Points"
