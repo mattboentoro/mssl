@@ -1,14 +1,16 @@
 import Link from "next/link";
 
 import { ActionForm, FieldError, SubmitButton } from "@/components/admin-forms";
+import { CalendarViewToggle, FixtureCalendar, parseView } from "@/components/fixture-calendar";
 import { MatchKitPicker } from "@/components/match-kit-picker";
 import { KitSwatch } from "@/components/team-colors";
 import { Card, EmptyState, Field, MatchStatusBadge, inputClass } from "@/components/ui";
 import { createMatchAction } from "@/app/admin/actions";
-import { formatDateTime, toDateTimeInputValue } from "@/lib/dates";
+import { formatDateTime, parseMonthValue, shiftMonth, toDateTimeInputValue } from "@/lib/dates";
 import { MATCH_STATUSES, MATCH_STATUS_LABELS } from "@/lib/enums";
 import { prisma } from "@/lib/prisma";
-import { getActiveSeason } from "@/lib/queries";
+import { getActiveSeason, listMatches } from "@/lib/queries";
+import { zonedToUtc } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,8 @@ interface Params {
   division?: string;
   q?: string;
   season?: string;
+  view?: string;
+  month?: string;
 }
 
 export default async function AdminMatchesPage({
@@ -62,6 +66,28 @@ export default async function AdminMatchesPage({
     }),
   ]);
 
+  // The calendar covers one whole league-time month, so it replaces the list's
+  // ordering and 200-row cap. The other filters (season, division, status,
+  // team) still apply.
+  const view = parseView(params.view);
+  const { year, month } = parseMonthValue(params.month);
+  const next = shiftMonth(year, month, 1);
+  const calendarMatches =
+    view === "calendar"
+      ? await listMatches({
+          ...where,
+          kickoffAt: { gte: zonedToUtc(year, month, 1), lt: zonedToUtc(next.year, next.month, 1) },
+        })
+      : [];
+
+  const carried = {
+    season: params.season,
+    division: params.division,
+    status: params.status,
+    q: params.q,
+    month: params.month,
+  };
+
   return (
     <div className="space-y-8">
       <section aria-labelledby="filters">
@@ -70,6 +96,8 @@ export default async function AdminMatchesPage({
         </h2>
         <Card className="p-4">
           <form method="get" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <input type="hidden" name="view" value={view} />
+            {params.month ? <input type="hidden" name="month" value={params.month} /> : null}
             <Field label="Season" htmlFor="season">
               <select id="season" name="season" defaultValue={seasonId} className={inputClass}>
                 {seasons.map((s) => (
@@ -119,7 +147,10 @@ export default async function AdminMatchesPage({
               >
                 Apply
               </button>
-              <Link href="/admin/matches" className="text-muted px-2 py-2 text-sm hover:underline">
+              <Link
+                href={`/admin/matches?view=${view}`}
+                className="text-muted px-2 py-2 text-sm hover:underline"
+              >
                 Reset
               </Link>
             </div>
@@ -128,10 +159,25 @@ export default async function AdminMatchesPage({
       </section>
 
       <section aria-labelledby="fixture-list">
-        <h2 id="fixture-list" className="mb-3 text-lg font-semibold">
-          Fixtures ({matches.length})
-        </h2>
-        {matches.length === 0 ? (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h2 id="fixture-list" className="text-lg font-semibold">
+            {view === "calendar"
+              ? `Fixture calendar (${calendarMatches.length})`
+              : `Fixtures (${matches.length})`}
+          </h2>
+          <CalendarViewToggle view={view} basePath="/admin/matches" query={carried} />
+        </div>
+        {view === "calendar" ? (
+          <FixtureCalendar
+            matches={calendarMatches}
+            year={year}
+            month={month}
+            basePath="/admin/matches"
+            query={{ ...carried, month: undefined, view: "calendar" }}
+            hrefForMatch={(match) => `/admin/matches/${match.id}`}
+            emptyHint="No fixtures are scheduled this month for the current filters."
+          />
+        ) : matches.length === 0 ? (
           <Card className="p-6">
             <EmptyState title="No fixtures match those filters" />
           </Card>

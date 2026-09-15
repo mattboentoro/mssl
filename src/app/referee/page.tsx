@@ -3,10 +3,12 @@ import Link from "next/link";
 import { forbidden, redirect } from "next/navigation";
 
 import { ActionButton } from "@/components/match-actions";
+import { CalendarViewToggle, FixtureCalendar, parseView } from "@/components/fixture-calendar";
 import { Alert, Card, EmptyState, PageHeader, inputClass, labelClass } from "@/components/ui";
 import { MatchStatusBadge } from "@/components/ui";
 import { AuthzError, requireReferee } from "@/lib/authz";
-import { formatDateTime } from "@/lib/dates";
+import { formatDateTime, parseMonthValue, shiftMonth } from "@/lib/dates";
+import { zonedToUtc } from "@/lib/timezone";
 import { MATCH_STATUS_LABELS, type MatchStatus } from "@/lib/enums";
 import { getActiveSeason, getDivisions, listMatches } from "@/lib/queries";
 import { prisma } from "@/lib/prisma";
@@ -19,6 +21,8 @@ interface RefereeParams {
   to?: string;
   division?: string;
   venue?: string;
+  view?: string;
+  month?: string;
 }
 
 export default async function RefereePage({
@@ -76,6 +80,38 @@ export default async function RefereePage({
 
   const active = mine.filter((m) => m.status === "ASSIGNED");
   const history = mine.filter((m) => m.status !== "ASSIGNED");
+
+  // --- Calendar --------------------------------------------------------------
+  // The month view answers a different question from the filtered list: "what
+  // is my weekend actually like?". So it deliberately ignores the date filters
+  // and shows the whole month, covering both open fixtures and the referee's
+  // own commitments.
+  const view = parseView(params.view);
+  const { year, month } = parseMonthValue(params.month);
+  // Month boundaries are league-time midnights: a 16:30 Redmond kickoff on 31
+  // January is 00:30 UTC on 1 February, and belongs to January's grid.
+  const next = shiftMonth(year, month, 1);
+  const monthStart = zonedToUtc(year, month, 1);
+  const monthEnd = zonedToUtc(next.year, next.month, 1);
+
+  const calendarMatches =
+    view === "calendar"
+      ? await listMatches({
+          seasonId: season.id,
+          kickoffAt: { gte: monthStart, lt: monthEnd },
+          OR: [{ refereeId: null }, { refereeId: referee.id }],
+          ...(params.division ? { divisionId: params.division } : {}),
+          ...(params.venue ? { venueId: params.venue } : {}),
+        })
+      : [];
+
+  const carried = {
+    from: params.from,
+    to: params.to,
+    division: params.division,
+    venue: params.venue,
+    month: params.month,
+  };
 
   return (
     <div>
@@ -147,36 +183,46 @@ export default async function RefereePage({
 
       {/* --------------------------- Available matches ------------------------ */}
       <section aria-labelledby="available" className="mt-10">
-        <h2 id="available" className="mb-3 text-lg font-semibold">
-          Available matches
-        </h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h2 id="available" className="text-lg font-semibold">
+            {view === "calendar" ? "Fixture calendar" : "Available matches"}
+          </h2>
+          <CalendarViewToggle view={view} basePath="/referee" query={carried} />
+        </div>
 
         <Card className="mb-4 p-4">
           <form method="get" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            <div>
-              <label className={labelClass} htmlFor="from">
-                From
-              </label>
-              <input
-                id="from"
-                name="from"
-                type="date"
-                defaultValue={params.from ?? ""}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className={labelClass} htmlFor="to">
-                To
-              </label>
-              <input
-                id="to"
-                name="to"
-                type="date"
-                defaultValue={params.to ?? ""}
-                className={inputClass}
-              />
-            </div>
+            {/* Keep the current view and month when the filters are applied. */}
+            <input type="hidden" name="view" value={view} />
+            {params.month ? <input type="hidden" name="month" value={params.month} /> : null}
+            {view === "calendar" ? null : (
+              <>
+                <div>
+                  <label className={labelClass} htmlFor="from">
+                    From
+                  </label>
+                  <input
+                    id="from"
+                    name="from"
+                    type="date"
+                    defaultValue={params.from ?? ""}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass} htmlFor="to">
+                    To
+                  </label>
+                  <input
+                    id="to"
+                    name="to"
+                    type="date"
+                    defaultValue={params.to ?? ""}
+                    className={inputClass}
+                  />
+                </div>
+              </>
+            )}
             <div>
               <label className={labelClass} htmlFor="division">
                 Division
@@ -220,14 +266,29 @@ export default async function RefereePage({
               >
                 Filter
               </button>
-              <Link href="/referee" className="text-muted px-2 py-2 text-sm hover:underline">
+              <Link
+                href={`/referee?view=${view}`}
+                className="text-muted px-2 py-2 text-sm hover:underline"
+              >
                 Reset
               </Link>
             </div>
           </form>
         </Card>
 
-        {available.length === 0 ? (
+        {view === "calendar" ? (
+          <FixtureCalendar
+            matches={calendarMatches}
+            year={year}
+            month={month}
+            basePath="/referee"
+            query={{ ...carried, month: undefined, view: "calendar" }}
+            hrefForMatch={(match) =>
+              match.referee?.id === referee.id ? `/referee/${match.id}` : undefined
+            }
+            emptyHint="Open fixtures and your own assignments appear here. Use the arrows to look ahead."
+          />
+        ) : available.length === 0 ? (
           <Card className="p-6">
             <EmptyState
               title="No unassigned matches match those filters"
