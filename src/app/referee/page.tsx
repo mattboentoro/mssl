@@ -5,6 +5,7 @@ import { forbidden, redirect } from "next/navigation";
 import { ActionButton } from "@/components/match-actions";
 import { CalendarViewToggle, FixtureCalendar, parseView } from "@/components/fixture-calendar";
 import { Alert, Card, EmptyState, PageHeader, inputClass, labelClass } from "@/components/ui";
+import { KitLine } from "@/components/team-colors";
 import { MatchStatusBadge } from "@/components/ui";
 import { AuthzError, requireReferee } from "@/lib/authz";
 import { formatDateTime, parseMonthValue, shiftMonth } from "@/lib/dates";
@@ -157,6 +158,13 @@ export default async function RefereePage({
                       {formatDateTime(match.kickoffAt)}
                       {match.venue ? ` \u00b7 ${match.venue.name}` : ""}
                     </p>
+                    <KitLine
+                      className="mt-1.5"
+                      homeTeam={match.homeTeam}
+                      homeKit={match.homeKit}
+                      awayTeam={match.awayTeam}
+                      awayKit={match.awayKit}
+                    />
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     {match.status === "ASSIGNED" ? (
@@ -309,6 +317,19 @@ export default async function RefereePage({
                       {formatDateTime(match.kickoffAt)}
                       {match.venue ? ` \u00b7 ${match.venue.name}, ${match.venue.city}` : ""}
                     </p>
+                    <KitLine
+                      className="mt-1.5"
+                      homeTeam={match.homeTeam}
+                      homeKit={match.homeKit}
+                      awayTeam={match.awayTeam}
+                      awayKit={match.awayKit}
+                    />
+                    <Link
+                      href={`/referee/${match.id}`}
+                      className="text-brand mt-1.5 inline-block text-xs font-medium hover:underline"
+                    >
+                      View match details
+                    </Link>
                   </div>
                   <ActionButton
                     url={`/api/matches/${match.id}/assign`}

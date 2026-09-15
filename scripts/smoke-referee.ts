@@ -178,6 +178,20 @@ async function main(): Promise<void> {
     "the referee calendar links every fixture, not just their own",
     calendar.includes(`/referee/${match.id}`),
   );
+  // The open-match list has to name the kit colours too, not just show a
+  // swatch: a phone screen in daylight makes two dark circles look identical.
+  const openList = await (await req("/referee")).text();
+  const homeKitText = `${match.homeTeam.name} in ${kitColorName(resolveKit(match.homeTeam, match.homeKit)).toLowerCase()}`;
+  const awayKitText = `${match.awayTeam.name} in ${kitColorName(resolveKit(match.awayTeam, match.awayKit)).toLowerCase()}`;
+  check(
+    "the open-match list names each side's kit colour",
+    openList.includes(homeKitText) && openList.includes(awayKitText),
+    `${homeKitText} / ${awayKitText}`,
+  );
+  check(
+    "an open fixture can be opened before it is claimed",
+    openList.includes(`/referee/${match.id}`),
+  );
   const preview = await (await req(`/referee/${match.id}`)).text();
   check("an unclaimed fixture is previewable", preview.includes(match.homeTeam.name));
   check("the preview offers a claim action", preview.includes("Claim this match"));

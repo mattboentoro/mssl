@@ -233,6 +233,48 @@ async function main(): Promise<void> {
       check("updateTeamAction refuses a duplicate slug", clashed?.slug === team.slug);
     }
 
+    // ...but the same slug in a *different* division is not a clash. The
+    // database only requires (divisionId, slug) to be unique, and the same club
+    // appears in every season it played, so a global check locked teams out of
+    // their own editor.
+    const seasonTeams = await prisma.team.findMany({
+      where: { division: { seasonId: division.seasonId } },
+      select: { id: true, name: true, slug: true, divisionId: true },
+    });
+    let twinned: (typeof seasonTeams)[number] | undefined;
+    let elsewhere = 0;
+    for (const candidate of seasonTeams) {
+      const count = await prisma.team.count({
+        where: { slug: candidate.slug, divisionId: { not: candidate.divisionId } },
+      });
+      if (count > 0) {
+        twinned = candidate;
+        elsewhere = count;
+        break;
+      }
+    }
+    if (twinned) {
+      const nudged = `${twinned.name} ${stamp}`;
+      await submit("/admin/league", `id="team-${twinned.id}-name"`, {
+        teamId: twinned.id,
+        divisionId: twinned.divisionId,
+        name: nudged,
+        shortName: "TWN",
+        slug: twinned.slug,
+        colorPrimary: "#0f766e",
+        colorAlternate: "#ffffff",
+        captainName: "",
+        contactEmail: "",
+      });
+      const saved = await prisma.team.findUnique({ where: { id: twinned.id } });
+      check(
+        "a team keeps its slug when another division uses the same one",
+        saved?.name === nudged,
+        `“${twinned.slug}” also used in ${elsewhere} other division(s)`,
+      );
+      await prisma.team.update({ where: { id: twinned.id }, data: { name: twinned.name } });
+    }
+
     // Restore the name so the delete-confirmation check below still matches.
     await prisma.team.update({ where: { id: team.id }, data: { name: teamName } });
   }
@@ -314,19 +356,20 @@ async function main(): Promise<void> {
   console.log("\nContent");
   const adjHtml = await (await req("/admin/standings")).text();
   check("the deduction console can be filtered by league", adjHtml.includes('id="adj-division"'));
-  const filtered = await (
-    await req(`/admin/standings?season=${division.seasonId}&division=${division.id}`)
-  ).text();
+  // The filter now runs in the browser, so every team ships with the page and
+  // the check is that the picker has the data it needs to narrow itself.
   const otherDivision = await prisma.division.findFirst({
     where: { seasonId: division.seasonId, id: { not: division.id } },
     include: { teams: { take: 1 } },
   });
   if (otherDivision?.teams[0]) {
     check(
-      "filtering to one league hides the other league's teams",
-      !filtered.includes(`value="${otherDivision.teams[0].id}"`),
+      "the team picker carries both leagues so filtering needs no reload",
+      adjHtml.includes(`value="${otherDivision.teams[0].id}"`) &&
+        adjHtml.includes(`value="${otherDivision.id}"`),
       otherDivision.name,
     );
+    check("the league filter is not a separate submit step", !adjHtml.includes("Apply filter"));
   }
 
   console.log("\nSeason ranking rule");
@@ -384,6 +427,31 @@ async function main(): Promise<void> {
     /<option value="upcoming"[^>]*selected/.test(matchesHtml),
   );
   check("the venue picker is gone from Add a fixture", !matchesHtml.includes('id="new-venue"'));
+  check("the fixture table has no separate score column", !matchesHtml.includes(">Score<"));
+  {
+    // A played fixture reads as "Home 2–1 Away" on one line; an unplayed one
+    // reads "Home vs Away". Both need visible space around the middle token,
+    // which is why the separator is a flex gap rather than literal whitespace.
+    const played = await prisma.match.findFirst({
+      where: { divisionId: division.id, report: { isNot: null } },
+      include: { report: true, homeTeam: true, awayTeam: true },
+    });
+    if (played?.report) {
+      const withResult = await (
+        await req(`/admin/matches?season=${division.seasonId}&when=all`)
+      ).text();
+      check(
+        "a played fixture shows its score inline",
+        withResult.includes(`${played.report.homeScore}\u2013${played.report.awayScore}`),
+        `${played.homeTeam.name} ${played.report.homeScore}-${played.report.awayScore} ${played.awayTeam.name}`,
+      );
+      check("an unplayed fixture reads as a versus line", withResult.includes(">vs<"));
+      check(
+        "team names are separated by a layout gap, not collapsing whitespace",
+        withResult.includes("gap-x-2"),
+      );
+    }
+  }
 
   const csv = await req(`/admin/schedule.csv?season=${division.seasonId}`);
   const csvBody = await csv.text();

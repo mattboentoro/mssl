@@ -58,3 +58,41 @@ export function KitSwatch({
     </span>
   );
 }
+
+/**
+ * The kit colours for one fixture, written out as visible text.
+ *
+ * A swatch alone is not enough on a phone at the pitch: colours are small,
+ * screens are washed out in sunlight, and two dark kits look identical. Naming
+ * the colour means a referee can confirm the clash call without squinting.
+ */
+export function KitLine({
+  homeTeam,
+  homeKit,
+  awayTeam,
+  awayKit,
+  className = "",
+}: {
+  homeTeam: TeamColors & { name: string };
+  homeKit: KitChoice | string;
+  awayTeam: TeamColors & { name: string };
+  awayKit: KitChoice | string;
+  className?: string;
+}) {
+  const sides = [
+    { team: homeTeam, kit: homeKit },
+    { team: awayTeam, kit: awayKit },
+  ];
+
+  return (
+    <p className={`text-muted flex flex-wrap items-center gap-x-3 gap-y-1 text-xs ${className}`}>
+      {sides.map(({ team, kit }) => (
+        <span key={team.name} className="inline-flex items-center gap-1.5">
+          <KitSwatch team={team} kit={kit} teamName={team.name} />
+          {/* One interpolation, so the phrase survives as a single text node. */}
+          <span>{`${team.name} in ${kitColorName(resolveKit(team, kit)).toLowerCase()}`}</span>
+        </span>
+      ))}
+    </p>
+  );
+}
