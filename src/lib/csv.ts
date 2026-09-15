@@ -40,3 +40,15 @@ export function parseCsv(text: string): string[][] {
   }
   return rows.filter((r) => r.some((cell) => cell.trim() !== ""));
 }
+
+/**
+ * Serialise one row back to CSV, quoting only when a cell needs it.
+ *
+ * The inverse of `parseCsv` for the subset we emit, so an exported schedule
+ * re-imports byte-for-byte.
+ */
+export function toCsvRow(cells: string[]): string {
+  return cells
+    .map((cell) => (/[",\r\n]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell))
+    .join(",");
+}

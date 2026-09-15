@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { postJson, type ApiResult } from "@/components/match-actions";
 import { Alert, Card, Field, buttonClass, inputClass } from "@/components/ui";
+import { toDateTimeInputValue } from "@/lib/dates";
 import {
   KIT_CHOICES,
   KIT_LABELS,
@@ -17,13 +18,6 @@ import { kitsClash, resolveKit, type TeamColors } from "@/lib/kits";
 interface Option {
   id: string;
   name: string;
-}
-
-/** Convert an ISO instant into the value shape `<input type="datetime-local">` wants. */
-function toLocalInput(iso: string): string {
-  const date = new Date(iso);
-  const offset = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
 
 export function AdminMatchForms({
@@ -104,7 +98,9 @@ export function AdminMatchForms({
             const data = new FormData(event.currentTarget);
             const local = String(data.get("kickoffAt") ?? "");
             void send("schedule", `/api/matches/${matchId}/schedule`, {
-              kickoffAt: local ? new Date(local).toISOString() : undefined,
+              // Sent as a bare wall-clock string; the server reads it as
+              // league (Redmond) time regardless of where the admin is.
+              kickoffAt: local || undefined,
               venueId: (data.get("venueId") as string) || null,
               status: String(data.get("status") ?? ""),
               homeKit: String(data.get("homeKit") ?? ""),
@@ -113,12 +109,12 @@ export function AdminMatchForms({
             });
           }}
         >
-          <Field label="Kick-off" htmlFor="kickoffAt">
+          <Field label="Kick-off" htmlFor="kickoffAt" hint="Redmond time.">
             <input
               id="kickoffAt"
               name="kickoffAt"
               type="datetime-local"
-              defaultValue={toLocalInput(kickoffAt)}
+              defaultValue={toDateTimeInputValue(kickoffAt)}
               className={inputClass}
             />
           </Field>

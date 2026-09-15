@@ -8,6 +8,7 @@ import { parseCsv } from "@/lib/csv";
 import { AuthzError, requireAdmin } from "@/lib/authz";
 import { addDisciplinaryAction, deleteDisciplinaryAction } from "@/lib/matches";
 import { prisma } from "@/lib/prisma";
+import { parseLeagueDateTime } from "@/lib/timezone";
 import {
   announcementSchema,
   csvMatchRowSchema,
@@ -428,8 +429,8 @@ export async function createMatchAction(_prev: ActionState, form: FormData): Pro
       if (data.homeTeamId === data.awayTeamId) {
         throw new Error("A team cannot play itself.");
       }
-      const kickoff = new Date(data.kickoffAt);
-      if (Number.isNaN(kickoff.getTime())) throw new Error("Kick-off date is not valid.");
+      const kickoff = parseLeagueDateTime(data.kickoffAt);
+      if (!kickoff) throw new Error("Kick-off date is not valid.");
 
       const match = await prisma.match.create({
         data: {
@@ -671,7 +672,7 @@ export async function importScheduleAction(
     const home = teamIndex.get(key(parsed.data.home));
     const away = teamIndex.get(key(parsed.data.away));
     const venue = parsed.data.venue ? venueIndex.get(key(parsed.data.venue)) : undefined;
-    const kickoff = new Date(parsed.data.kickoff);
+    const kickoff = parseLeagueDateTime(parsed.data.kickoff);
 
     const problems: string[] = [];
     if (!division) problems.push(`unknown division “${parsed.data.division}”`);
@@ -679,8 +680,10 @@ export async function importScheduleAction(
     if (!away) problems.push(`unknown away team “${parsed.data.away}”`);
     if (home && away && home.id === away.id) problems.push("a team cannot play itself");
     if (parsed.data.venue && !venue) problems.push(`unknown venue “${parsed.data.venue}”`);
-    if (Number.isNaN(kickoff.getTime()))
-      problems.push(`unreadable kick-off “${parsed.data.kickoff}”`);
+    if (!kickoff)
+      problems.push(
+        `unreadable kick-off “${parsed.data.kickoff}” — use YYYY-MM-DD HH:mm (Redmond time)`,
+      );
     if (division && home && home.divisionId !== division.id) {
       problems.push(`${home.name} is not in ${division.name}`);
     }
@@ -688,7 +691,7 @@ export async function importScheduleAction(
       problems.push(`${away.name} is not in ${division.name}`);
     }
 
-    if (problems.length > 0 || !division || !home || !away) {
+    if (problems.length > 0 || !division || !home || !away || !kickoff) {
       rows.push({ line: i + 1, raw, error: problems.join("; ") });
       continue;
     }

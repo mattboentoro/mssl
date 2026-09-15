@@ -1,20 +1,34 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { importScheduleAction, type CsvImportState } from "@/app/admin/actions";
 import { SubmitButton } from "@/components/admin-forms";
-import { Alert, Card, Field, inputClass } from "@/components/ui";
+import { Alert, Card, Field, buttonClass, inputClass } from "@/components/ui";
+import { formatDateTime } from "@/lib/dates";
 
 const SAMPLE = `matchweek,kickoff,division,home,away,venue
-1,2026-03-07T18:00:00Z,Premier Division,Redmond Rangers,Bellevue Bytes,Redmond Campus Pitch 1`;
+1,2026-03-07 18:00,Premier Division,Redmond Rangers,Bellevue Bytes,Redmond Campus Pitch 1`;
 
 export function ScheduleImportForm({ seasons }: { seasons: { id: string; name: string }[] }) {
   const [state, formAction] = useActionState<CsvImportState, FormData>(importScheduleAction, {});
+  const [seasonId, setSeasonId] = useState(state.seasonId ?? seasons[0]?.id ?? "");
 
   return (
     <div className="space-y-6">
       <Card className="p-5">
+        <div className="border-subtle mb-4 flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+          <p className="text-muted text-xs">
+            Download the current schedule to get a correctly-shaped file you can edit and re-upload.
+          </p>
+          <a
+            href={`/admin/schedule.csv?season=${encodeURIComponent(seasonId)}`}
+            className={buttonClass("secondary")}
+            download
+          >
+            Download schedule CSV
+          </a>
+        </div>
         <form action={formAction} className="space-y-4">
           {state.error ? <Alert tone="danger">{state.error}</Alert> : null}
           {state.ok ? <Alert tone="success">{state.ok}</Alert> : null}
@@ -23,7 +37,8 @@ export function ScheduleImportForm({ seasons }: { seasons: { id: string; name: s
             <select
               id="import-season"
               name="seasonId"
-              defaultValue={state.seasonId ?? seasons[0]?.id ?? ""}
+              value={seasonId}
+              onChange={(event) => setSeasonId(event.target.value)}
               className={inputClass}
               required
             >
@@ -38,7 +53,7 @@ export function ScheduleImportForm({ seasons }: { seasons: { id: string; name: s
           <Field
             label="CSV"
             htmlFor="import-csv"
-            hint="Columns: matchweek (1-60), kickoff (ISO 8601), division, home, away, venue (optional). Teams and divisions are matched by name, slug or short name."
+            hint="Columns: matchweek (1-60), kickoff, division, home, away, venue (optional). Kick-off is written as YYYY-MM-DD HH:mm and is always read as Redmond time — no timezone suffix needed. Teams and divisions are matched by name, slug or short name."
           >
             <textarea
               id="import-csv"
@@ -102,7 +117,7 @@ export function ScheduleImportForm({ seasons }: { seasons: { id: string; name: s
                     {row.resolved?.divisionName ?? row.raw.division}
                   </td>
                   <td className="text-muted px-3 py-2 font-mono text-xs">
-                    {row.resolved?.kickoffAt ?? row.raw.kickoff}
+                    {row.resolved ? formatDateTime(row.resolved.kickoffAt) : row.raw.kickoff}
                   </td>
                   <td className="text-muted px-3 py-2">
                     {row.resolved?.venueName ?? row.raw.venue ?? "\u2014"}

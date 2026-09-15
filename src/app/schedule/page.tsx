@@ -78,7 +78,7 @@ export default async function SchedulePage({
       <PageHeader
         eyebrow={season.name}
         title="Schedule"
-        description="Kickoff times are shown in UTC. Subscribe to the calendar feed to get fixtures in Outlook."
+        description="Kickoff times are shown in Redmond time (Pacific). Subscribe to the calendar feed to get fixtures in Outlook."
         actions={
           <ButtonLink href={`/schedule/calendar.ics?${icsQuery.toString()}`} variant="secondary">
             Export .ics

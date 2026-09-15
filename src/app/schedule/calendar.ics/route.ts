@@ -1,4 +1,5 @@
 import { listMatches, resolveSeason } from "@/lib/queries";
+import { LEAGUE_TIME_ZONE } from "@/lib/timezone";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,7 +55,10 @@ export async function GET(request: Request) {
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     `X-WR-CALNAME:${escapeText(`MSSL ${season.name}`)}`,
-    "X-WR-TIMEZONE:UTC",
+    // Events are emitted as absolute UTC instants (the trailing Z), which every
+    // calendar client renders in the subscriber's own zone. This hint just sets
+    // the calendar's default display zone to the league's.
+    `X-WR-TIMEZONE:${LEAGUE_TIME_ZONE}`,
   ];
 
   for (const match of matches) {
