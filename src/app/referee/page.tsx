@@ -84,7 +84,12 @@ export default async function RefereePage({
   if (Object.keys(kickoff).length > 0) availableWhere.kickoffAt = kickoff;
 
   const [available, mine] = await Promise.all([
-    listMatches(availableWhere, 50),
+    // Deliberately uncapped. A cap here silently disagreed with the calendar,
+    // which has never been capped: a referee saw the list stop partway through
+    // the season while the month grid kept showing fixtures beyond it. Two
+    // views of the same query must not contradict each other, and the date and
+    // division filters below are the intended way to narrow this down.
+    listMatches(availableWhere),
     listMatches({ refereeId: referee.id }),
   ]);
 
@@ -248,7 +253,16 @@ export default async function RefereePage({
       <section aria-labelledby="available" className="mt-10">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 id="available" className="text-lg font-semibold">
-            {view === "calendar" ? "Open fixtures calendar" : "Available matches"}
+            {view === "calendar" ? (
+              "Open fixtures calendar"
+            ) : (
+              <>
+                Available matches{" "}
+                {/* The count makes it obvious the list is complete rather than
+                    cut short — the symptom that a row cap used to cause. */}
+                <span className="text-muted font-normal">{`(${available.length})`}</span>
+              </>
+            )}
           </h2>
           <CalendarViewToggle view={view} basePath="/referee" query={carried} />
         </div>
