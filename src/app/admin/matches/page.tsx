@@ -235,7 +235,18 @@ export default async function AdminMatchesPage({
               <tbody className="divide-subtle divide-y">
                 {matches.map((match) => (
                   <ClickableRow key={match.id} href={`/admin/matches/${match.id}`}>
-                    <td className="text-muted px-3 py-2">{match.matchweek}</td>
+                    <td className="text-muted px-3 py-2">
+                      {match.matchweek}
+                      {match.countsForStandings ? null : (
+                        <span
+                          className="ml-1 rounded bg-amber-100 px-1 py-px text-[10px] font-semibold tracking-wide text-amber-900 dark:bg-amber-900/50 dark:text-amber-100"
+                          title="This fixture is excluded from the league table."
+                        >
+                          <span className="sr-only">Does not count towards the standings, </span>
+                          NL
+                        </span>
+                      )}
+                    </td>
                     <td className="text-muted px-3 py-2 whitespace-nowrap">
                       {formatDateTime(match.kickoffAt)}
                     </td>
@@ -326,14 +337,31 @@ export default async function AdminMatchesPage({
               <input
                 id="new-mw"
                 name="matchweek"
-                type="number"
-                min={1}
-                max={60}
-                defaultValue={1}
+                type="text"
+                maxLength={40}
+                defaultValue="1"
+                placeholder="7 or Final"
                 className={inputClass}
                 required
               />
               <FieldError name="matchweek" />
+            </Field>
+            <Field label="Counts for standings" htmlFor="new-counts">
+              <label className="flex items-center gap-2 py-2 text-sm">
+                <input
+                  id="new-counts"
+                  name="countsForStandings"
+                  type="checkbox"
+                  defaultChecked
+                  className="h-4 w-4"
+                />
+                Include this result in the league table
+              </label>
+              <p className="text-muted text-xs">
+                Clear it for a final, play-off or friendly. The fixture still appears everywhere
+                else.
+              </p>
+              <FieldError name="countsForStandings" />
             </Field>
             <MatchKitPicker
               teams={teams.map((t) => ({

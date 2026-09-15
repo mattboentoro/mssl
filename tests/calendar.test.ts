@@ -12,7 +12,7 @@ import {
 /**
  * The month grid drives the fixture calendar for referees and admins. It is
  * pure arithmetic, so it is worth pinning down the edges: leap years, the
- * Monday-first offset, and year rollover in both directions.
+ * Sunday-first offset, and year rollover in both directions.
  */
 describe("shiftMonth", () => {
   it("steps forward within a year", () => {
@@ -76,17 +76,29 @@ describe("buildMonthGrid", () => {
   });
 
   it("pads the start so the first of the month lands on its real weekday", () => {
-    // 1 February 2026 is a Sunday, so a Monday-first week needs six leading cells.
+    // 1 February 2026 is a Sunday, so a Sunday-first week needs no leading cells.
     const grid = buildMonthGrid(2026, 2, today);
     const leading = grid.findIndex((cell) => cell.inMonth);
-    expect(leading).toBe(6);
-    expect(grid[leading].key).toBe("2026-02-01");
+    expect(leading).toBe(0);
+    expect(grid[0].key).toBe("2026-02-01");
+  });
+
+  it("starts every week on a Sunday", () => {
+    expect(WEEKDAY_HEADINGS[0]).toBe("Sun");
+    expect(WEEKDAY_HEADINGS[6]).toBe("Sat");
+    // Every seventh cell must be a Sunday for the columns to mean anything.
+    const grid = buildMonthGrid(2026, 4, today);
+    for (let i = 0; i < grid.length; i += 7) {
+      expect(new Date(`${grid[i].key}T12:00:00Z`).getUTCDay()).toBe(0);
+    }
   });
 
   it("borrows the tail of the previous month for the leading pad", () => {
-    const grid = buildMonthGrid(2026, 2, today);
-    expect(grid[0]).toMatchObject({ key: "2026-01-26", day: 26, inMonth: false });
-    expect(grid[5]).toMatchObject({ key: "2026-01-31", day: 31, inMonth: false });
+    // 1 April 2026 is a Wednesday, so three days of March lead the grid.
+    const grid = buildMonthGrid(2026, 4, today);
+    expect(grid[0]).toMatchObject({ key: "2026-03-29", day: 29, inMonth: false });
+    expect(grid[2]).toMatchObject({ key: "2026-03-31", day: 31, inMonth: false });
+    expect(grid[3]).toMatchObject({ key: "2026-04-01", day: 1, inMonth: true });
   });
 
   it("counts leap-year February correctly", () => {

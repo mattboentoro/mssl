@@ -105,7 +105,7 @@ async function createFixture(): Promise<Fixture> {
       awayTeamId: away.id,
       venueName: "Redmond Pitch",
       kickoffAt: new Date("2026-02-01T18:00:00Z"),
-      matchweek: 1,
+      matchweek: "1",
       status: "SCHEDULED",
     },
   });

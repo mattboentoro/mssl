@@ -5,6 +5,7 @@ import { MatchList } from "@/components/match-display";
 import { ButtonLink, Card, EmptyState, PageHeader, inputClass, labelClass } from "@/components/ui";
 import { getCurrentUser } from "@/lib/authz";
 import { formatLongDate } from "@/lib/dates";
+import { compareMatchweeks } from "@/lib/matchweek";
 import { getDivisions, getSeasons, listMatches, resolveSeason } from "@/lib/queries";
 import { prisma } from "@/lib/prisma";
 
@@ -51,12 +52,12 @@ export default async function SchedulePage({
   ]);
 
   const view = params.view === "results" ? "results" : params.view === "all" ? "all" : "fixtures";
-  const matchweek = params.matchweek ? Number(params.matchweek) : undefined;
+  const matchweek = params.matchweek?.trim() || undefined;
 
   const where: Record<string, unknown> = { seasonId: season.id };
   if (params.division) where.divisionId = params.division;
   if (params.team) where.OR = [{ homeTeamId: params.team }, { awayTeamId: params.team }];
-  if (matchweek && Number.isFinite(matchweek)) where.matchweek = matchweek;
+  if (matchweek) where.matchweek = matchweek;
   if (view === "fixtures") where.report = { is: null };
   if (view === "results") where.report = { isNot: null };
 
@@ -71,7 +72,7 @@ export default async function SchedulePage({
     else grouped.set(key, [match]);
   }
 
-  const matchweeks = [...new Set(matches.map((m) => m.matchweek))].sort((a, b) => a - b);
+  const matchweeks = [...new Set(matches.map((m) => m.matchweek))].sort(compareMatchweeks);
   const icsQuery = new URLSearchParams({ season: season.slug });
   if (params.division) icsQuery.set("division", params.division);
   if (params.team) icsQuery.set("team", params.team);

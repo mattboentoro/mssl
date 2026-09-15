@@ -25,6 +25,8 @@ export function AdminMatchForms({
   status,
   kickoffAt,
   venueName,
+  matchweek,
+  countsForStandings,
   refereeId,
   hasReport,
   homeTeamName,
@@ -41,6 +43,8 @@ export function AdminMatchForms({
   status: string;
   kickoffAt: string;
   venueName: string | null;
+  matchweek: string;
+  countsForStandings: boolean;
   refereeId: string | null;
   hasReport: boolean;
   homeTeamName: string;
@@ -101,6 +105,9 @@ export function AdminMatchForms({
               kickoffAt: local || undefined,
               venueName: (data.get("venueName") as string) || null,
               status: String(data.get("status") ?? ""),
+              matchweek: String(data.get("matchweek") ?? "") || undefined,
+              // A cleared checkbox is simply absent from the FormData.
+              countsForStandings: data.get("countsForStandings") === "on",
               homeKit: String(data.get("homeKit") ?? ""),
               awayKit: String(data.get("awayKit") ?? ""),
               reason: String(data.get("reason") ?? ""),
@@ -126,6 +133,20 @@ export function AdminMatchForms({
               className={inputClass}
             />
           </Field>
+          <Field
+            label="Matchweek"
+            htmlFor="matchweek"
+            hint="Free text — 7, or Final for a knockout tie."
+          >
+            <input
+              id="matchweek"
+              name="matchweek"
+              type="text"
+              maxLength={40}
+              defaultValue={matchweek}
+              className={inputClass}
+            />
+          </Field>
           <Field label="Status" htmlFor="status">
             <select id="status" name="status" defaultValue={status} className={inputClass}>
               {MATCH_STATUSES.map((s) => (
@@ -143,6 +164,28 @@ export function AdminMatchForms({
               placeholder="Pitch waterlogged"
             />
           </Field>
+
+          {/*
+            A cup final or a friendly still needs a fixture, a referee and a
+            report — it just must not move the league table. Clearing this
+            keeps the result off the standings without hiding the match.
+          */}
+          <label className="border-subtle flex items-start gap-2 rounded-lg border p-3 text-sm sm:col-span-2">
+            <input
+              id="countsForStandings"
+              name="countsForStandings"
+              type="checkbox"
+              defaultChecked={countsForStandings}
+              className="mt-0.5 h-4 w-4"
+            />
+            <span>
+              Counts towards the league table
+              <span className="text-muted block text-xs">
+                Clear it for a final, play-off or friendly. The fixture still appears in the
+                schedule and the referee still files a report.
+              </span>
+            </span>
+          </label>
 
           <fieldset className="border-subtle grid gap-3 rounded-lg border p-3 sm:grid-cols-2">
             <legend className="text-muted px-1 text-xs font-semibold uppercase">Kits</legend>
@@ -224,84 +267,85 @@ export function AdminMatchForms({
       </Card>
 
       {/* ------------------------------- Override --------------------------- */}
-      {hasReport ? (
-        <Card className="p-5 lg:col-span-2">
-          <h3 className="font-semibold">Override the result</h3>
-          <p className="text-muted mt-1 text-xs">
-            Use only to correct a filed report. The original stays in the audit log, a reason is
-            mandatory, and standings recompute from the corrected figures.
-          </p>
-          <form
-            className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const data = new FormData(event.currentTarget);
-              void send("override", `/api/matches/${matchId}/override`, {
-                homeScore: Number(data.get("homeScore")),
-                awayScore: Number(data.get("awayScore")),
-                homeForfeit: data.get("homeForfeit") === "on",
-                awayForfeit: data.get("awayForfeit") === "on",
-                reason: String(data.get("reason") ?? ""),
-              });
-            }}
-          >
-            <Field label={`${homeTeamName} score`} htmlFor="homeScore">
-              <input
-                id="homeScore"
-                name="homeScore"
-                type="number"
-                min={0}
-                max={99}
-                defaultValue={currentHomeScore}
-                className={inputClass}
-                required
-              />
-            </Field>
-            <Field label={`${awayTeamName} score`} htmlFor="awayScore">
-              <input
-                id="awayScore"
-                name="awayScore"
-                type="number"
-                min={0}
-                max={99}
-                defaultValue={currentAwayScore}
-                className={inputClass}
-                required
-              />
-            </Field>
-            <div className="flex flex-col justify-end gap-2 text-sm">
-              <label className="flex items-center gap-2">
-                <input type="checkbox" name="homeForfeit" className="h-4 w-4" />
-                {homeTeamName} forfeit
-              </label>
-              <label className="flex items-center gap-2">
-                <input type="checkbox" name="awayForfeit" className="h-4 w-4" />
-                {awayTeamName} forfeit
-              </label>
-            </div>
-            <Field label="Reason (required)" htmlFor="override-reason">
-              <input
-                id="override-reason"
-                name="reason"
-                minLength={5}
-                required
-                className={inputClass}
-                placeholder="Scorer mis-recorded, corrected by committee"
-              />
-            </Field>
-            <div className="sm:col-span-2 lg:col-span-4">
-              <button
-                type="submit"
-                disabled={busy === "override"}
-                className={buttonClass("danger")}
-              >
-                {busy === "override" ? "Applying\u2026" : "Override result"}
-              </button>
-              {feedback("override")}
-            </div>
-          </form>
-        </Card>
-      ) : null}
+      {/* Always available: a referee may never file a report, and the league
+          still has to be able to put the result on the table. */}
+      <Card className="p-5 lg:col-span-2">
+        <h3 className="font-semibold">{hasReport ? "Override the result" : "Enter the result"}</h3>
+        <p className="text-muted mt-1 text-xs">
+          {hasReport
+            ? "Use only to correct a filed report. The original stays in the audit log, a reason is mandatory, and standings recompute from the corrected figures."
+            : "No referee report was filed. Entering the score here creates the report on the referee's behalf, confirmed and counted in the standings. A reason is mandatory and the entry is audited."}
+        </p>
+        <form
+          className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const data = new FormData(event.currentTarget);
+            void send("override", `/api/matches/${matchId}/override`, {
+              homeScore: Number(data.get("homeScore")),
+              awayScore: Number(data.get("awayScore")),
+              homeForfeit: data.get("homeForfeit") === "on",
+              awayForfeit: data.get("awayForfeit") === "on",
+              reason: String(data.get("reason") ?? ""),
+            });
+          }}
+        >
+          <Field label={`${homeTeamName} score`} htmlFor="homeScore">
+            <input
+              id="homeScore"
+              name="homeScore"
+              type="number"
+              min={0}
+              max={99}
+              defaultValue={currentHomeScore}
+              className={inputClass}
+              required
+            />
+          </Field>
+          <Field label={`${awayTeamName} score`} htmlFor="awayScore">
+            <input
+              id="awayScore"
+              name="awayScore"
+              type="number"
+              min={0}
+              max={99}
+              defaultValue={currentAwayScore}
+              className={inputClass}
+              required
+            />
+          </Field>
+          <div className="flex flex-col justify-end gap-2 text-sm">
+            <label className="flex items-center gap-2">
+              <input type="checkbox" name="homeForfeit" className="h-4 w-4" />
+              {homeTeamName} forfeit
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" name="awayForfeit" className="h-4 w-4" />
+              {awayTeamName} forfeit
+            </label>
+          </div>
+          <Field label="Reason (required)" htmlFor="override-reason">
+            <input
+              id="override-reason"
+              name="reason"
+              minLength={5}
+              required
+              className={inputClass}
+              placeholder="Scorer mis-recorded, corrected by committee"
+            />
+          </Field>
+          <div className="sm:col-span-2 lg:col-span-4">
+            <button type="submit" disabled={busy === "override"} className={buttonClass("danger")}>
+              {busy === "override"
+                ? "Applying\u2026"
+                : hasReport
+                  ? "Override result"
+                  : "Enter result"}
+            </button>
+            {feedback("override")}
+          </div>
+        </form>
+      </Card>
     </div>
   );
 }

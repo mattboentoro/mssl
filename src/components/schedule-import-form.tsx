@@ -7,8 +7,9 @@ import { SubmitButton } from "@/components/admin-forms";
 import { Alert, Card, Field, buttonClass, inputClass } from "@/components/ui";
 import { formatDateTime } from "@/lib/dates";
 
-const SAMPLE = `matchweek,kickoff,division,home,away,venue
-1,2026-03-07 18:00,Premier Division,Redmond Rangers,Bellevue Bytes,Marymoor Field 3`;
+const SAMPLE = `matchweek,kickoff,division,home,away,venue,counts
+1,2026-03-07 18:00,Premier Division,Redmond Rangers,Bellevue Bytes,Marymoor Field 3,yes
+Final,2026-06-13 18:00,Premier Division,Redmond Rangers,Bellevue Bytes,Marymoor Field 1,no`;
 
 export function ScheduleImportForm({ seasons }: { seasons: { id: string; name: string }[] }) {
   const [state, formAction] = useActionState<CsvImportState, FormData>(importScheduleAction, {});
@@ -84,7 +85,7 @@ export function ScheduleImportForm({ seasons }: { seasons: { id: string; name: s
           <Field
             label="CSV"
             htmlFor="import-csv"
-            hint="Columns: matchweek (1-60), kickoff, division, home, away, venue. Kick-off is read as Redmond time; YYYY-MM-DD HH:mm and M/D/YYYY HH:mm both work. Divisions and teams that are not on file yet are created for you. Venue is free text and is stored exactly as typed."
+            hint="Columns: matchweek, kickoff, division, home, away, venue, counts. Matchweek is free text, so 7 and Final both work. Kick-off is read as Redmond time; YYYY-MM-DD HH:mm and M/D/YYYY HH:mm both work. Divisions and teams that are not on file yet are created for you. Venue is free text and is stored exactly as typed. Counts is optional — put no for a final or friendly that must stay out of the league table."
           >
             <textarea
               id="import-csv"

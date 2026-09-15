@@ -142,29 +142,35 @@ model Referee {
 /// `refereeId` is set the fixture is frozen to everyone but that referee (who
 /// may release it until they file a report) and league admins.
 model Match {
-  id         String    @id @default(cuid())
-  seasonId   String
-  divisionId String
-  homeTeamId String
-  awayTeamId String
+  id                 String    @id @default(cuid())
+  seasonId           String
+  divisionId         String
+  homeTeamId         String
+  awayTeamId         String
   /// Where the fixture is played, as free text. Deliberately not a relation:
   /// organisers name pitches however they like week to week, and a schedule
   /// import must never be blocked because a pitch is not on a register.
-  venueName  String?
-  kickoffAt  DateTime
-  matchweek  Int
-  status     String    @default("SCHEDULED")
+  venueName          String?
+  kickoffAt          DateTime
+  /// Free text, not a number: a season has "1".."14" but also "Final",
+  /// "Semi-final" and "Cup R1". Ordering is always by kick-off, never by this.
+  matchweek          String
+  /// False for anything that must not move the league table — finals,
+  /// play-offs, friendlies. The fixture still appears in the schedule and
+  /// still carries a result; the standings module simply skips it.
+  countsForStandings Boolean   @default(true)
+  status             String    @default("SCHEDULED")
   /// Which registered kit each side wears, one of KitChoice: PRIMARY | ALTERNATE.
   /// The colour itself is always read from the Team record so re-colouring a team
   /// keeps every fixture in sync.
-  homeKit    String    @default("PRIMARY")
-  awayKit    String    @default("ALTERNATE")
-  refereeId  String?
-  assignedAt DateTime?
-  version    Int       @default(0)
-  notes      String?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  homeKit            String    @default("PRIMARY")
+  awayKit            String    @default("ALTERNATE")
+  refereeId          String?
+  assignedAt         DateTime?
+  version            Int       @default(0)
+  notes              String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   season     Season               @relation(fields: [seasonId], references: [id], onDelete: Cascade)
   division   Division             @relation(fields: [divisionId], references: [id], onDelete: Cascade)
@@ -188,7 +194,10 @@ model Match {
 model GameReport {
   id             String    @id @default(cuid())
   matchId        String    @unique
-  refereeId      String
+  /// Null when a league admin entered the result directly — an override on a
+  /// fixture whose referee never filed anything still has to produce a report,
+  /// because the standings are derived from reports and nothing else.
+  refereeId      String?
   homeScore      Int       @default(0)
   awayScore      Int       @default(0)
   homeForfeit    Boolean   @default(false)
@@ -207,7 +216,7 @@ model GameReport {
   updatedAt      DateTime  @updatedAt
 
   match      Match                @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  referee    Referee              @relation(fields: [refereeId], references: [id], onDelete: Cascade)
+  referee    Referee?             @relation(fields: [refereeId], references: [id], onDelete: Cascade)
   discipline DisciplinaryAction[]
 
   @@index([refereeId])

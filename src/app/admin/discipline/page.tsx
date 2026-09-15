@@ -31,7 +31,7 @@ export default async function AdminDisciplinePage() {
     }),
     prisma.match.findMany({
       where: { seasonId: season.id },
-      orderBy: [{ matchweek: "asc" }, { kickoffAt: "asc" }],
+      orderBy: [{ kickoffAt: "asc" }],
       take: 200,
       select: {
         id: true,

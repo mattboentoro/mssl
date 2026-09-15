@@ -190,6 +190,15 @@ async function main(): Promise<void> {
     "switching the assignments view keeps the open-fixture view",
     calendar.includes("myView=calendar") && splitViews.includes("view=calendar"),
   );
+  // League fixtures run on Sundays, so a Monday-first grid pushed every match
+  // to the far edge of the row.
+  const sundayFirst = calendar.indexOf(">Sun<");
+  const mondaySecond = calendar.indexOf(">Mon<");
+  check(
+    "the calendar week starts on Sunday",
+    sundayFirst !== -1 && mondaySecond > sundayFirst,
+    `Sun@${sundayFirst} Mon@${mondaySecond}`,
+  );
   // The open-match list has to name the kit colours too, not just show a
   // swatch: a phone screen in daylight makes two dark circles look identical.
   const openList = await (await req("/referee")).text();
@@ -203,6 +212,27 @@ async function main(): Promise<void> {
   check(
     "the fixture name itself links to the match detail",
     openList.includes(`/referee/${match.id}`) && !openList.includes("View match details"),
+  );
+  // A row cap on this list used to disagree with the calendar, which has never
+  // been capped: the list stopped partway through the season while the month
+  // grid kept showing fixtures beyond it. The heading count proves the list is
+  // whole.
+  const openCount = await prisma.match.count({
+    where: { seasonId: match.seasonId, refereeId: null, status: "SCHEDULED" },
+  });
+  check(
+    "the available list is not truncated",
+    openCount > 0 && openList.includes(`(${openCount})`),
+    `${openCount} open fixture(s)`,
+  );
+  check(
+    "every open fixture is actually rendered",
+    (
+      await prisma.match.findMany({
+        where: { seasonId: match.seasonId, refereeId: null, status: "SCHEDULED" },
+        select: { id: true },
+      })
+    ).every((m) => openList.includes(`/referee/${m.id}`)),
   );
   const preview = await (await req(`/referee/${match.id}`)).text();
   check("an unclaimed fixture is previewable", preview.includes(match.homeTeam.name));

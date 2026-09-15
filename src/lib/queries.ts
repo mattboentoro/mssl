@@ -28,6 +28,9 @@ const STANDINGS_MATCH_SELECT = {
   awayTeamId: true,
   status: true,
   kickoffAt: true,
+  // Must be selected: the calculator skips a fixture that is flagged out of the
+  // table, and the caller casts this shape, so a missing column fails silently.
+  countsForStandings: true,
   report: {
     select: {
       status: true,

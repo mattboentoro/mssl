@@ -111,6 +111,8 @@ export const matchUpdateSchema = z.object({
   /** Free text, shown on the fixture exactly as typed. Never validated. */
   venueName: z.string().max(200).nullable().optional(),
   status: z.enum(MATCH_STATUSES).optional(),
+  matchweek: trimmed(40).min(1, "Give the fixture a matchweek, such as 7 or Final.").optional(),
+  countsForStandings: z.boolean().optional(),
   homeKit: z.enum(KIT_CHOICES).optional(),
   awayKit: z.enum(KIT_CHOICES).optional(),
   reason: optionalText(500).optional(),
@@ -211,7 +213,13 @@ export const matchCreateSchema = z.object({
   /** Free text, shown on the fixture exactly as typed. Never validated. */
   venueName: z.string().max(200).nullable().optional(),
   kickoffAt: z.string().min(4),
-  matchweek: z.number().int().min(1).max(60),
+  /**
+   * Free text, so a season can label a fixture "Final" or "Cup R1" as easily
+   * as "7". Fixtures are always ordered by kick-off, never by this.
+   */
+  matchweek: trimmed(40).min(1, "Give the fixture a matchweek, such as 7 or Final."),
+  /** Clear for a final, play-off or friendly that must not move the table. */
+  countsForStandings: z.boolean().default(true),
   homeKit: z.enum(KIT_CHOICES).default("PRIMARY"),
   awayKit: z.enum(KIT_CHOICES).default("ALTERNATE"),
   notes: optionalText(500).optional(),
@@ -246,7 +254,7 @@ export const announcementSchema = z.object({
  * even that — it is simply text copied onto the fixture.
  */
 export const csvMatchRowSchema = z.object({
-  matchweek: z.coerce.number().int().min(1).max(60),
+  matchweek: z.coerce.string().trim().min(1).max(40),
   kickoff: z.string().min(4),
   division: z.string().min(1),
   home: z.string().min(1),
@@ -256,6 +264,12 @@ export const csvMatchRowSchema = z.object({
    * register to check it against and nothing is ever created from it.
    */
   venue: z.string().optional().default(""),
+  /**
+   * Optional. Anything falsy-looking ("no", "false", "0") marks the fixture as
+   * not counting towards the table; a blank column leaves it counting, so an
+   * older template without the column still imports unchanged.
+   */
+  counts: z.string().optional().default(""),
 });
 
 export type CsvMatchRow = z.infer<typeof csvMatchRowSchema>;

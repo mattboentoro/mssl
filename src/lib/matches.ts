@@ -397,7 +397,15 @@ export async function disputeGameReport(
   });
 }
 
-/** Admin override of a filed result. A reason is mandatory and audited. */
+/**
+ * Admin override of a result. A reason is mandatory and audited.
+ *
+ * The fixture need not have a report: a referee may never file one, and the
+ * league still has to be able to record the score. In that case the admin's
+ * entry *becomes* the report, credited to the assigned referee if there is one
+ * and to nobody if there is not. The standings read reports and nothing else,
+ * so this is the only way an unreported result can reach the table.
+ */
 export async function overrideGameReport(
   db: DbClient,
   params: {
@@ -413,29 +421,39 @@ export async function overrideGameReport(
   const { matchId, actor, reason } = params;
   if (!actor.isAdmin) throw new MatchError("Admin only.", 403, "NOT_YOUR_MATCH");
 
-  const report = await db.gameReport.findUnique({ where: { matchId } });
-  if (!report) throw new MatchError("No report to override.", 404, "REPORT_MISSING");
+  const match = await db.match.findUnique({
+    where: { id: matchId },
+    select: { id: true, refereeId: true },
+  });
+  if (!match) throw new MatchError("Match not found.", 404, "NOT_FOUND");
 
-  const before = {
-    homeScore: report.homeScore,
-    awayScore: report.awayScore,
-    homeForfeit: report.homeForfeit,
-    awayForfeit: report.awayForfeit,
+  const report = await db.gameReport.findUnique({ where: { matchId } });
+
+  const before = report
+    ? {
+        homeScore: report.homeScore,
+        awayScore: report.awayScore,
+        homeForfeit: report.homeForfeit,
+        awayForfeit: report.awayForfeit,
+      }
+    : null;
+
+  const result = {
+    homeScore: params.homeScore,
+    awayScore: params.awayScore,
+    homeForfeit: params.homeForfeit ?? false,
+    awayForfeit: params.awayForfeit ?? false,
+    overrideReason: reason,
+    status: "CONFIRMED",
+    confirmedAt: new Date(),
+    confirmedById: actor.id ?? null,
   };
 
-  await db.gameReport.update({
-    where: { id: report.id },
-    data: {
-      homeScore: params.homeScore,
-      awayScore: params.awayScore,
-      homeForfeit: params.homeForfeit ?? false,
-      awayForfeit: params.awayForfeit ?? false,
-      overrideReason: reason,
-      status: "CONFIRMED",
-      confirmedAt: new Date(),
-      confirmedById: actor.id ?? null,
-    },
-  });
+  const saved = report
+    ? await db.gameReport.update({ where: { id: report.id }, data: result })
+    : await db.gameReport.create({
+        data: { ...result, matchId, refereeId: match.refereeId ?? null },
+      });
 
   await db.match.update({
     where: { id: matchId },
@@ -444,9 +462,9 @@ export async function overrideGameReport(
 
   await writeAudit(db, {
     actor,
-    action: "report.override",
+    action: report ? "report.override" : "report.enter",
     entity: "GameReport",
-    entityId: report.id,
+    entityId: saved.id,
     metadata: { matchId, reason, before, after: { ...params, actor: undefined } },
   });
 }
@@ -460,6 +478,8 @@ export async function updateMatchSchedule(
     kickoffAt?: Date;
     venueName?: string | null;
     status?: MatchStatus;
+    matchweek?: string;
+    countsForStandings?: boolean;
     homeKit?: KitChoice;
     awayKit?: KitChoice;
     reason?: string;
@@ -475,6 +495,10 @@ export async function updateMatchSchedule(
     data.venueName = params.venueName?.trim() || null;
   }
   if (params.status) data.status = params.status;
+  if (params.matchweek) data.matchweek = params.matchweek;
+  if (params.countsForStandings !== undefined) {
+    data.countsForStandings = params.countsForStandings;
+  }
   if (params.homeKit) data.homeKit = params.homeKit;
   if (params.awayKit) data.awayKit = params.awayKit;
 
@@ -491,6 +515,8 @@ export async function updateMatchSchedule(
         kickoffAt: match.kickoffAt,
         status: match.status,
         venueName: match.venueName,
+        matchweek: match.matchweek,
+        countsForStandings: match.countsForStandings,
         homeKit: match.homeKit,
         awayKit: match.awayKit,
       },
@@ -498,6 +524,8 @@ export async function updateMatchSchedule(
         kickoffAt: params.kickoffAt ?? match.kickoffAt,
         status: params.status ?? match.status,
         venueName: params.venueName === undefined ? match.venueName : params.venueName,
+        matchweek: params.matchweek ?? match.matchweek,
+        countsForStandings: params.countsForStandings ?? match.countsForStandings,
         homeKit: params.homeKit ?? match.homeKit,
         awayKit: params.awayKit ?? match.awayKit,
       },

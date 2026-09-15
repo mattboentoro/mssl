@@ -167,7 +167,9 @@ export default async function AdminMatchDetailPage({
         </section>
       ) : (
         <Alert tone="info" title="No report filed yet">
-          The assigned referee files the report once the match has been played.
+          The assigned referee files the report once the match has been played. If they cannot,
+          enter the result yourself below &mdash; it is recorded as the report and counted in the
+          standings.
         </Alert>
       )}
 
@@ -176,6 +178,8 @@ export default async function AdminMatchDetailPage({
         status={match.status}
         kickoffAt={match.kickoffAt.toISOString()}
         venueName={match.venueName}
+        matchweek={match.matchweek}
+        countsForStandings={match.countsForStandings}
         refereeId={match.refereeId}
         hasReport={Boolean(match.report)}
         homeTeamName={match.homeTeam.name}

@@ -669,7 +669,9 @@ export async function createMatchAction(_prev: ActionState, form: FormData): Pro
       awayTeamId: str(form, "awayTeamId"),
       venueName: optional(form, "venueName") ?? null,
       kickoffAt: str(form, "kickoffAt"),
-      matchweek: num(form, "matchweek") ?? 1,
+      matchweek: str(form, "matchweek") || "1",
+      // Unchecked checkboxes are simply absent from the payload.
+      countsForStandings: form.get("countsForStandings") === "on",
       homeKit: str(form, "homeKit") || "PRIMARY",
       awayKit: str(form, "awayKit") || "ALTERNATE",
       notes: optional(form, "notes"),
@@ -690,6 +692,7 @@ export async function createMatchAction(_prev: ActionState, form: FormData): Pro
           venueName: data.venueName ?? null,
           kickoffAt: kickoff,
           matchweek: data.matchweek,
+          countsForStandings: data.countsForStandings,
           homeKit: data.homeKit,
           awayKit: data.awayKit,
           notes: data.notes ?? null,
@@ -804,6 +807,16 @@ export async function createDocumentAction(
 // CSV schedule import
 // ---------------------------------------------------------------------------
 
+/**
+ * Read the optional `counts` column. A blank cell means "counts", so a template
+ * exported before the column existed still imports every fixture into the
+ * table. Only an explicit negative opts a fixture out.
+ */
+function csvCountsForStandings(raw: string | undefined): boolean {
+  const value = (raw ?? "").trim().toLowerCase();
+  return !["no", "n", "false", "0", "off", "exhibition", "friendly"].includes(value);
+}
+
 export interface CsvPreviewRow {
   line: number;
   raw: Record<string, string>;
@@ -820,7 +833,9 @@ export interface CsvPreviewRow {
     /** Whatever the CSV said, stored verbatim. Never looked up, never created. */
     venueName: string | null;
     kickoffAt: string;
-    matchweek: number;
+    matchweek: string;
+    /** False for a final / play-off / friendly that must not move the table. */
+    countsForStandings: boolean;
     duplicate: boolean;
   };
 }
@@ -1098,6 +1113,7 @@ export async function importScheduleAction(
         venueName: parsed.data.venue?.trim() || null,
         kickoffAt: kickoff.toISOString(),
         matchweek: parsed.data.matchweek,
+        countsForStandings: csvCountsForStandings(parsed.data.counts),
         duplicate: existingKeys.has(`${parsed.data.matchweek}|${home.ref}|${away.ref}`),
       },
     });
@@ -1213,6 +1229,7 @@ export async function importScheduleAction(
         venueName: row.resolved!.venueName,
         kickoffAt: new Date(row.resolved!.kickoffAt),
         matchweek: row.resolved!.matchweek,
+        countsForStandings: row.resolved!.countsForStandings,
         status: "SCHEDULED",
         ...pickKitsForFixture(
           colorsByRef.get(row.resolved!.homeTeamId),

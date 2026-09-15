@@ -25,6 +25,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       kickoffAt: kickoffAt ?? undefined,
       venueName: body.venueName,
       status: body.status,
+      matchweek: body.matchweek,
+      countsForStandings: body.countsForStandings,
       homeKit: body.homeKit,
       awayKit: body.awayKit,
       reason: body.reason,

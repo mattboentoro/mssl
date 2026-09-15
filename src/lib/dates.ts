@@ -144,8 +144,8 @@ function weekdayOf(year: number, month: number, day: number): number {
 
 /**
  * Build the 7-column grid for a month, padded with the neighbouring months'
- * days so every row is full. Weeks start on Monday, which is how a fixture
- * list reads: the weekend lands together at the end of the row.
+ * days so every row is full. Weeks start on Sunday, matching how the league
+ * reads a weekend fixture list.
  */
 export function buildMonthGrid(
   year: number,
@@ -160,8 +160,8 @@ export function buildMonthGrid(
     cells.push({ key, day: d, inMonth, isToday: key === todayKey });
   };
 
-  // Monday-first, so Sunday (0) sits at the end of the week.
-  const leading = (weekdayOf(year, month, 1) + 6) % 7;
+  // Sunday-first, so `weekdayOf` (0 = Sunday) is already the column index.
+  const leading = weekdayOf(year, month, 1);
   if (leading > 0) {
     const prev = shiftMonth(year, month, -1);
     const prevLength = daysInMonth(prev.year, prev.month);
@@ -183,8 +183,8 @@ export function buildMonthGrid(
   return cells;
 }
 
-/** Column headings for `buildMonthGrid`, in the same Monday-first order. */
-export const WEEKDAY_HEADINGS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+/** Column headings for `buildMonthGrid`, in the same Sunday-first order. */
+export const WEEKDAY_HEADINGS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /** "in 3 days" / "2 hours ago" — coarse and deterministic. */
 export function relativeTime(value: Date | string, now: Date = new Date()): string {

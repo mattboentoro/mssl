@@ -121,11 +121,11 @@ async function main(): Promise<void> {
   });
   const stamp = Date.now();
 
-  // csvMatchRowSchema caps matchweek at 60, and the import checks claim two
-  // consecutive slots, so leave room for both.
-  const busiest = await prisma.match.aggregate({ _max: { matchweek: true } });
-  const MW = Math.min(59, (busiest._max.matchweek ?? 0) + 1);
-  await prisma.match.deleteMany({ where: { matchweek: { in: [MW, MW + 1] } } });
+  // Matchweek is free text, so label the smoke fixtures with something no real
+  // schedule will collide with. The import checks claim two slots.
+  const MW = `smoke-${stamp}`;
+  const MW2 = `smoke-${stamp}-b`;
+  await prisma.match.deleteMany({ where: { matchweek: { in: [MW, MW2] } } });
 
   console.log("Access control");
   await signIn("referee");
@@ -447,7 +447,7 @@ async function main(): Promise<void> {
   const exportHeader = csvBody.split("\n")[0]?.trim() ?? "";
   check(
     "CSV export carries every column the importer requires",
-    ["matchweek", "kickoff", "division", "home", "away", "venue"].every((c) =>
+    ["matchweek", "kickoff", "division", "home", "away", "venue", "counts"].every((c) =>
       exportHeader.split(",").includes(c),
     ),
     exportHeader,
@@ -517,6 +517,29 @@ async function main(): Promise<void> {
   );
 
   {
+    // Matchweek is free text now, and a knockout tie must be importable
+    // alongside the league season without moving the table.
+    const cupWeek = `${MW}-cup`;
+    await prisma.match.deleteMany({ where: { matchweek: cupWeek } });
+    await submit("/admin/import", 'id="import-csv"', {
+      csv: [
+        `${header},counts`,
+        `${cupWeek},2030-06-08T18:00:00Z,${division.name},${division.teams[0].name},${division.teams[2].name},Smoke Pitch,no`,
+      ].join("\n"),
+      seasonId: season.id,
+      mode: "commit",
+    });
+    const cupTie = await prisma.match.findFirst({ where: { matchweek: cupWeek } });
+    check("a non-numeric matchweek imports", Boolean(cupTie), cupTie?.matchweek ?? "not created");
+    check(
+      "the counts column keeps a cup tie out of the league table",
+      cupTie?.countsForStandings === false,
+      String(cupTie?.countsForStandings),
+    );
+    await prisma.match.deleteMany({ where: { matchweek: cupWeek } });
+  }
+
+  {
     // The two complaints that made a real admin's import unusable: a US-style
     // kick-off and a division nobody had created. Neither may block an import
     // any more. The venue column is free text: whatever is typed lands on
@@ -524,7 +547,7 @@ async function main(): Promise<void> {
     const tolerant = await submit("/admin/import", 'id="import-csv"', {
       csv: [
         header,
-        `${MW + 1},8/5/2030 5:30 pm,Sunday Invitational,Rovers Athletic,Harbour Town,A Field Nobody Registered`,
+        `${MW2},8/5/2030 5:30 pm,Sunday Invitational,Rovers Athletic,Harbour Town,A Field Nobody Registered`,
       ].join("\n"),
       seasonId: season.id,
       mode: "dry-run",
@@ -543,13 +566,13 @@ async function main(): Promise<void> {
     const committed = await submit("/admin/import", 'id="import-csv"', {
       csv: [
         header,
-        `${MW + 1},8/5/2030 5:30 pm,Sunday Invitational,Rovers Athletic,Harbour Town,A Field Nobody Registered`,
+        `${MW2},8/5/2030 5:30 pm,Sunday Invitational,Rovers Athletic,Harbour Town,A Field Nobody Registered`,
       ].join("\n"),
       seasonId: season.id,
       mode: "commit",
     });
     const enrolled = await prisma.match.findFirst({
-      where: { seasonId: season.id, matchweek: MW + 1 },
+      where: { seasonId: season.id, matchweek: MW2 },
       include: { division: true, homeTeam: true, awayTeam: true },
     });
     check(
@@ -639,6 +662,60 @@ async function main(): Promise<void> {
     });
     check("a referee cannot change kits", denied.status === 403, `status ${denied.status}`);
     await signIn("admin");
+
+    console.log("\nAdmin result entry and non-league fixtures");
+    // A referee who never files a report used to leave a fixture permanently
+    // blank. An admin must be able to enter the result themselves.
+    const detail = await (await req(`/admin/matches/${importedMatch.id}`)).text();
+    check(
+      "the result form is offered even with no report on file",
+      detail.includes("Enter the result"),
+    );
+    check("the fixture can be flagged as non-league", detail.includes("countsForStandings"));
+    check("matchweek is editable after creation", detail.includes('id="matchweek"'));
+
+    const entered = await req(`/api/matches/${importedMatch.id}/override`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        homeScore: 3,
+        awayScore: 1,
+        reason: "Referee never filed; result confirmed by both captains.",
+      }),
+    });
+    const enteredReport = await prisma.gameReport.findUnique({
+      where: { matchId: importedMatch.id },
+    });
+    check(
+      "admin can enter a result on a fixture the referee never reported",
+      enteredReport?.homeScore === 3 && enteredReport?.awayScore === 1,
+      `status ${entered.status} \u2192 ${enteredReport?.homeScore}-${enteredReport?.awayScore}`,
+    );
+    const enterAudit = await prisma.auditLog.findFirst({
+      where: { action: "report.enter", metadata: { contains: importedMatch.id } },
+    });
+    check("entering a result is audited separately from an override", Boolean(enterAudit));
+
+    const flagged = await req(`/api/matches/${importedMatch.id}/schedule`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        matchweek: "Final",
+        countsForStandings: false,
+        reason: "Cup final",
+      }),
+    });
+    const reflagged = await prisma.match.findUnique({ where: { id: importedMatch.id } });
+    check(
+      "admin can retitle the matchweek and take a fixture out of the table",
+      reflagged?.matchweek === "Final" && reflagged?.countsForStandings === false,
+      `status ${flagged.status} \u2192 ${reflagged?.matchweek} / ${reflagged?.countsForStandings}`,
+    );
+    // Put it back so the clean-up delete still finds the row.
+    await prisma.match.update({
+      where: { id: importedMatch.id },
+      data: { matchweek: MW, countsForStandings: true },
+    });
   }
 
   console.log("\nDestructive deletes");
@@ -769,7 +846,17 @@ async function main(): Promise<void> {
   );
 
   // ---- clean up -----------------------------------------------------------
-  await prisma.match.deleteMany({ where: { matchweek: MW } });
+  await prisma.match.deleteMany({ where: { matchweek: { in: [MW, MW2] } } });
+  // The tolerant-import check enrols a throwaway division and two clubs.
+  const smokeDivision = await prisma.division.findFirst({
+    where: { name: "Sunday Invitational" },
+  });
+  if (smokeDivision) {
+    await prisma.match.deleteMany({ where: { divisionId: smokeDivision.id } });
+    await prisma.team.deleteMany({ where: { divisionId: smokeDivision.id } });
+    await prisma.division.delete({ where: { id: smokeDivision.id } });
+  }
+  await prisma.team.deleteMany({ where: { name: "Nobody FC" } });
   if (team) await prisma.disciplinaryAction.deleteMany({ where: { teamId: team.id } });
   if (team) await prisma.team.deleteMany({ where: { id: team.id } });
   await prisma.season.deleteMany({ where: { id: doomedSeason.id } });

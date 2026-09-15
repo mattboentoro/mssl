@@ -32,6 +32,11 @@ export interface StandingsMatchInput {
   awayTeamId: string;
   status: MatchStatus | string;
   kickoffAt: Date | string;
+  /**
+   * Defaults to true. A final, play-off or friendly is set false and is then
+   * invisible to the table — no points, no played, no goals, no cards.
+   */
+  countsForStandings?: boolean;
   report?: StandingsReportInput | null;
 }
 
@@ -148,6 +153,7 @@ export function resolveResult(
   options: Required<StandingsOptions>,
 ): EffectiveResult | null {
   if (NON_COUNTING_MATCH_STATUSES.has(String(match.status))) return null;
+  if (match.countsForStandings === false) return null;
 
   const report = match.report;
   if (!report) return null;

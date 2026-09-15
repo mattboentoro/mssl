@@ -486,7 +486,7 @@ async function seedSeason(options: {
             awayTeamId: away.id,
             venueName: venueNames[(roundIndex + slotIndex) % venueNames.length],
             kickoffAt,
-            matchweek,
+            matchweek: String(matchweek),
             status,
             homeKit,
             awayKit,

@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** Header the schedule importer expects. Keep the two in lock-step. */
-const HEADER = ["matchweek", "kickoff", "division", "home", "away", "venue"];
+const HEADER = ["matchweek", "kickoff", "division", "home", "away", "venue", "counts"];
 
 /**
  * Download a season's fixtures as CSV.
@@ -34,7 +34,9 @@ export async function GET(request: Request) {
 
   const matches = await prisma.match.findMany({
     where: { seasonId: season.id },
-    orderBy: [{ matchweek: "asc" }, { kickoffAt: "asc" }],
+    // Kick-off order, not matchweek order: matchweek is free text now, so
+    // "Final" and "10" would sort as words rather than as a season.
+    orderBy: [{ kickoffAt: "asc" }, { id: "asc" }],
     include: {
       division: { select: { name: true } },
       homeTeam: { select: { name: true } },
@@ -52,6 +54,7 @@ export async function GET(request: Request) {
         match.homeTeam.name,
         match.awayTeam.name,
         match.venueName ?? "",
+        match.countsForStandings ? "yes" : "no",
       ]),
     );
   }

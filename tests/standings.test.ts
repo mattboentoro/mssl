@@ -28,6 +28,8 @@ interface MatchOptions {
   /** Day offset used to order the form guide. */
   day?: number;
   noReport?: boolean;
+  /** False for a final, play-off or friendly that must not move the table. */
+  countsForStandings?: boolean;
 }
 
 function match(
@@ -45,6 +47,7 @@ function match(
     homeTeamId: home,
     awayTeamId: away,
     status: options.status ?? "CONFIRMED",
+    countsForStandings: options.countsForStandings ?? true,
     kickoffAt: new Date(Date.UTC(2026, 0, day, 18, 0, 0)),
     report: options.noReport
       ? null
@@ -356,6 +359,51 @@ describe("calculateStandings — tiebreakers", () => {
       disciplinaryPoints: 5,
     });
     expect(rowFor(rows, "b")).toMatchObject({ yellowCards: 0, redCards: 0 });
+  });
+});
+
+describe("calculateStandings — fixtures that do not count", () => {
+  const pair = [team("a"), team("b")];
+
+  it("moves nothing at all for a non-counting fixture", () => {
+    const rows = calculateStandings(pair, [match("a", 4, 0, "b", { countsForStandings: false })]);
+    expect(rowFor(rows, "a")).toMatchObject({
+      played: 0,
+      won: 0,
+      goalsFor: 0,
+      goalsAgainst: 0,
+      points: 0,
+    });
+    expect(rowFor(rows, "b")).toMatchObject({ played: 0, lost: 0, goalsAgainst: 0 });
+  });
+
+  it("leaves the league fixtures around it untouched", () => {
+    const rows = calculateStandings(pair, [
+      match("a", 1, 0, "b", { day: 1 }),
+      match("a", 9, 0, "b", { day: 2, countsForStandings: false }),
+    ]);
+    expect(rowFor(rows, "a")).toMatchObject({ played: 1, points: 3, goalsFor: 1 });
+  });
+
+  it("keeps a non-counting result out of the form guide", () => {
+    const rows = calculateStandings(pair, [
+      match("a", 1, 0, "b", { day: 1 }),
+      match("a", 0, 5, "b", { day: 2, countsForStandings: false }),
+    ]);
+    expect(rowFor(rows, "a").form).toEqual(["W"]);
+  });
+
+  it("ignores a forfeit that does not count", () => {
+    const rows = calculateStandings(pair, [
+      match("a", 0, 0, "b", { status: "FORFEIT", homeForfeit: true, countsForStandings: false }),
+    ]);
+    expect(rowFor(rows, "b")).toMatchObject({ played: 0, points: 0, goalsFor: 0 });
+  });
+
+  it("counts the fixture when the flag is absent, so old rows keep working", () => {
+    const input = match("a", 2, 0, "b");
+    delete (input as { countsForStandings?: boolean }).countsForStandings;
+    expect(rowFor(calculateStandings(pair, [input]), "a").points).toBe(3);
   });
 });
 
