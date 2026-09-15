@@ -108,6 +108,38 @@ export function kitsClash(a: string, b: string): boolean {
 }
 
 /**
+ * Choose the strips for a fixture without asking anyone.
+ *
+ * The home side always wears its first-choice kit — that is the convention the
+ * league follows and what "the team's home crest" means. The away side only
+ * changes when the two would be hard to tell apart from the touchline. If both
+ * away options clash (two teams that own near-identical wardrobes) we keep
+ * whichever is the lesser evil rather than silently picking the worse one.
+ *
+ * Pure, so the bulk importer and the unit tests agree by construction.
+ */
+export function pickKitsForFixture(
+  home: TeamColors | undefined,
+  away: TeamColors | undefined,
+): { homeKit: "PRIMARY" | "ALTERNATE"; awayKit: "PRIMARY" | "ALTERNATE" } {
+  if (!home || !away) return { homeKit: "PRIMARY", awayKit: "PRIMARY" };
+
+  const homeShirt = resolveKit(home, "PRIMARY");
+  const awayPrimary = resolveKit(away, "PRIMARY");
+  if (!kitsClash(homeShirt, awayPrimary)) return { homeKit: "PRIMARY", awayKit: "PRIMARY" };
+
+  const awayAlternate = resolveKit(away, "ALTERNATE");
+  if (!kitsClash(homeShirt, awayAlternate)) return { homeKit: "PRIMARY", awayKit: "ALTERNATE" };
+
+  const gapToAlternate = colorDistance(homeShirt, awayAlternate);
+  const gapToPrimary = colorDistance(homeShirt, awayPrimary);
+  return {
+    homeKit: "PRIMARY",
+    awayKit: gapToAlternate > gapToPrimary ? "ALTERNATE" : "PRIMARY",
+  };
+}
+
+/**
  * Black or white, whichever stays readable on top of `hex`. Uses the WCAG
  * relative-luminance formula so mid-tones flip at the right point.
  */

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { ActionForm, FieldError, SubmitButton } from "@/components/admin-forms";
+import { ClickableRow } from "@/components/clickable-row";
 import { CalendarViewToggle, FixtureCalendar, parseView } from "@/components/fixture-calendar";
 import { MatchKitPicker } from "@/components/match-kit-picker";
 import { KitSwatch } from "@/components/team-colors";
@@ -21,6 +22,7 @@ interface Params {
   season?: string;
   view?: string;
   month?: string;
+  when?: string;
 }
 
 export default async function AdminMatchesPage({
@@ -37,9 +39,17 @@ export default async function AdminMatchesPage({
     return <EmptyState title="Create a season first" hint="Head to League setup." />;
   }
 
+  // Admins are nearly always working on fixtures that have not been played yet,
+  // so "upcoming" is the default and "all dates" is the opt-in. A select rather
+  // than a checkbox: an unticked checkbox submits nothing, which is
+  // indistinguishable from "no preference" and would snap straight back to the
+  // default.
+  const when = params.when === "all" ? "all" : "upcoming";
+
   const where: Record<string, unknown> = { seasonId };
   if (params.status) where.status = params.status;
   if (params.division) where.divisionId = params.division;
+  if (when === "upcoming") where.kickoffAt = { gte: new Date() };
   if (params.q) {
     where.OR = [
       { homeTeam: { name: { contains: params.q } } },
@@ -47,10 +57,9 @@ export default async function AdminMatchesPage({
     ];
   }
 
-  const [divisions, teams, venues, matches] = await Promise.all([
+  const [divisions, teams, matches] = await Promise.all([
     prisma.division.findMany({ where: { seasonId }, orderBy: { sortOrder: "asc" } }),
     prisma.team.findMany({ where: { division: { seasonId } }, orderBy: { name: "asc" } }),
-    prisma.venue.findMany({ orderBy: { name: "asc" } }),
     prisma.match.findMany({
       where,
       orderBy: [{ kickoffAt: "asc" }],
@@ -67,8 +76,8 @@ export default async function AdminMatchesPage({
   ]);
 
   // The calendar covers one whole league-time month, so it replaces the list's
-  // ordering and 200-row cap. The other filters (season, division, status,
-  // team) still apply.
+  // ordering, its 200-row cap and its upcoming-only window. The other filters
+  // (season, division, status, team) still apply.
   const view = parseView(params.view);
   const { year, month } = parseMonthValue(params.month);
   const next = shiftMonth(year, month, 1);
@@ -86,6 +95,7 @@ export default async function AdminMatchesPage({
     status: params.status,
     q: params.q,
     month: params.month,
+    when: params.when,
   };
 
   return (
@@ -95,7 +105,7 @@ export default async function AdminMatchesPage({
           Filters
         </h2>
         <Card className="p-4">
-          <form method="get" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <form method="get" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
             <input type="hidden" name="view" value={view} />
             {params.month ? <input type="hidden" name="month" value={params.month} /> : null}
             <Field label="Season" htmlFor="season">
@@ -120,6 +130,12 @@ export default async function AdminMatchesPage({
                     {d.name}
                   </option>
                 ))}
+              </select>
+            </Field>
+            <Field label="Dates" htmlFor="when">
+              <select id="when" name="when" defaultValue={when} className={inputClass}>
+                <option value="upcoming">Upcoming only</option>
+                <option value="all">All dates</option>
               </select>
             </Field>
             <Field label="Status" htmlFor="status">
@@ -165,7 +181,20 @@ export default async function AdminMatchesPage({
               ? `Fixture calendar (${calendarMatches.length})`
               : `Fixtures (${matches.length})`}
           </h2>
-          <CalendarViewToggle view={view} basePath="/admin/matches" query={carried} />
+          <div className="flex flex-wrap items-center gap-2">
+            {/*
+              Exactly the columns the importer reads back, so an organiser can
+              export a season, edit it in Excel and re-upload it as a template.
+            */}
+            <a
+              href={`/admin/schedule.csv?season=${encodeURIComponent(seasonId)}`}
+              download
+              className="border-subtle hover:bg-surface-muted rounded-lg border px-3 py-1.5 text-sm font-medium"
+            >
+              Download CSV
+            </a>
+            <CalendarViewToggle view={view} basePath="/admin/matches" query={carried} />
+          </div>
         </div>
         {view === "calendar" ? (
           <FixtureCalendar
@@ -179,48 +208,67 @@ export default async function AdminMatchesPage({
           />
         ) : matches.length === 0 ? (
           <Card className="p-6">
-            <EmptyState title="No fixtures match those filters" />
+            <EmptyState
+              title="No fixtures match those filters"
+              hint={
+                when === "upcoming"
+                  ? "Only upcoming fixtures are shown \u2014 switch Dates to \u201cAll dates\u201d to include played matches."
+                  : undefined
+              }
+            />
           </Card>
         ) : (
           <Card className="overflow-x-auto">
             <table className="w-full min-w-[52rem] text-sm">
+              <caption className="sr-only">
+                Fixtures for the selected filters. Selecting a row opens its management page.
+              </caption>
               <thead className="bg-surface-muted text-muted text-xs uppercase">
                 <tr>
-                  <th className="px-3 py-2 text-left">Kick-off</th>
                   <th className="px-3 py-2 text-left">MW</th>
+                  <th className="px-3 py-2 text-left">Kick-off</th>
                   <th className="px-3 py-2 text-left">Fixture</th>
                   <th className="px-3 py-2 text-left">Division</th>
                   <th className="px-3 py-2 text-left">Referee</th>
                   <th className="px-3 py-2 text-left">Status</th>
                   <th className="px-3 py-2 text-right">Score</th>
-                  <th className="px-3 py-2 text-right">Manage</th>
                 </tr>
               </thead>
               <tbody className="divide-subtle divide-y">
                 {matches.map((match) => (
-                  <tr key={match.id}>
+                  <ClickableRow key={match.id} href={`/admin/matches/${match.id}`}>
+                    <td className="text-muted px-3 py-2">{match.matchweek}</td>
                     <td className="text-muted px-3 py-2 whitespace-nowrap">
                       {formatDateTime(match.kickoffAt)}
                     </td>
-                    <td className="text-muted px-3 py-2">{match.matchweek}</td>
                     <td className="px-3 py-2">
-                      <span className="inline-flex items-center gap-1.5">
-                        <KitSwatch
-                          team={match.homeTeam}
-                          kit={match.homeKit}
-                          teamName={match.homeTeam.name}
-                        />
-                        <span className="font-medium">{match.homeTeam.name}</span>
-                      </span>
-                      <span className="text-muted"> v </span>
-                      <span className="inline-flex items-center gap-1.5">
-                        <KitSwatch
-                          team={match.awayTeam}
-                          kit={match.awayKit}
-                          teamName={match.awayTeam.name}
-                        />
-                        <span className="font-medium">{match.awayTeam.name}</span>
-                      </span>
+                      {/*
+                        The whole row is clickable, but this link is what
+                        keyboard users tab to and what still works with
+                        JavaScript disabled.
+                      */}
+                      <Link
+                        href={`/admin/matches/${match.id}`}
+                        className="hover:text-brand font-medium hover:underline"
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          <KitSwatch
+                            team={match.homeTeam}
+                            kit={match.homeKit}
+                            teamName={match.homeTeam.name}
+                          />
+                          {match.homeTeam.name}
+                        </span>
+                        <span className="text-muted font-normal"> v </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <KitSwatch
+                            team={match.awayTeam}
+                            kit={match.awayKit}
+                            teamName={match.awayTeam.name}
+                          />
+                          {match.awayTeam.name}
+                        </span>
+                      </Link>
                       {match.venue ? (
                         <span className="text-muted block text-xs">{match.venue.name}</span>
                       ) : null}
@@ -235,15 +283,7 @@ export default async function AdminMatchesPage({
                         ? `${match.report.homeScore}\u2013${match.report.awayScore}`
                         : "\u2014"}
                     </td>
-                    <td className="px-3 py-2 text-right">
-                      <Link
-                        href={`/admin/matches/${match.id}`}
-                        className="text-brand font-medium hover:underline"
-                      >
-                        Open
-                      </Link>
-                    </td>
-                  </tr>
+                  </ClickableRow>
                 ))}
               </tbody>
             </table>
@@ -299,16 +339,6 @@ export default async function AdminMatchesPage({
                 required
               />
               <FieldError name="kickoffAt" />
-            </Field>
-            <Field label="Venue" htmlFor="new-venue">
-              <select id="new-venue" name="venueId" className={inputClass}>
-                <option value="">To be confirmed</option>
-                {venues.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.name}
-                  </option>
-                ))}
-              </select>
             </Field>
             <div className="sm:col-span-2">
               <SubmitButton>Create fixture</SubmitButton>
