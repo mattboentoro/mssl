@@ -40,7 +40,9 @@ export default async function SignInPage({
   searchParams: Promise<{ callbackUrl?: string; error?: string }>;
 }) {
   const params = await searchParams;
-  const callbackUrl = params.callbackUrl ?? "/";
+  // No explicit destination means "take me to my console" — /after-signin
+  // resolves the session and forwards admins to /admin, referees to /referee.
+  const callbackUrl = params.callbackUrl ?? "/after-signin";
   const user = await getCurrentUser();
 
   async function entraSignIn() {
