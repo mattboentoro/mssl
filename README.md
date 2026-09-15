@@ -156,6 +156,30 @@ performs no I/O, which is why it is cheap to test exhaustively.
 Results are **never** hand-editable. The only way to change what a team earned on
 the pitch is to change a game report, and every such change is audited.
 
+#### Ranking on points per game
+
+Some seasons end with teams having played a different number of matches, and
+ranking those on total points rewards whoever has played most rather than
+whoever has performed best. A Game Administrator can switch a **particular
+season** to rank on points per game from the season list in `/admin/league`; the
+choice is stored on `Season.tiebreakerMode` and audited.
+
+Every other tiebreaker is unchanged — only the first comparison swaps.
+
+Two implementation details worth knowing:
+
+- The comparison **cross-multiplies** (`b.points * a.played` against
+  `a.points * b.played`) rather than dividing. Two teams on 4 points from 3 games
+  and 8 from 6 are therefore exactly level and fall through to goal difference.
+  Dividing would compare `1.333…` against `1.333…` and let floating-point
+  rounding decide a league position.
+- A team that has played **no** matches has no rate at all, so it sorts below
+  anyone on positive points and above anyone left negative by a deduction.
+
+The setting is read from the season row inside `getStandingsForSeason`, so the
+public table, the home-page snippet and the admin console cannot disagree about
+how the same season is ranked.
+
 #### Points adjustments
 
 A league administrator can apply a sanction at **Match Control → Standings**
@@ -177,7 +201,7 @@ reason, and the calculator applies it after all match arithmetic:
 
 | Model                | Notes                                                                                                                                                                                                                                                                |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Season`             | Has many divisions; one is flagged current.                                                                                                                                                                                                                          |
+| `Season`             | Has many divisions; one is flagged current. `tiebreakerMode` picks whether the table ranks on total points or points per game.                                                                                                                                       |
 | `Division`           | Belongs to a season; owns teams. Two per season.                                                                                                                                                                                                                     |
 | `Team`               | Belongs to a **division** (a team reaches its season via division). Registers a **primary** and an **alternate** kit colour as hex.                                                                                                                                  |
 | `Venue`              | Shared across seasons.                                                                                                                                                                                                                                               |
@@ -207,6 +231,12 @@ choice into a hex, `kitsClash()` flags two kits that are too close to tell apart
 the WCAG luminance formula. The admin kit pickers show live swatches and warn on a
 clash; the seed script uses the same rule to pick each away kit.
 
+`pickKitsForFixture()` applies the league's preference automatically: **both
+sides wear their home crest**, and the away team is moved to its alternate only
+when the two primaries would clash. CSV schedule imports run every row through
+it, so a bulk upload can't produce a fixture where both teams turn up in the same
+colour. An administrator can still override either side afterwards.
+
 The old emoji crest is gone. Team badges are now a two-tone disc drawn from the
 team's own two colours with its short-name initials on top, so visual identity
 comes from real data rather than an arbitrary emoji field.
@@ -216,7 +246,12 @@ comes from real data rather than an arbitrary emoji field.
 ## Referee Control (`/referee`)
 
 - **Available matches** — unclaimed fixtures, filterable by date, division and
-  venue.
+  venue, as a list **or a month calendar**.
+- **Preview before claiming** — every fixture on the calendar links to its detail
+  page, not just the ones already assigned. A referee can open an unclaimed match
+  to see the teams, kick-off in Redmond time and **which colour each side will
+  wear**, then claim it from there. Judging a fixture from a one-line list entry
+  was not enough to decide whether to take it.
 - **Claim** — `POST /api/matches/[id]/assign`, race-safe (above). Claiming is the
   lock: the fixture is now that referee's and nobody else can take it.
 - **Warning board** — once the fixture is theirs, the referee sees every player
@@ -241,7 +276,11 @@ The report form is mobile-first: referees file from a phone at the pitch.
 - `/admin/matches` — create a fixture (choosing both teams **and which kit each
   wears**, with a live clash warning), reschedule, postpone, cancel, change the
   kits later, assign or force-unassign a referee, confirm/dispute a report,
-  override a result with a mandatory reason.
+  override a result with a mandatory reason. Available as a table or a **month
+  calendar**; the table leads with the matchweek, the whole row links to that
+  fixture's manage page, and it defaults to **upcoming fixtures only** so the
+  page opens on work still to come rather than months of finished results.
+  **Download CSV** exports the current season's fixtures — see below.
 - `/admin/league` — CRUD for seasons, divisions, teams, venues. Teams carry a
   primary and alternate kit colour, picked with a native colour input.
   **Deletes** live here too, and are guarded:
@@ -260,15 +299,25 @@ The report form is mobile-first: referees file from a phone at the pitch.
 - `/admin/import` — bulk CSV schedule import with a **dry-run preview**.
   Columns: `matchweek` (1-60), `kickoff` (ISO 8601), `division`, `home`, `away`,
   `venue` (optional). Teams and divisions match by name, slug or short name.
+  Kits are assigned automatically per fixture (see [Kit colours](#kit-colours)).
   The commit is **all-or-nothing**: if any row still errors nothing is written.
   Rows matching an existing fixture (same matchweek, same two teams) are skipped
   as duplicates.
+- `/admin/schedule.csv?season=<id>` — exports the season's fixtures. The export
+  is **a valid import template**: download it, edit or append rows, and feed it
+  straight back into `/admin/import`. It carries the extra optional `venue`
+  column, which the importer accepts. The admin smoke test proves the round trip
+  rather than asserting a fixed header string.
 - `/admin/content` — announcements and documents.
-- `/admin/standings` — apply or reverse a **points adjustment** against a team.
-  Deductions and awards are stored separately from results, shown on the public
-  table with their reason, and never touch what was earned on the pitch. See
-  [Points adjustments](#points-adjustments).
+- `/admin/standings` — apply or reverse a **points adjustment** against a team,
+  filtered by league so a deduction can't land on the right name in the wrong
+  division. Deductions and awards are stored separately from results, shown on
+  the public table with their reason, and never touch what was earned on the
+  pitch. See [Points adjustments](#points-adjustments).
 - `/admin/audit` — filterable, paged audit log viewer.
+
+The active section is marked with `aria-current="page"` so it is obvious which
+part of Match Control is open.
 
 Every mutating admin action writes an `AuditLog` row.
 
@@ -463,3 +512,31 @@ Ambiguous product decisions, resolved and recorded rather than escalated.
     auth-protected and could not be read, so rules, officers, FAQ and contact
     details are plausible placeholders — replace them in `/admin/content` and
     `src/app/rules` / `src/app/contact`.
+22. **Every time is Redmond time, everywhere.** `Match.kickoffAt` is stored as
+    UTC, but the league has one home and nobody should have to think about
+    offsets. `src/lib/timezone.ts` converts at the edges: a CSV upload and the
+    admin fixture form both read their input as `America/Los_Angeles` with **no
+    timezone suffix required**, and every rendered time is formatted back into
+    it. Daylight saving is handled by the `Intl` API, not by a fixed offset.
+    The consequence to be aware of is that calendar month boundaries must be
+    computed in league time — `zonedToUtc(year, month, 1)`, never `Date.UTC` —
+    because a fixture's UTC date and its Redmond date routinely differ.
+23. **Points per game cross-multiplies rather than divides.** See
+    [Ranking on points per game](#ranking-on-points-per-game). Integer
+    arithmetic means two genuinely equal rates compare as equal and fall through
+    to goal difference, instead of a floating-point rounding artefact silently
+    deciding a league position. A team with zero matches played has no rate at
+    all and is ordered explicitly.
+24. **Match Control opens on upcoming fixtures only.** An administrator arriving
+    at `/admin/matches` is almost always there to do something about a fixture
+    that has not happened yet. Past results are one click away and the filter is
+    in the query string, so a link to a specific view still works.
+25. **The schedule export is the import template.** Rather than ship a separate
+    blank template that can drift out of sync with the parser, the export is the
+    template: download, edit, re-upload. It carries an extra optional `venue`
+    column that the importer tolerates, and the admin smoke test proves the
+    round trip instead of asserting a header string.
+26. **CSV imports pick kits automatically.** Bulk uploads have no place to state
+    what each side wears, so `pickKitsForFixture()` puts both teams in their home
+    crest and moves the away side to its alternate only on a clash. An
+    administrator can override either side afterwards.
