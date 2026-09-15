@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { MatchList } from "@/components/match-display";
 import { ButtonLink, Card, EmptyState, PageHeader, inputClass, labelClass } from "@/components/ui";
+import { getCurrentUser } from "@/lib/authz";
 import { formatLongDate } from "@/lib/dates";
 import { getDivisions, getSeasons, listMatches, resolveSeason } from "@/lib/queries";
 import { prisma } from "@/lib/prisma";
@@ -28,6 +29,9 @@ export default async function SchedulePage({
 }) {
   const params = await searchParams;
   const [seasons, season] = await Promise.all([getSeasons(), resolveSeason(params.season)]);
+  // Anonymous visitors get fixtures and results; who has been appointed to
+  // referee them is only shown once you are signed in.
+  const viewer = await getCurrentUser();
 
   if (!season) {
     return (
@@ -191,7 +195,7 @@ export default async function SchedulePage({
               >
                 {day}
               </h2>
-              <MatchList matches={dayMatches} />
+              <MatchList matches={dayMatches} showReferee={Boolean(viewer)} />
             </section>
           ))}
         </div>

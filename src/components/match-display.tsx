@@ -12,7 +12,13 @@ function scoreLabel(match: MatchListItem): string | null {
   return `${match.report.homeScore} \u2013 ${match.report.awayScore}`;
 }
 
-export function MatchRow({ match }: { match: MatchListItem }) {
+export function MatchRow({
+  match,
+  showReferee = false,
+}: {
+  match: MatchListItem;
+  showReferee?: boolean;
+}) {
   const score = scoreLabel(match);
 
   return (
@@ -42,7 +48,13 @@ export function MatchRow({ match }: { match: MatchListItem }) {
 
       <div className="text-muted mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
         {match.venue ? <span>&#128205; {match.venue.name}</span> : <span>&#128205; TBD</span>}
-        <span>&#128100; {match.referee ? match.referee.name : <em>Referee needed</em>}</span>
+        {/*
+          Who is refereeing is league business, not public information — the
+          caller decides, so this component never has to reach for the session.
+        */}
+        {showReferee ? (
+          <span>&#128100; {match.referee ? match.referee.name : <em>Referee needed</em>}</span>
+        ) : null}
       </div>
     </Card>
   );
@@ -62,11 +74,17 @@ function TeamCell({ team, kit }: { team: TeamCellTeam; kit: string }) {
   );
 }
 
-export function MatchList({ matches }: { matches: MatchListItem[] }) {
+export function MatchList({
+  matches,
+  showReferee = false,
+}: {
+  matches: MatchListItem[];
+  showReferee?: boolean;
+}) {
   return (
     <ul className="grid gap-3">
       {matches.map((match) => (
-        <MatchRow key={match.id} match={match} />
+        <MatchRow key={match.id} match={match} showReferee={showReferee} />
       ))}
     </ul>
   );
@@ -78,6 +96,7 @@ export function MatchList({ matches }: { matches: MatchListItem[] }) {
 
 const TIEBREAKER_LABELS: Record<string, string> = {
   points: "points",
+  pointsPerGame: "points per game",
   goalDifference: "goal difference",
   goalsFor: "goals scored",
   headToHead: "head-to-head",

@@ -11,6 +11,7 @@ import {
   toDateInputValue,
 } from "@/lib/dates";
 import type { MatchListItem } from "@/lib/queries";
+import { kitColorName, resolveKit } from "@/lib/kits";
 
 /**
  * Month view of a fixture list.
@@ -97,7 +98,7 @@ export function FixtureCalendar({
         user to infer the column.
       */}
       <div className="-mx-4 overflow-x-auto px-4">
-        <table className="w-full min-w-[42rem] border-collapse text-sm">
+        <table className="w-full min-w-[42rem] table-fixed border-collapse text-sm">
           <caption className="sr-only">Fixtures for {label}, shown in Redmond time</caption>
           <thead>
             <tr>
@@ -172,12 +173,18 @@ export function FixtureCalendar({
 
 function FixtureChip({ match, href }: { match: MatchListItem; href?: string }) {
   const label = `${match.homeTeam.shortName} v ${match.awayTeam.shortName}`;
-  const detail = `${formatTime(match.kickoffAt)} ${label}`;
+  // The swatches are tiny, so the tooltip spells the kits out in words. It is
+  // the only place a referee can check the strip without opening the fixture.
+  const detail =
+    `${formatTime(match.kickoffAt)} ${label} \u2014 ` +
+    `${match.homeTeam.name} in ${kitColorName(resolveKit(match.homeTeam, match.homeKit))}, ` +
+    `${match.awayTeam.name} in ${kitColorName(resolveKit(match.awayTeam, match.awayKit))}`;
 
   const body = (
     <>
       <span className="tabular-nums">{formatTime(match.kickoffAt)}</span>
       <KitSwatch team={match.homeTeam} kit={match.homeKit} teamName={match.homeTeam.name} />
+      <KitSwatch team={match.awayTeam} kit={match.awayKit} teamName={match.awayTeam.name} />
       <span className="truncate">{label}</span>
     </>
   );

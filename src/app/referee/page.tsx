@@ -283,9 +283,7 @@ export default async function RefereePage({
             month={month}
             basePath="/referee"
             query={{ ...carried, month: undefined, view: "calendar" }}
-            hrefForMatch={(match) =>
-              match.referee?.id === referee.id ? `/referee/${match.id}` : undefined
-            }
+            hrefForMatch={(match) => `/referee/${match.id}`}
             emptyHint="Open fixtures and your own assignments appear here. Use the arrows to look ahead."
           />
         ) : available.length === 0 ? (

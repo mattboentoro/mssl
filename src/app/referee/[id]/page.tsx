@@ -5,10 +5,12 @@ import { forbidden, notFound, redirect } from "next/navigation";
 import { GameReportForm } from "@/components/game-report-form";
 import { ActionButton } from "@/components/match-actions";
 import { Alert, Badge, Card, MatchStatusBadge, PageHeader } from "@/components/ui";
+import { KitSwatch } from "@/components/team-colors";
 import { WarningBoard } from "@/components/warning-board";
 import { AuthzError, requireReferee } from "@/lib/authz";
 import { formatDateTime } from "@/lib/dates";
 import { CARD_LABELS, type CardType } from "@/lib/enums";
+import { kitColorName, resolveKit } from "@/lib/kits";
 import { prisma } from "@/lib/prisma";
 import { getWarningBoard } from "@/lib/queries";
 
@@ -36,8 +38,8 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
       division: { select: { name: true } },
       venue: { select: { name: true, city: true } },
       referee: { select: { id: true, name: true } },
-      homeTeam: { select: { id: true, name: true } },
-      awayTeam: { select: { id: true, name: true } },
+      homeTeam: { select: { id: true, name: true, colorPrimary: true, colorAlternate: true } },
+      awayTeam: { select: { id: true, name: true, colorPrimary: true, colorAlternate: true } },
       report: {
         include: {
           referee: { select: { name: true } },
@@ -73,20 +75,54 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
           <>
             {formatDateTime(match.kickoffAt)}
             {match.venue ? ` \u00b7 ${match.venue.name}, ${match.venue.city}` : ""}
+            <span className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+              <span className="flex items-center gap-1.5">
+                <KitSwatch
+                  team={match.homeTeam}
+                  kit={match.homeKit}
+                  teamName={match.homeTeam.name}
+                />
+                {match.homeTeam.name} in {kitColorName(resolveKit(match.homeTeam, match.homeKit))}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <KitSwatch
+                  team={match.awayTeam}
+                  kit={match.awayKit}
+                  teamName={match.awayTeam.name}
+                />
+                {match.awayTeam.name} in {kitColorName(resolveKit(match.awayTeam, match.awayKit))}
+              </span>
+            </span>
           </>
         }
         actions={<MatchStatusBadge status={match.status} />}
       />
 
       {!canAct ? (
-        <Alert title="This is not your match">
-          {match.referee
-            ? `${match.referee.name} is the assigned referee.`
-            : "Nobody is assigned to it yet."}{" "}
-          <Link href="/referee" className="underline">
-            Back to the available list
-          </Link>
-          .
+        <Alert title={match.referee ? "This is not your match" : "Nobody has claimed this match"}>
+          {match.referee ? (
+            <>
+              {match.referee.name} is the assigned referee.{" "}
+              <Link href="/referee" className="underline">
+                Back to the available list
+              </Link>
+              .
+            </>
+          ) : (
+            <>
+              <span className="block">
+                Review the details above, then claim it to file the report.
+              </span>
+              <span className="mt-3 block">
+                <ActionButton
+                  url={`/api/matches/${match.id}/assign`}
+                  body={{ expectedVersion: match.version }}
+                  label="Claim this match"
+                  pendingLabel={"Claiming\u2026"}
+                />
+              </span>
+            </>
+          )}
         </Alert>
       ) : null}
 
