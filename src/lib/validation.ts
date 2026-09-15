@@ -174,6 +174,26 @@ export const deleteTeamSchema = z.object({
   confirmName: trimmed(120).min(1, "Type the team name to confirm."),
 });
 
+/**
+ * An administrative points adjustment. The reason is mandatory and shown on the
+ * public table, because an unexplained deduction is indistinguishable from a
+ * mistake. Zero is rejected so that every stored row actually changes something.
+ */
+export const pointsAdjustmentSchema = z.object({
+  teamId: z.string().min(1, "Choose a team."),
+  points: z.coerce
+    .number()
+    .int("Use a whole number of points.")
+    .min(-50, "That is more than any plausible deduction.")
+    .max(50, "That is more than any plausible award.")
+    .refine((value) => value !== 0, "Enter a non-zero number of points."),
+  reason: trimmed(300).min(5, "Give a reason — it is shown on the public table."),
+});
+
+export const deletePointsAdjustmentSchema = z.object({
+  adjustmentId: z.string().min(1),
+});
+
 export const venueSchema = z.object({
   name: trimmed(120).min(2),
   slug: trimmed(120)

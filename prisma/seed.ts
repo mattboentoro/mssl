@@ -323,6 +323,7 @@ async function reset() {
   await prisma.disciplinaryAction.deleteMany();
   await prisma.gameReport.deleteMany();
   await prisma.match.deleteMany();
+  await prisma.pointsAdjustment.deleteMany();
   await prisma.team.deleteMany();
   await prisma.division.deleteMany();
   await prisma.announcement.deleteMany();
@@ -776,6 +777,38 @@ async function seedContent(seasonId: string) {
   }
 }
 
+/**
+ * One sample deduction so the adjustment column on the public table is visible
+ * straight after a seed. Applied to a mid-table side in the top division: a
+ * deduction on the leaders or the bottom club is easy to mistake for a bug.
+ */
+async function seedPointsAdjustment(seasonId: string) {
+  const division = await prisma.division.findFirst({
+    where: { seasonId },
+    orderBy: { sortOrder: "asc" },
+    select: { id: true },
+  });
+  if (!division) return;
+
+  const teams = await prisma.team.findMany({
+    where: { divisionId: division.id },
+    orderBy: { name: "asc" },
+    select: { id: true },
+  });
+  const team = teams[Math.floor(teams.length / 2)];
+  if (!team) return;
+
+  await prisma.pointsAdjustment.create({
+    data: {
+      teamId: team.id,
+      points: -3,
+      reason: "Fielding an unregistered player in matchweek 3 (Rule 6.2).",
+      createdByName: "Sample Data",
+      createdByEmail: "seed@mssl.local",
+    },
+  });
+}
+
 async function main() {
   console.log("Resetting database...");
   await reset();
@@ -820,6 +853,9 @@ async function main() {
   console.log("Seeding league sanctions for the referee warning board...");
   await seedLeagueSanctions(active.id);
 
+  console.log("Seeding a sample points deduction...");
+  await seedPointsAdjustment(active.id);
+
   const counts = {
     seasons: await prisma.season.count(),
     divisions: await prisma.division.count(),
@@ -831,6 +867,7 @@ async function main() {
     reports: await prisma.gameReport.count(),
     cards: await prisma.disciplinaryAction.count(),
     sanctions: await prisma.disciplinaryAction.count({ where: { issuedBy: "ADMIN" } }),
+    adjustments: await prisma.pointsAdjustment.count(),
   };
 
   console.log("\nSeed complete:");

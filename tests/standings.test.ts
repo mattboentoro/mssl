@@ -405,3 +405,188 @@ describe("calculateStandingsByDivision", () => {
     expect(byDivision.get("d2")?.every((r) => r.divisionId === "d2")).toBe(true);
   });
 });
+
+describe("calculateStandings — points adjustments", () => {
+  const pair = [team("a"), team("b")];
+
+  /**
+   * Three teams, each having played the other two once, contrived so that A and
+   * B are level on points, goal difference *and* goals for, and only the
+   * head-to-head between them separates the two. Needed because two teams that
+   * have played nobody but each other can never be level overall yet split on
+   * head-to-head — their head-to-head record *is* their whole record.
+   */
+  const triangle = (): { teams: StandingsTeamInput[]; matches: StandingsMatchInput[] } => ({
+    teams: [team("a"), team("b"), team("c")],
+    matches: [
+      match("a", 2, 1, "b", { day: 1 }), // A 3pts, gf2 ga1
+      match("c", 1, 0, "a", { day: 2 }), // A gf0 ga1 -> 3pts, gf2, ga2, gd0
+      match("b", 1, 0, "c", { day: 3 }), // B 3pts, gf2, ga2, gd0 -- level with A
+    ],
+  });
+
+  it("subtracts a deduction from the points total", () => {
+    const rows = calculateStandings(pair, [match("a", 3, 0, "b")], {
+      adjustments: [{ teamId: "a", points: -3, reason: "Ineligible player" }],
+    });
+    expect(rowFor(rows, "a").points).toBe(0);
+    expect(rowFor(rows, "a").pointsAdjustment).toBe(-3);
+  });
+
+  it("reports a zero adjustment for teams that have none", () => {
+    const rows = calculateStandings(pair, [match("a", 3, 0, "b")], {
+      adjustments: [{ teamId: "a", points: -3, reason: "Ineligible player" }],
+    });
+    expect(rowFor(rows, "b").pointsAdjustment).toBe(0);
+  });
+
+  it("defaults to no adjustment at all", () => {
+    const rows = calculateStandings(pair, [match("a", 3, 0, "b")]);
+    expect(rowFor(rows, "a").pointsAdjustment).toBe(0);
+    expect(rowFor(rows, "a").points).toBe(3);
+  });
+
+  it("re-ranks the table once a deduction is applied", () => {
+    const matches = [match("a", 2, 0, "b", { day: 1 }), match("a", 2, 0, "b", { day: 2 })];
+
+    const before = calculateStandings(pair, matches);
+    expect(before[0].teamId).toBe("a");
+    expect(before[0].points).toBe(6);
+
+    // A has a +4 goal difference, so a 6-point deduction only draws them level
+    // on points and goal difference still keeps them top. It takes 7 to drop
+    // them beneath a side that has not won a game.
+    const levelled = calculateStandings(pair, matches, {
+      adjustments: [{ teamId: "a", points: -6 }],
+    });
+    expect(levelled[0].teamId).toBe("a");
+    expect(levelled[1].separatedBy).toBe("goalDifference");
+
+    const after = calculateStandings(pair, matches, {
+      adjustments: [{ teamId: "a", points: -7 }],
+    });
+    expect(after[0].teamId).toBe("b");
+    expect(after.map((r) => r.rank)).toEqual([1, 2]);
+  });
+
+  it("accumulates several adjustments for the same team", () => {
+    const rows = calculateStandings(pair, [match("a", 3, 0, "b")], {
+      adjustments: [
+        { teamId: "a", points: -1 },
+        { teamId: "a", points: -2 },
+      ],
+    });
+    expect(rowFor(rows, "a").pointsAdjustment).toBe(-3);
+    expect(rowFor(rows, "a").points).toBe(0);
+  });
+
+  it("allows a positive award as well as a deduction", () => {
+    const rows = calculateStandings(pair, [match("a", 0, 1, "b")], {
+      adjustments: [{ teamId: "a", points: 3, reason: "Opponent expelled" }],
+    });
+    expect(rowFor(rows, "a").points).toBe(3);
+    expect(rowFor(rows, "a").pointsAdjustment).toBe(3);
+  });
+
+  it("lets a deduction take a team below zero points", () => {
+    const rows = calculateStandings(pair, [match("a", 0, 1, "b")], {
+      adjustments: [{ teamId: "a", points: -5 }],
+    });
+    expect(rowFor(rows, "a").points).toBe(-5);
+  });
+
+  it("ignores an adjustment for a team outside the requested set", () => {
+    const rows = calculateStandings(pair, [match("a", 3, 0, "b")], {
+      adjustments: [{ teamId: "ghost", points: -99 }],
+    });
+    expect(rows).toHaveLength(2);
+    expect(rowFor(rows, "a").points).toBe(3);
+  });
+
+  it("ignores a zero adjustment", () => {
+    const rows = calculateStandings(pair, [match("a", 3, 0, "b")], {
+      adjustments: [{ teamId: "a", points: 0 }],
+    });
+    expect(rowFor(rows, "a").pointsAdjustment).toBe(0);
+    expect(rowFor(rows, "a").points).toBe(3);
+  });
+
+  it("truncates a fractional adjustment rather than corrupting the total", () => {
+    const rows = calculateStandings(pair, [match("a", 3, 0, "b")], {
+      adjustments: [{ teamId: "a", points: -1.9 }],
+    });
+    expect(rowFor(rows, "a").points).toBe(2);
+    expect(Number.isInteger(rowFor(rows, "a").points)).toBe(true);
+  });
+
+  it("leaves goal difference and goals for untouched", () => {
+    const rows = calculateStandings(pair, [match("a", 4, 1, "b")], {
+      adjustments: [{ teamId: "a", points: -3 }],
+    });
+    const row = rowFor(rows, "a");
+    expect(row.goalsFor).toBe(4);
+    expect(row.goalsAgainst).toBe(1);
+    expect(row.goalDifference).toBe(3);
+  });
+
+  it("leaves the form guide untouched — a deduction is not a result", () => {
+    const rows = calculateStandings(pair, [match("a", 3, 0, "b")], {
+      adjustments: [{ teamId: "a", points: -3 }],
+    });
+    const row = rowFor(rows, "a");
+    expect(row.form).toEqual(["W"]);
+    expect(row.won).toBe(1);
+    expect(row.played).toBe(1);
+  });
+
+  it("does not disturb the head-to-head mini-league", () => {
+    const { teams, matches } = triangle();
+
+    const level = calculateStandings(teams, matches);
+    expect(level.map((r) => r.teamId)).toEqual(["a", "b", "c"]);
+    expect(level[1].separatedBy).toBe("headToHead");
+
+    // Same deduction for both: they stay level, so head-to-head must decide
+    // again and A must stay ahead of B.
+    const deducted = calculateStandings(teams, matches, {
+      adjustments: [
+        { teamId: "a", points: -1 },
+        { teamId: "b", points: -1 },
+      ],
+    });
+    expect(deducted.map((r) => r.teamId)).toEqual(["c", "a", "b"]);
+    expect(rowFor(deducted, "b").separatedBy).toBe("headToHead");
+  });
+
+  it("can overturn a head-to-head win, and says points did it", () => {
+    const { teams, matches } = triangle();
+    const rows = calculateStandings(teams, matches, {
+      adjustments: [{ teamId: "a", points: -1 }],
+    });
+    // A beat B on the pitch but is now a point behind, so drops beneath them.
+    expect(rows.map((r) => r.teamId)).toEqual(["b", "c", "a"]);
+    expect(rowFor(rows, "a").separatedBy).toBe("points");
+  });
+
+  it("scopes adjustments to the right division", () => {
+    const teams: StandingsTeamInput[] = [
+      { id: "a", name: "A", divisionId: "d1" },
+      { id: "x", name: "X", divisionId: "d1" },
+      { id: "b", name: "B", divisionId: "d2" },
+      { id: "y", name: "Y", divisionId: "d2" },
+    ];
+    const matches: StandingsMatchInput[] = [
+      { ...match("a", 3, 0, "x"), divisionId: "d1" },
+      { ...match("b", 3, 0, "y"), divisionId: "d2" },
+    ];
+    const byDivision = calculateStandingsByDivision(teams, matches, {
+      adjustments: [{ teamId: "a", points: -3 }],
+    });
+    expect(byDivision.get("d1")?.find((r) => r.teamId === "a")?.points).toBe(0);
+    expect(byDivision.get("d2")?.find((r) => r.teamId === "b")?.points).toBe(3);
+  });
+
+  it("is listed in the default options as an empty array", () => {
+    expect(DEFAULT_STANDINGS_OPTIONS.adjustments).toEqual([]);
+  });
+});

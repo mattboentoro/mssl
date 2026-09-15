@@ -172,7 +172,22 @@ export function StandingsTable({
               <td className="px-2 py-2 text-right tabular-nums">
                 {row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference}
               </td>
-              <td className="px-2 py-2 text-right font-bold tabular-nums">{row.points}</td>
+              <td className="px-2 py-2 text-right font-bold tabular-nums">
+                {row.points}
+                {row.pointsAdjustment !== 0 ? (
+                  <span
+                    className="text-muted ml-1 text-[10px] font-semibold"
+                    title={`Includes an administrative adjustment of ${row.pointsAdjustment > 0 ? "+" : ""}${row.pointsAdjustment} point(s).`}
+                  >
+                    {row.pointsAdjustment > 0 ? "+" : "−"}
+                    {Math.abs(row.pointsAdjustment)}
+                    <span className="sr-only">
+                      {" "}
+                      point adjustment applied by the league administrator
+                    </span>
+                  </span>
+                ) : null}
+              </td>
               {compact ? null : (
                 <td className="px-3 py-2">
                   <FormGuide form={row.form} />

@@ -145,11 +145,18 @@ export async function getStandingsForSeason(seasonId: string): Promise<DivisionS
     select: STANDINGS_MATCH_SELECT,
   });
 
+  // Deductions are scoped by team, and a team belongs to exactly one division
+  // in one season, so filtering by the season's divisions is enough.
+  const adjustments = await prisma.pointsAdjustment.findMany({
+    where: { team: { division: { seasonId } } },
+    select: { teamId: true, points: true, reason: true },
+  });
+
   const teams: StandingsTeamInput[] = divisions.flatMap((division) => division.teams);
   const byDivision = calculateStandingsByDivision(
     teams,
     matches as unknown as StandingsMatchInput[],
-    standingsOptionsFromConfig(),
+    { ...standingsOptionsFromConfig(), adjustments },
   );
 
   return divisions.map((division) => ({
@@ -158,6 +165,26 @@ export async function getStandingsForSeason(seasonId: string): Promise<DivisionS
     rows: byDivision.get(division.id) ?? [],
   }));
 }
+
+/** Every administrative points adjustment in a season, newest first. */
+export async function getPointsAdjustments(seasonId: string) {
+  return prisma.pointsAdjustment.findMany({
+    where: { team: { division: { seasonId } } },
+    orderBy: { createdAt: "desc" },
+    include: {
+      team: {
+        select: {
+          id: true,
+          name: true,
+          shortName: true,
+          division: { select: { id: true, name: true } },
+        },
+      },
+    },
+  });
+}
+
+export type PointsAdjustmentRow = Awaited<ReturnType<typeof getPointsAdjustments>>[number];
 
 export async function getUpcomingMatches(seasonId: string, take = 5) {
   return listMatches(

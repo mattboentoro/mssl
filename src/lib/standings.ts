@@ -67,12 +67,24 @@ export interface StandingsRow {
   yellowCards: number;
   redCards: number;
   disciplinaryPoints: number;
+  /**
+   * Net administrative points applied to this team, normally negative.
+   * `points` already includes it; this field exists so the table can show it.
+   */
+  pointsAdjustment: number;
   /** Which tiebreaker separated this row from the one above it, if any. */
   separatedBy?: Tiebreaker;
 }
 
 export type Tiebreaker =
   "points" | "goalDifference" | "goalsFor" | "headToHead" | "disciplinaryPoints" | "alphabetical";
+
+export interface StandingsAdjustmentInput {
+  teamId: string;
+  /** Signed: negative deducts, positive awards. */
+  points: number;
+  reason?: string;
+}
 
 export interface StandingsOptions {
   /** Count reports that are SUBMITTED but not yet admin-CONFIRMED. */
@@ -85,6 +97,8 @@ export interface StandingsOptions {
   /** Disciplinary points used by the final tiebreaker. */
   disciplinary?: { yellow: number; red: number };
   formLength?: number;
+  /** Administrative points deductions/awards, applied after every match. */
+  adjustments?: StandingsAdjustmentInput[];
 }
 
 export const DEFAULT_STANDINGS_OPTIONS: Required<StandingsOptions> = {
@@ -95,6 +109,7 @@ export const DEFAULT_STANDINGS_OPTIONS: Required<StandingsOptions> = {
   pointsForLoss: 0,
   disciplinary: { yellow: 1, red: 3 },
   formLength: 5,
+  adjustments: [],
 };
 
 /** Statuses whose fixture never contributes to the table. */
@@ -171,6 +186,7 @@ export function calculateStandings(
     ...options,
     forfeitScore: options.forfeitScore ?? DEFAULT_STANDINGS_OPTIONS.forfeitScore,
     disciplinary: options.disciplinary ?? DEFAULT_STANDINGS_OPTIONS.disciplinary,
+    adjustments: options.adjustments ?? DEFAULT_STANDINGS_OPTIONS.adjustments,
   };
 
   const table = new Map<string, Accumulator>();
@@ -193,6 +209,7 @@ export function calculateStandings(
       yellowCards: 0,
       redCards: 0,
       disciplinaryPoints: 0,
+      pointsAdjustment: 0,
       formTimeline: [],
     });
   }
@@ -287,6 +304,19 @@ export function calculateStandings(
 
   for (const row of table.values()) {
     row.goalDifference = row.goalsFor - row.goalsAgainst;
+  }
+
+  // Administrative deductions land *after* every match is accumulated and
+  // *before* any sorting, so they move a team down the table but leave the
+  // head-to-head ledger alone -- that mini-league is about what happened on the
+  // pitch, and a points deduction is not a result.
+  for (const adjustment of opts.adjustments) {
+    const row = table.get(adjustment.teamId);
+    if (!row) continue; // team outside the requested set (e.g. other division)
+    const delta = Math.trunc(adjustment.points);
+    if (!Number.isFinite(delta) || delta === 0) continue;
+    row.pointsAdjustment += delta;
+    row.points += delta;
   }
 
   const rows = [...table.values()];

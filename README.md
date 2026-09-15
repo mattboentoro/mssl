@@ -45,11 +45,11 @@ Then walk the critical path:
 
 ### Roles at a glance
 
-| Role                     | Can do                                                                                                                                                                                                                                                                                                                      |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Public** (anonymous)   | Standings for both divisions (**Premier League** and **First Division**), match dates and fixture details, team pages, rules.                                                                                                                                                                                               |
-| **Referee** (`msslrefs`) | Claim a match, read the pre-match **warning board**, input the score, input disciplinary actions.                                                                                                                                                                                                                           |
-| **Game Administrator**   | Create **and delete** a season, add **and delete** a team (with its two kit colours), choose which kit each side wears in a fixture, add a disciplinary result (which reaches the referee taking the game as a warning), **override a score**, plus divisions, venues, the schedule, report confirmation and the audit log. |
+| Role                     | Can do                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Public** (anonymous)   | Standings for both divisions (**Premier League** and **First Division**), match dates and fixture details, team pages, rules.                                                                                                                                                                                                                                    |
+| **Referee** (`msslrefs`) | Claim a match, read the pre-match **warning board**, input the score, input disciplinary actions.                                                                                                                                                                                                                                                                |
+| **Game Administrator**   | Create **and delete** a season, add **and delete** a team (with its two kit colours), choose which kit each side wears in a fixture, add a disciplinary result (which reaches the referee taking the game as a warning), **override a score**, **deduct or restore league points**, plus divisions, venues, the schedule, report confirmation and the audit log. |
 
 ### Verifying it without a browser
 
@@ -153,26 +153,42 @@ performs no I/O, which is why it is cheap to test exhaustively.
 - Forfeits award `STANDINGS_FORFEIT_SCORE` (default `3-0`).
 - Columns P/W/D/L/GF/GA/GD/Pts plus a last-5 form guide.
 
-Standings are **never** hand-editable. The only way to change the table is to
-change a game report, and every such change is audited.
+Results are **never** hand-editable. The only way to change what a team earned on
+the pitch is to change a game report, and every such change is audited.
+
+#### Points adjustments
+
+A league administrator can apply a sanction at **Match Control → Standings**
+(`/admin/standings`). This does not edit any result. It stores a signed
+`PointsAdjustment` row — negative deducts, positive restores — with a mandatory
+reason, and the calculator applies it after all match arithmetic:
+
+- The adjustment shows on the public table beside that team's points total, so a
+  deduction can never be mistaken for a bug.
+- P/W/D/L, GF/GA/GD and the form guide are untouched. A deduction is not a result.
+- The head-to-head tiebreaker ledger is untouched too — that mini-league is about
+  what happened on the pitch.
+- Adjustments are reversible from the same page. Both applying and reversing are
+  audited.
 
 ---
 
 ## Data model
 
-| Model                | Notes                                                                                                                                                                                                                               |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Season`             | Has many divisions; one is flagged current.                                                                                                                                                                                         |
-| `Division`           | Belongs to a season; owns teams. Two per season.                                                                                                                                                                                    |
-| `Team`               | Belongs to a **division** (a team reaches its season via division). Registers a **primary** and an **alternate** kit colour as hex.                                                                                                 |
-| `Venue`              | Shared across seasons.                                                                                                                                                                                                              |
-| `Referee`            | Mirrors an Entra user; auto-provisioned on first referee sign-in.                                                                                                                                                                   |
-| `Match`              | `status`, `refereeId`, `assignedAt`, `homeKit`/`awayKit`, `version` (OCC).                                                                                                                                                          |
-| `GameReport`         | One-to-one with `Match` (unique `matchId`); immutable once filed.                                                                                                                                                                   |
-| `DisciplinaryAction` | A yellow or red card. Free-text `playerName`, optional minute, `issuedBy: REFEREE \| ADMIN`. Links to a report/match when it came from a game report, or to the season and team alone when an admin issued it as a league sanction. |
-| `Announcement`       | Optional season scope; pinned items surface on the home page.                                                                                                                                                                       |
-| `Document`           | Rules, waivers, downloads.                                                                                                                                                                                                          |
-| `AuditLog`           | Every mutating privileged action.                                                                                                                                                                                                   |
+| Model                | Notes                                                                                                                                                                                                                                                                |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Season`             | Has many divisions; one is flagged current.                                                                                                                                                                                                                          |
+| `Division`           | Belongs to a season; owns teams. Two per season.                                                                                                                                                                                                                     |
+| `Team`               | Belongs to a **division** (a team reaches its season via division). Registers a **primary** and an **alternate** kit colour as hex.                                                                                                                                  |
+| `Venue`              | Shared across seasons.                                                                                                                                                                                                                                               |
+| `Referee`            | Mirrors an Entra user; auto-provisioned on first referee sign-in.                                                                                                                                                                                                    |
+| `Match`              | `status`, `refereeId`, `assignedAt`, `homeKit`/`awayKit`, `version` (OCC).                                                                                                                                                                                           |
+| `GameReport`         | One-to-one with `Match` (unique `matchId`); immutable once filed.                                                                                                                                                                                                    |
+| `DisciplinaryAction` | A yellow or red card. Free-text `playerName`, optional minute, `issuedBy: REFEREE \| ADMIN`. Links to a report/match when it came from a game report, or to the season and team alone when an admin issued it as a league sanction.                                  |
+| `Announcement`       | Optional season scope; pinned items surface on the home page.                                                                                                                                                                                                        |
+| `Document`           | Rules, waivers, downloads.                                                                                                                                                                                                                                           |
+| `PointsAdjustment`   | An administrative sanction against a team: signed `points`, mandatory `reason`, and who applied it. Applied by the standings calculator after all match arithmetic; never edits a result. A team belongs to one division in one season, so `teamId` alone scopes it. |
+| `AuditLog`           | Every mutating privileged action.                                                                                                                                                                                                                                    |
 
 There is deliberately **no `Player` model and no squad lists.** The league does
 not want to maintain rosters, so a referee types the offender's name as free text
@@ -248,6 +264,10 @@ The report form is mobile-first: referees file from a phone at the pitch.
   Rows matching an existing fixture (same matchweek, same two teams) are skipped
   as duplicates.
 - `/admin/content` — announcements and documents.
+- `/admin/standings` — apply or reverse a **points adjustment** against a team.
+  Deductions and awards are stored separately from results, shown on the public
+  table with their reason, and never touch what was earned on the pitch. See
+  [Points adjustments](#points-adjustments).
 - `/admin/audit` — filterable, paged audit log viewer.
 
 Every mutating admin action writes an `AuditLog` row.

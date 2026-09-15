@@ -75,6 +75,10 @@ export default async function StandingsPage({
               ? "Submitted reports count immediately, before an admin confirms them."
               : "Only admin-confirmed reports count."}
           </li>
+          <li>
+            A league administrator may apply a points adjustment for a disciplinary or
+            administrative sanction. Any adjustment is shown beside that team&rsquo;s points total.
+          </li>
         </ul>
       </Alert>
 

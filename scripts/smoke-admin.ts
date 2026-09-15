@@ -14,6 +14,7 @@
  * and cleans up after itself.
  */
 import { prisma } from "../src/lib/prisma";
+import { getStandingsForSeason } from "../src/lib/queries";
 
 const BASE = process.env.SMOKE_BASE_URL ?? "http://localhost:3000";
 
@@ -233,6 +234,80 @@ async function main(): Promise<void> {
 
     // Restore the name so the delete-confirmation check below still matches.
     await prisma.team.update({ where: { id: team.id }, data: { name: teamName } });
+  }
+
+  console.log("\nPoints adjustments");
+  {
+    const target = division.teams[0];
+    const reason = `Smoke sanction ${stamp}`;
+
+    // A deduction must reduce the points the calculator reports, not just store a row.
+    const beforeRow = (await getStandingsForSeason(division.seasonId))
+      .flatMap((d) => d.rows)
+      .find((r) => r.teamId === target.id);
+
+    const applied = await submit("/admin/standings", 'id="adj-team"', {
+      teamId: target.id,
+      points: "-3",
+      reason,
+    });
+    const stored = await prisma.pointsAdjustment.findFirst({ where: { reason } });
+    check(
+      "createPointsAdjustmentAction stores the deduction",
+      stored?.points === -3,
+      `status ${applied.status}`,
+    );
+
+    const afterRow = (await getStandingsForSeason(division.seasonId))
+      .flatMap((d) => d.rows)
+      .find((r) => r.teamId === target.id);
+    check(
+      "the deduction reaches the computed table",
+      beforeRow !== undefined &&
+        afterRow !== undefined &&
+        afterRow.points === beforeRow.points - 3 &&
+        afterRow.pointsAdjustment === beforeRow.pointsAdjustment - 3,
+      `${beforeRow?.points} -> ${afterRow?.points}`,
+    );
+    check(
+      "a deduction leaves results untouched",
+      beforeRow !== undefined &&
+        afterRow !== undefined &&
+        afterRow.played === beforeRow.played &&
+        afterRow.goalDifference === beforeRow.goalDifference,
+    );
+
+    // The public table has to explain itself, or a deduction looks like a bug.
+    const publicTable = await (await req("/standings")).text();
+    check(
+      "the public table annotates the adjustment",
+      publicTable.includes("point adjustment applied"),
+    );
+
+    const zero = await submit("/admin/standings", 'id="adj-team"', {
+      teamId: target.id,
+      points: "0",
+      reason: `Zero ${stamp}`,
+    });
+    check(
+      "a zero adjustment is rejected",
+      (await prisma.pointsAdjustment.count({ where: { reason: `Zero ${stamp}` } })) === 0,
+      `status ${zero.status}`,
+    );
+
+    if (stored) {
+      await submit("/admin/standings", `value="${stored.id}"`, { adjustmentId: stored.id });
+      const gone = await prisma.pointsAdjustment.findUnique({ where: { id: stored.id } });
+      check("deletePointsAdjustmentAction reverses it", gone === null);
+
+      const restored = (await getStandingsForSeason(division.seasonId))
+        .flatMap((d) => d.rows)
+        .find((r) => r.teamId === target.id);
+      check(
+        "reversing restores the earned points",
+        restored !== undefined && beforeRow !== undefined && restored.points === beforeRow.points,
+      );
+    }
   }
 
   console.log("\nContent");

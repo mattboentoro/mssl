@@ -14,11 +14,13 @@ import {
   csvMatchRowSchema,
   deleteSeasonSchema,
   deleteTeamSchema,
+  deletePointsAdjustmentSchema,
   disciplinaryActionSchema,
   divisionSchema,
   documentSchema,
   flattenZodError,
   matchCreateSchema,
+  pointsAdjustmentSchema,
   seasonSchema,
   teamSchema,
   updateTeamSchema,
@@ -391,6 +393,98 @@ export async function deleteTeamAction(_prev: ActionState, form: FormData): Prom
 
       refreshAdmin();
       return `Team “${team.name}” deleted along with ${fixtures} fixture(s).`;
+    },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Points adjustments
+// ---------------------------------------------------------------------------
+
+export async function createPointsAdjustmentAction(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  return run(
+    pointsAdjustmentSchema,
+    {
+      teamId: str(form, "teamId"),
+      points: str(form, "points"),
+      reason: str(form, "reason"),
+    },
+    async (data, actor) => {
+      const team = await prisma.team.findUnique({
+        where: { id: data.teamId },
+        select: { id: true, name: true, divisionId: true },
+      });
+      if (!team) throw new Error("That team no longer exists.");
+
+      const adjustment = await prisma.$transaction(async (tx) => {
+        const created = await tx.pointsAdjustment.create({
+          data: {
+            teamId: team.id,
+            points: data.points,
+            reason: data.reason,
+            createdByEmail: actor.email ?? null,
+            createdByName: actor.name ?? null,
+          },
+        });
+        await writeAudit(tx, {
+          actor: actorFrom(actor),
+          action: "standings.adjust",
+          entity: "PointsAdjustment",
+          entityId: created.id,
+          metadata: {
+            teamId: team.id,
+            teamName: team.name,
+            points: data.points,
+            reason: data.reason,
+          },
+        });
+        return created;
+      });
+
+      refreshAdmin();
+      revalidatePath("/standings");
+      const verb = adjustment.points < 0 ? "deducted from" : "awarded to";
+      return `${Math.abs(adjustment.points)} point(s) ${verb} ${team.name}.`;
+    },
+  );
+}
+
+export async function deletePointsAdjustmentAction(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  return run(
+    deletePointsAdjustmentSchema,
+    { adjustmentId: str(form, "adjustmentId") },
+    async (data, actor) => {
+      const existing = await prisma.pointsAdjustment.findUnique({
+        where: { id: data.adjustmentId },
+        include: { team: { select: { id: true, name: true } } },
+      });
+      if (!existing) throw new Error("That adjustment has already been removed.");
+
+      await prisma.$transaction(async (tx) => {
+        await tx.pointsAdjustment.delete({ where: { id: existing.id } });
+        await writeAudit(tx, {
+          actor: actorFrom(actor),
+          action: "standings.adjust.remove",
+          entity: "PointsAdjustment",
+          entityId: existing.id,
+          metadata: {
+            teamId: existing.teamId,
+            teamName: existing.team.name,
+            points: existing.points,
+            reason: existing.reason,
+          },
+        });
+      });
+
+      refreshAdmin();
+      revalidatePath("/standings");
+      return `Adjustment reversed — ${existing.team.name} is back to its earned points.`;
     },
   );
 }

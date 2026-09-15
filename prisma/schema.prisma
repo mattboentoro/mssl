@@ -79,9 +79,35 @@ model Team {
   homeMatches Match[]              @relation("HomeTeam")
   awayMatches Match[]              @relation("AwayTeam")
   discipline  DisciplinaryAction[]
+  adjustments PointsAdjustment[]
 
   @@unique([divisionId, slug])
   @@index([divisionId])
+}
+
+/// An administrative change to a team's points total, almost always a deduction
+/// (fielding an ineligible player, a forfeited fixture, unpaid fees).
+///
+/// This is the *only* sanctioned way to alter a league table. The rest of the
+/// table stays derived from game reports; a deduction is recorded here as an
+/// explicit, reasoned, audited row rather than by editing a result. A team
+/// belongs to exactly one division, and a division to exactly one season, so
+/// `teamId` alone already scopes the adjustment to a season.
+model PointsAdjustment {
+  id     String @id @default(cuid())
+  teamId String
+  /// Signed: negative deducts, positive awards. Never zero.
+  points Int
+  /// Mandatory justification, shown on the public table.
+  reason String
+
+  createdByEmail String?
+  createdByName  String?
+  createdAt      DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([teamId])
 }
 
 model Venue {
