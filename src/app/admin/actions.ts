@@ -302,6 +302,16 @@ export async function createTeamAction(_prev: ActionState, form: FormData): Prom
       contactEmail: str(form, "contactEmail"),
     },
     async (data, actor) => {
+      // Same division-scoped rule as the editor, so a duplicate surfaces as a
+      // sentence rather than a raw unique-constraint violation.
+      const clash = await prisma.team.findFirst({
+        where: { divisionId: data.divisionId, slug: data.slug },
+        select: { name: true },
+      });
+      if (clash) {
+        throw new Error(`“${clash.name}” already uses the slug “${data.slug}” in that division.`);
+      }
+
       const team = await prisma.team.create({ data });
       await writeAudit(prisma, {
         actor: actorFrom(actor),
@@ -343,11 +353,17 @@ export async function updateTeamAction(_prev: ActionState, form: FormData): Prom
       const before = await prisma.team.findUnique({ where: { id: teamId } });
       if (!before) throw new Error("That team no longer exists.");
 
+      // Slugs only have to be unique inside a division — that is what the
+      // database enforces, and the same club legitimately appears in several
+      // seasons. Checking globally rejected a team for clashing with itself in
+      // last season's copy of the division.
       const clash = await prisma.team.findFirst({
-        where: { slug: data.slug, id: { not: teamId } },
+        where: { divisionId: data.divisionId, slug: data.slug, id: { not: teamId } },
         select: { name: true },
       });
-      if (clash) throw new Error(`“${clash.name}” already uses the slug “${data.slug}”.`);
+      if (clash) {
+        throw new Error(`“${clash.name}” already uses the slug “${data.slug}” in that division.`);
+      }
 
       const team = await prisma.team.update({ where: { id: teamId }, data });
       await writeAudit(prisma, {
