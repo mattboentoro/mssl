@@ -270,6 +270,15 @@ async function main(): Promise<void> {
           "Smoke Captain Two,Smoke Captain Three,Smoke Captain Four" &&
         edited.captains[1]?.email === null,
     );
+    const teamPage = await (await req(`/teams/${team.slug}`)).text();
+    check(
+      "the public team page highlights each captain on a separate line",
+      teamPage.includes("Team captains") &&
+        teamPage.includes("<li") &&
+        teamPage.includes("Smoke Captain Two") &&
+        teamPage.includes("Smoke Captain Three") &&
+        teamPage.includes("Smoke Captain Four"),
+    );
     await submit("/admin/league", `id="team-${team.id}-name"`, {
       divisionId: team.divisionId,
       name: renamed,
