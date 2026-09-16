@@ -1,7 +1,6 @@
 @import "tailwindcss";
 
 /* Matchday typography, Touchline palette. The league identity is light-only. */
-@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   --background: #ffffff;

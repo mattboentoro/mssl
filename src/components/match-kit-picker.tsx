@@ -191,7 +191,7 @@ function KitSelect({
         {color ? (
           <span
             aria-hidden
-            className="inline-block h-8 w-8 shrink-0 rounded-lg ring-1 ring-black/20 dark:ring-white/25"
+            className="inline-block h-8 w-8 shrink-0 rounded-lg ring-1 ring-black/20"
             style={{ backgroundColor: color }}
           />
         ) : null}

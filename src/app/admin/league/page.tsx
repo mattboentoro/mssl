@@ -2,6 +2,7 @@ import { FieldError } from "@/components/admin-forms";
 import { DivisionEditor } from "@/components/admin-division-editor";
 import { SeasonEditor } from "@/components/admin-season-editor";
 import { TeamEditor } from "@/components/admin-team-editor";
+import { CaptainFields } from "@/components/captain-fields";
 import { ColorPalettePicker } from "@/components/color-palette-picker";
 import { FormDialog } from "@/components/form-dialog";
 import { TeamColorBar } from "@/components/team-colors";
@@ -22,7 +23,10 @@ export default async function AdminLeaguePage() {
     }),
     prisma.team.findMany({
       orderBy: { name: "asc" },
-      include: { division: { select: { name: true } } },
+      include: {
+        division: { select: { name: true } },
+        captains: { orderBy: { sortOrder: "asc" } },
+      },
     }),
   ]);
 
@@ -225,13 +229,7 @@ export default async function AdminLeaguePage() {
               />
               <FieldError name="colorAlternate" />
             </Field>
-            <Field label="Captain" htmlFor="team-captain">
-              <input id="team-captain" name="captainName" className={inputClass} />
-            </Field>
-            <Field label="Contact e-mail" htmlFor="team-email">
-              <input id="team-email" name="contactEmail" type="email" className={inputClass} />
-              <FieldError name="contactEmail" />
-            </Field>
+            <CaptainFields idPrefix="new-team" />
           </FormDialog>
         </div>
         {teams.length === 0 ? (
@@ -267,8 +265,7 @@ export default async function AdminLeaguePage() {
                     divisionId: team.divisionId,
                     colorPrimary: team.colorPrimary,
                     colorAlternate: team.colorAlternate,
-                    captainName: team.captainName,
-                    contactEmail: team.contactEmail,
+                    captains: team.captains.map(({ id, name, email }) => ({ id, name, email })),
                   }}
                   divisions={divisions.map((d) => ({ id: d.id, name: d.name }))}
                 />

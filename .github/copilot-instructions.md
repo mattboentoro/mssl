@@ -9,6 +9,8 @@
   The preview is a visual reference, not permission to replace existing page layouts.
 - Keep the site light-only, including public, referee and admin screens.
   Do not restore a dark-mode toggle, OS theme switching, or a stored-theme script.
+  Do not add `dark:*` utilities or a custom dark variant; remove legacy references
+  rather than leaving unreachable theme styles.
 - Use these shared tokens in `src/app/globals.css`, not new per-page palettes:
 
   | Token                                     | Colour                 | Purpose                                                    |

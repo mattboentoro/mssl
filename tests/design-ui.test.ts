@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -187,6 +187,22 @@ describe("TeamColorBar", () => {
 });
 
 describe("Matchday identity", () => {
+  it("has no leftover dark-theme utilities or custom variants in application source", () => {
+    function checkDirectory(directory: string) {
+      for (const entry of readdirSync(directory, { withFileTypes: true })) {
+        const file = path.join(directory, entry.name);
+        if (entry.isDirectory()) {
+          checkDirectory(file);
+        } else if (/\.(tsx?|css)$/.test(entry.name)) {
+          expect(readFileSync(file, "utf8"), file).not.toMatch(
+            /\bdark:|@custom-variant\s+dark\b|prefers-color-scheme:\s*dark/,
+          );
+        }
+      }
+    }
+    checkDirectory(path.join(process.cwd(), "src"));
+  });
+
   it("preserves the original landing-page hierarchy and four matches in each list", () => {
     const home = readFileSync(path.join(process.cwd(), "src/app/page.tsx"), "utf8");
     const sections = [

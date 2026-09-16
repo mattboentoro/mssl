@@ -211,7 +211,7 @@ function FixtureChip({
         aligned down the week. `ml-auto` pins it to the right edge of the chip.
       */}
       {mark ? (
-        <span className="ml-auto shrink-0 font-semibold text-emerald-600 dark:text-emerald-400">
+        <span className="ml-auto shrink-0 font-semibold text-emerald-600">
           <span className="sr-only">{mark}</span>
           <Check aria-hidden="true" size={12} />
         </span>
@@ -221,19 +221,14 @@ function FixtureChip({
 
   // A marked fixture is tinted green as well as ticked, so the distinction
   // survives for anyone who cannot pick the glyph out at 11px.
-  const tone = mark
-    ? "bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/40"
-    : "bg-surface-muted hover:bg-brand/10";
+  const tone = mark ? "bg-emerald-50 hover:bg-emerald-100" : "bg-surface-muted hover:bg-brand/10";
 
   const shared =
     "flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-[11px] leading-tight";
 
   if (!href) {
     return (
-      <span
-        className={`${shared} ${mark ? "bg-emerald-50 dark:bg-emerald-950/40" : "bg-surface-muted"}`}
-        title={detail}
-      >
+      <span className={`${shared} ${mark ? "bg-emerald-50" : "bg-surface-muted"}`} title={detail}>
         {body}
       </span>
     );
