@@ -146,10 +146,17 @@ export async function createSeasonAction(_prev: ActionState, form: FormData): Pr
 }
 
 /**
- * Rename a season or move its dates.
+ * Save every editable property of one season in a single write: its name, its
+ * dates, how its tables are ranked and whether it is the active season.
  *
- * Which season is active and how it ranks its table stay on their own buttons:
- * both have side effects well beyond the row being edited.
+ * Total points is the normal ranking rule; points per game is the fair one
+ * while teams have played unequal numbers of fixtures. It is stored on the
+ * season so every table for it agrees.
+ *
+ * Activating this season deactivates the rest. Clearing the toggle on the
+ * season that is already active is ignored rather than obeyed: the league is
+ * never in a state with no active season, and the way to move on is to
+ * activate a different one.
  */
 export async function updateSeasonAction(_prev: ActionState, form: FormData): Promise<ActionState> {
   return run(
@@ -160,6 +167,8 @@ export async function updateSeasonAction(_prev: ActionState, form: FormData): Pr
       slug: str(form, "slug"),
       startsOn: str(form, "startsOn"),
       endsOn: str(form, "endsOn"),
+      tiebreakerMode: str(form, "tiebreakerMode"),
+      isActive: bool(form, "isActive"),
     },
     async ({ seasonId, ...data }, actor) => {
       const before = await prisma.season.findUnique({ where: { id: seasonId } });
@@ -175,80 +184,39 @@ export async function updateSeasonAction(_prev: ActionState, form: FormData): Pr
       });
       if (clash) throw new Error(`There is already a season called “${clash.name}”.`);
 
-      const season = await prisma.season.update({
-        where: { id: seasonId },
-        data: { name: data.name, slug: data.slug, startsOn, endsOn },
-      });
-      await writeAudit(prisma, {
-        actor: actorFrom(actor),
-        action: "season.update",
-        entity: "Season",
-        entityId: season.id,
-        metadata: { name: data.name, startsOn: data.startsOn, endsOn: data.endsOn },
-      });
-      refreshAdmin();
-      return `Season “${data.name}” updated.`;
-    },
-  );
-}
+      const activating = data.isActive && !before.isActive;
 
-export async function activateSeasonAction(
-  _prev: ActionState,
-  form: FormData,
-): Promise<ActionState> {
-  return run(
-    z.object({ seasonId: z.string().min(1) }),
-    { seasonId: str(form, "seasonId") },
-    async (data, actor) => {
       await prisma.$transaction(async (tx) => {
-        await tx.season.updateMany({ data: { isActive: false } });
-        await tx.season.update({ where: { id: data.seasonId }, data: { isActive: true } });
-        await writeAudit(tx, {
-          actor: actorFrom(actor),
-          action: "season.activate",
-          entity: "Season",
-          entityId: data.seasonId,
-        });
-      });
-      refreshAdmin();
-      return "Active season updated.";
-    },
-  );
-}
-
-/**
- * Choose how a season's tables are ranked. Total points is the normal rule;
- * points per game is the fair one while teams have played unequal numbers of
- * fixtures. Stored on the season so every table for it agrees.
- */
-export async function setSeasonTiebreakerAction(
-  _prev: ActionState,
-  form: FormData,
-): Promise<ActionState> {
-  return run(
-    z.object({
-      seasonId: z.string().min(1),
-      tiebreakerMode: z.enum(["POINTS", "POINTS_PER_GAME"]),
-    }),
-    { seasonId: str(form, "seasonId"), tiebreakerMode: str(form, "tiebreakerMode") },
-    async (data, actor) => {
-      await prisma.$transaction(async (tx) => {
+        if (activating) await tx.season.updateMany({ data: { isActive: false } });
         await tx.season.update({
-          where: { id: data.seasonId },
-          data: { tiebreakerMode: data.tiebreakerMode },
+          where: { id: seasonId },
+          data: {
+            name: data.name,
+            slug: data.slug,
+            startsOn,
+            endsOn,
+            tiebreakerMode: data.tiebreakerMode,
+            isActive: before.isActive || data.isActive,
+          },
         });
         await writeAudit(tx, {
           actor: actorFrom(actor),
-          action: "season.tiebreaker",
+          action: "season.update",
           entity: "Season",
-          entityId: data.seasonId,
-          metadata: { tiebreakerMode: data.tiebreakerMode },
+          entityId: seasonId,
+          metadata: {
+            name: data.name,
+            startsOn: data.startsOn,
+            endsOn: data.endsOn,
+            tiebreakerMode: data.tiebreakerMode,
+            activated: activating,
+          },
         });
       });
       refreshAdmin();
-      return data.tiebreakerMode === "POINTS_PER_GAME"
-        ? "Tables for this season now rank on points per game."
-        : "Tables for this season now rank on total points.";
+      return activating
+        ? `Season “${data.name}” updated and made active.`
+        : `Season “${data.name}” updated.`;
     },
   );
 }

@@ -1,11 +1,20 @@
 import Link from "next/link";
 
-import { ActionForm, FieldError, SubmitButton } from "@/components/admin-forms";
+import { FieldError } from "@/components/admin-forms";
 import { ClickableRow } from "@/components/clickable-row";
 import { CalendarViewToggle, FixtureCalendar, parseView } from "@/components/fixture-calendar";
+import { Dialog, FormDialog } from "@/components/form-dialog";
 import { MatchKitPicker } from "@/components/match-kit-picker";
+import { ScheduleImportForm } from "@/components/schedule-import-form";
 import { KitSwatch } from "@/components/team-colors";
-import { Card, EmptyState, Field, MatchStatusBadge, inputClass } from "@/components/ui";
+import {
+  Card,
+  EmptyState,
+  Field,
+  MatchStatusBadge,
+  inputClass,
+  outlineButtonClass,
+} from "@/components/ui";
 import { createMatchAction } from "@/app/admin/actions";
 import { formatDateTime, parseMonthValue, shiftMonth, toDateTimeInputValue } from "@/lib/dates";
 import {
@@ -193,6 +202,81 @@ export default async function AdminMatchesPage({
               : `Fixtures (${matches.length})`}
           </h2>
           <div className="flex flex-wrap items-center gap-2">
+            <FormDialog
+              trigger="Add fixture"
+              title="Add a fixture"
+              action={createMatchAction}
+              submitLabel="Create fixture"
+              fieldsClassName="grid gap-4 sm:grid-cols-2"
+            >
+              <input type="hidden" name="seasonId" value={seasonId} />
+              <Field label="Matchweek" htmlFor="new-mw">
+                <input
+                  id="new-mw"
+                  name="matchweek"
+                  type="text"
+                  maxLength={40}
+                  defaultValue="1"
+                  placeholder="7 or Final"
+                  className={inputClass}
+                  required
+                />
+                <FieldError name="matchweek" />
+              </Field>
+              <Field label="Counts for standings" htmlFor="new-counts">
+                <label className="flex items-center gap-2 py-2 text-sm">
+                  <input
+                    id="new-counts"
+                    name="countsForStandings"
+                    type="checkbox"
+                    defaultChecked
+                    className="h-4 w-4"
+                  />
+                  Include this result in the league table
+                </label>
+                <p className="text-muted text-xs">
+                  Clear it for a final, play-off or friendly. The fixture still appears everywhere
+                  else.
+                </p>
+                <FieldError name="countsForStandings" />
+              </Field>
+              <MatchKitPicker
+                divisions={divisions.map((d) => ({ id: d.id, name: d.name }))}
+                teams={teams.map((t) => ({
+                  id: t.id,
+                  name: t.name,
+                  divisionId: t.divisionId,
+                  colorPrimary: t.colorPrimary,
+                  colorAlternate: t.colorAlternate,
+                }))}
+              />
+              <Field label="Kick-off" htmlFor="new-kickoff">
+                <input
+                  id="new-kickoff"
+                  name="kickoffAt"
+                  type="datetime-local"
+                  defaultValue={toDateTimeInputValue(new Date())}
+                  className={inputClass}
+                  required
+                />
+                <FieldError name="kickoffAt" />
+              </Field>
+              <Field
+                label="Venue"
+                htmlFor="new-venue"
+                hint="Free text, shown exactly as typed. Blank shows as TBD."
+              >
+                <input
+                  id="new-venue"
+                  name="venueName"
+                  type="text"
+                  maxLength={200}
+                  placeholder="To be confirmed"
+                  className={inputClass}
+                />
+                <FieldError name="venueName" />
+              </Field>
+            </FormDialog>
             {/*
               Exactly the columns the importer reads back, so an organiser can
               export a season, edit it in Excel and re-upload it as a template.
@@ -200,10 +284,19 @@ export default async function AdminMatchesPage({
             <a
               href={`/admin/schedule.csv?season=${encodeURIComponent(seasonId)}`}
               download
-              className="border-subtle hover:bg-surface-muted rounded-lg border px-3 py-1.5 text-sm font-medium"
+              className={outlineButtonClass}
             >
               Download CSV
             </a>
+            <Dialog
+              trigger="Upload CSV"
+              triggerClassName={outlineButtonClass}
+              title="Import a schedule"
+              description="Paste or upload a CSV, dry run it to see exactly what would change, then import the valid rows."
+              widthClassName="w-[min(64rem,calc(100vw-2rem))]"
+            >
+              <ScheduleImportForm seasons={seasons.map((s) => ({ id: s.id, name: s.name }))} />
+            </Dialog>
             <CalendarViewToggle view={view} basePath="/admin/matches" query={carried} />
           </div>
         </div>
@@ -327,86 +420,6 @@ export default async function AdminMatchesPage({
             </table>
           </Card>
         )}
-      </section>
-
-      <section aria-labelledby="new-fixture">
-        <h2 id="new-fixture" className="mb-3 text-lg font-semibold">
-          Add a fixture
-        </h2>
-        <Card className="p-5">
-          <ActionForm action={createMatchAction} className="grid gap-4 sm:grid-cols-2">
-            <input type="hidden" name="seasonId" value={seasonId} />
-            <Field label="Matchweek" htmlFor="new-mw">
-              <input
-                id="new-mw"
-                name="matchweek"
-                type="text"
-                maxLength={40}
-                defaultValue="1"
-                placeholder="7 or Final"
-                className={inputClass}
-                required
-              />
-              <FieldError name="matchweek" />
-            </Field>
-            <Field label="Counts for standings" htmlFor="new-counts">
-              <label className="flex items-center gap-2 py-2 text-sm">
-                <input
-                  id="new-counts"
-                  name="countsForStandings"
-                  type="checkbox"
-                  defaultChecked
-                  className="h-4 w-4"
-                />
-                Include this result in the league table
-              </label>
-              <p className="text-muted text-xs">
-                Clear it for a final, play-off or friendly. The fixture still appears everywhere
-                else.
-              </p>
-              <FieldError name="countsForStandings" />
-            </Field>
-            <MatchKitPicker
-              divisions={divisions.map((d) => ({ id: d.id, name: d.name }))}
-              teams={teams.map((t) => ({
-                id: t.id,
-                name: t.name,
-                divisionId: t.divisionId,
-                colorPrimary: t.colorPrimary,
-                colorAlternate: t.colorAlternate,
-              }))}
-            />
-            <Field label="Kick-off" htmlFor="new-kickoff">
-              <input
-                id="new-kickoff"
-                name="kickoffAt"
-                type="datetime-local"
-                defaultValue={toDateTimeInputValue(new Date())}
-                className={inputClass}
-                required
-              />
-              <FieldError name="kickoffAt" />
-            </Field>
-            <Field
-              label="Venue"
-              htmlFor="new-venue"
-              hint="Free text, shown exactly as typed. Blank shows as TBD."
-            >
-              <input
-                id="new-venue"
-                name="venueName"
-                type="text"
-                maxLength={200}
-                placeholder="To be confirmed"
-                className={inputClass}
-              />
-              <FieldError name="venueName" />
-            </Field>
-            <div className="sm:col-span-2">
-              <SubmitButton>Create fixture</SubmitButton>
-            </div>
-          </ActionForm>
-        </Card>
       </section>
     </div>
   );

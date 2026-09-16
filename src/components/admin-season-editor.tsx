@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  activateSeasonAction,
-  deleteSeasonAction,
-  setSeasonTiebreakerAction,
-  updateSeasonAction,
-} from "@/app/admin/actions";
+import { deleteSeasonAction, updateSeasonAction } from "@/app/admin/actions";
 import { ActionForm, FieldError, SubmitButton } from "@/components/admin-forms";
 import { CloseOnSuccess, Dialog, DialogCancel } from "@/components/form-dialog";
 import { Field, buttonClass, inputClass } from "@/components/ui";
@@ -40,6 +35,7 @@ export function SeasonEditor({ season }: { season: EditableSeason }) {
         <ActionForm
           action={updateSeasonAction}
           resetOnSuccess={false}
+          showSuccess={false}
           className="grid gap-3 sm:grid-cols-2"
         >
           <input type="hidden" name="seasonId" value={season.id} />
@@ -83,22 +79,7 @@ export function SeasonEditor({ season }: { season: EditableSeason }) {
             </Field>
           </div>
 
-          <div className="border-subtle flex items-center justify-end gap-2 border-t pt-3 sm:col-span-2">
-            <DialogCancel />
-            <SubmitButton>Save changes</SubmitButton>
-          </div>
-          <CloseOnSuccess />
-        </ActionForm>
-
-        {/* The ranking rule rewrites every table in the season, so it saves on
-            its own rather than riding along with a rename. */}
-        <div className="border-subtle border-t pt-3">
-          <ActionForm
-            action={setSeasonTiebreakerAction}
-            resetOnSuccess={false}
-            className="flex flex-wrap items-end gap-2"
-          >
-            <input type="hidden" name="seasonId" value={season.id} />
+          <div className="sm:col-span-2">
             <Field label="Ranked on" htmlFor={`tiebreak-${season.id}`}>
               <select
                 id={`tiebreak-${season.id}`}
@@ -110,25 +91,51 @@ export function SeasonEditor({ season }: { season: EditableSeason }) {
                 <option value="POINTS_PER_GAME">Points per game</option>
               </select>
             </Field>
-            <SubmitButton variant="ghost">Save</SubmitButton>
-          </ActionForm>
-        </div>
+          </div>
+
+          {/* The active season is the one the whole site defaults to, so the
+              toggle only ever switches one on: clearing it on the active
+              season would leave the league with none, and the action ignores
+              that rather than obeying it. */}
+          <label className="flex items-start gap-2 text-sm sm:col-span-2">
+            <input
+              type="checkbox"
+              name="isActive"
+              defaultChecked={season.isActive}
+              disabled={season.isActive}
+              className="mt-0.5 h-4 w-4"
+            />
+            <span>
+              Active season
+              <span className="text-muted block text-xs">
+                {season.isActive
+                  ? "The site defaults to this season. Activate another one to move on."
+                  : "Makes this the season the site defaults to, and stands the current one down."}
+              </span>
+            </span>
+          </label>
+
+          <div className="border-subtle flex items-center justify-end gap-2 border-t pt-3 sm:col-span-2">
+            <DialogCancel />
+            <SubmitButton>Save changes</SubmitButton>
+          </div>
+          <CloseOnSuccess />
+        </ActionForm>
 
         {season.isActive ? (
           <p className="text-muted border-subtle border-t pt-3 text-xs">
-            This is the active season. Activate another one before it can be deleted.
+            Activate another season before this one can be deleted.
           </p>
         ) : (
-          <div className="border-subtle space-y-3 border-t pt-3">
-            <ActionForm action={activateSeasonAction} resetOnSuccess={false}>
-              <input type="hidden" name="seasonId" value={season.id} />
-              <SubmitButton variant="ghost">Make active</SubmitButton>
-              <CloseOnSuccess />
-            </ActionForm>
-
+          <div className="border-subtle border-t pt-3">
             {/* Deleting a season takes its fixtures and reports with it, so the
                 name has to be retyped. */}
-            <ActionForm action={deleteSeasonAction} resetOnSuccess={false} className="space-y-2">
+            <ActionForm
+              action={deleteSeasonAction}
+              resetOnSuccess={false}
+              showSuccess={false}
+              className="space-y-2"
+            >
               <input type="hidden" name="seasonId" value={season.id} />
               <Field
                 label="Delete season"

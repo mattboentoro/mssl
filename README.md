@@ -296,7 +296,8 @@ The report form is mobile-first: referees file from a phone at the pitch.
   rescind one. Admin-issued rows are tagged `ADMIN`, surface on the **referee's
   warning board** for that team's next fixture, and count towards the standings
   tiebreaker. Rows that arrived on a game report are tagged `REFEREE`.
-- `/admin/import` — bulk CSV schedule import with a **dry-run preview**.
+- **Upload CSV** on `/admin/matches` — bulk CSV schedule import with a
+  **dry-run preview**, in a banner opened by the button next to Download CSV.
   Columns: `matchweek` (1-60), `kickoff` (ISO 8601), `division`, `home`, `away`,
   `venue` (optional). Teams and divisions match by name, slug or short name.
   Kits are assigned automatically per fixture (see [Kit colours](#kit-colours)).
@@ -305,7 +306,7 @@ The report form is mobile-first: referees file from a phone at the pitch.
   as duplicates.
 - `/admin/schedule.csv?season=<id>` — exports the season's fixtures. The export
   is **a valid import template**: download it, edit or append rows, and feed it
-  straight back into `/admin/import`. It carries the extra optional `venue`
+  straight back into the Upload CSV dialog. It carries the extra optional `venue`
   column, which the importer accepts. The admin smoke test proves the round trip
   rather than asserting a fixed header string.
 - `/admin/content` — announcements and documents.

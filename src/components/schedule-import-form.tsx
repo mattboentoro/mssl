@@ -4,7 +4,7 @@ import { useActionState, useRef, useState } from "react";
 
 import { importScheduleAction, type CsvImportState } from "@/app/admin/actions";
 import { SubmitButton } from "@/components/admin-forms";
-import { Alert, Card, Field, buttonClass, inputClass } from "@/components/ui";
+import { Alert, Card, Field, inputClass } from "@/components/ui";
 import { formatDateTime } from "@/lib/dates";
 
 const SAMPLE = `matchweek,kickoff,division,home,away,venue,counts
@@ -33,85 +33,71 @@ export function ScheduleImportForm({ seasons }: { seasons: { id: string; name: s
 
   return (
     <div className="space-y-6">
-      <Card className="p-5">
-        <div className="border-subtle mb-4 flex flex-wrap items-center justify-between gap-3 border-b pb-4">
-          <p className="text-muted text-xs">
-            Download the current schedule to get a correctly-shaped file you can edit and re-upload.
+      <form action={formAction} className="space-y-4">
+        {state.error ? <Alert tone="danger">{state.error}</Alert> : null}
+        {state.ok ? <Alert tone="success">{state.ok}</Alert> : null}
+
+        <Field label="Season" htmlFor="import-season">
+          <select
+            id="import-season"
+            name="seasonId"
+            value={seasonId}
+            onChange={(event) => setSeasonId(event.target.value)}
+            className={inputClass}
+            required
+          >
+            {seasons.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label="Upload a CSV file" htmlFor="import-file">
+          <input
+            id="import-file"
+            type="file"
+            accept=".csv,text/csv"
+            onChange={onFile}
+            className={`${inputClass} file:border-0 file:bg-transparent file:text-sm`}
+          />
+          <p className="text-muted mt-1 text-xs">
+            {fileName
+              ? `Loaded ${fileName}. Review it below, then dry run.`
+              : "Optional \u2014 the file is loaded into the box below, where you can still edit it."}
           </p>
-          <a
-            href={`/admin/schedule.csv?season=${encodeURIComponent(seasonId)}`}
-            className={buttonClass("secondary")}
-            download
+        </Field>
+
+        <Field
+          label="CSV"
+          htmlFor="import-csv"
+          hint="Columns: matchweek, kickoff, division, home, away, venue, counts. Matchweek is free text, so 7 and Final both work. Kick-off is read as Redmond time; YYYY-MM-DD HH:mm and M/D/YYYY HH:mm both work. Divisions and teams that are not on file yet are created for you. Venue is free text and is stored exactly as typed. Counts is optional — put no for a final or friendly that must stay out of the league table."
+        >
+          <textarea
+            id="import-csv"
+            name="csv"
+            ref={csvRef}
+            rows={10}
+            defaultValue={state.csv ?? SAMPLE}
+            className={`${inputClass} font-mono text-xs`}
+            required
+          />
+        </Field>
+
+        <div className="flex flex-wrap gap-2">
+          <SubmitButton name="mode" value="dry-run" variant="secondary">
+            Dry run
+          </SubmitButton>
+          <SubmitButton
+            name="mode"
+            value="commit"
+            confirm="Import every valid row into the schedule?"
           >
-            Download schedule CSV
-          </a>
+            Import valid rows
+          </SubmitButton>
         </div>
-        <form action={formAction} className="space-y-4">
-          {state.error ? <Alert tone="danger">{state.error}</Alert> : null}
-          {state.ok ? <Alert tone="success">{state.ok}</Alert> : null}
-
-          <Field label="Season" htmlFor="import-season">
-            <select
-              id="import-season"
-              name="seasonId"
-              value={seasonId}
-              onChange={(event) => setSeasonId(event.target.value)}
-              className={inputClass}
-              required
-            >
-              {seasons.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Upload a CSV file" htmlFor="import-file">
-            <input
-              id="import-file"
-              type="file"
-              accept=".csv,text/csv"
-              onChange={onFile}
-              className={`${inputClass} file:border-0 file:bg-transparent file:text-sm`}
-            />
-            <p className="text-muted mt-1 text-xs">
-              {fileName
-                ? `Loaded ${fileName}. Review it below, then dry run.`
-                : "Optional \u2014 the file is loaded into the box below, where you can still edit it."}
-            </p>
-          </Field>
-
-          <Field
-            label="CSV"
-            htmlFor="import-csv"
-            hint="Columns: matchweek, kickoff, division, home, away, venue, counts. Matchweek is free text, so 7 and Final both work. Kick-off is read as Redmond time; YYYY-MM-DD HH:mm and M/D/YYYY HH:mm both work. Divisions and teams that are not on file yet are created for you. Venue is free text and is stored exactly as typed. Counts is optional — put no for a final or friendly that must stay out of the league table."
-          >
-            <textarea
-              id="import-csv"
-              name="csv"
-              ref={csvRef}
-              rows={10}
-              defaultValue={state.csv ?? SAMPLE}
-              className={`${inputClass} font-mono text-xs`}
-              required
-            />
-          </Field>
-
-          <div className="flex flex-wrap gap-2">
-            <SubmitButton name="mode" value="dry-run" variant="secondary">
-              Dry run
-            </SubmitButton>
-            <SubmitButton
-              name="mode"
-              value="commit"
-              confirm="Import every valid row into the schedule?"
-            >
-              Import valid rows
-            </SubmitButton>
-          </div>
-        </form>
-      </Card>
+      </form>
 
       {(state.newDivisions && state.newDivisions.length > 0) ||
       (state.newTeams && state.newTeams.length > 0) ? (

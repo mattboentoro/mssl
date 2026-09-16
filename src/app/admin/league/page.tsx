@@ -28,139 +28,141 @@ export default async function AdminLeaguePage() {
 
   return (
     <div className="space-y-10">
-      {/* -------------------------------- Seasons --------------------------- */}
-      <section aria-labelledby="seasons">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 id="seasons" className="text-lg font-semibold">
-            Seasons
-          </h2>
-          <FormDialog
-            trigger="New season"
-            title="New season"
-            action={createSeasonAction}
-            submitLabel="Create season"
-          >
-            <Field label="Name" htmlFor="season-name">
-              <input id="season-name" name="name" className={inputClass} required />
-              <FieldError name="name" />
-            </Field>
-            <Field label="Slug" htmlFor="season-slug" hint="Blank = derived from the name.">
-              <input id="season-slug" name="slug" className={inputClass} />
-              <FieldError name="slug" />
-            </Field>
-            <Field label="Starts" htmlFor="season-start">
-              <input
-                id="season-start"
-                name="startsOn"
-                type="date"
-                className={inputClass}
-                required
-              />
-              <FieldError name="startsOn" />
-            </Field>
-            <Field label="Ends" htmlFor="season-end">
-              <input id="season-end" name="endsOn" type="date" className={inputClass} required />
-              <FieldError name="endsOn" />
-            </Field>
-            <label className="flex items-center gap-2 text-sm sm:col-span-2">
-              <input type="checkbox" name="isActive" className="h-4 w-4" />
-              Make this the active season
-            </label>
-          </FormDialog>
-        </div>
-        <ul className="space-y-3">
-          {seasons.map((season) => (
-            <Card
-              as="li"
-              key={season.id}
-              className="flex items-start justify-between gap-3 p-3 text-sm"
+      {/* Seasons and divisions are both short lists that change rarely, so they
+          sit side by side and leave the long team list the full width. */}
+      <div className="grid gap-10 lg:grid-cols-2">
+        {/* -------------------------------- Seasons --------------------------- */}
+        <section aria-labelledby="seasons">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 id="seasons" className="text-lg font-semibold">
+              Seasons
+            </h2>
+            <FormDialog
+              trigger="New season"
+              title="New season"
+              action={createSeasonAction}
+              submitLabel="Create season"
             >
-              <div className="min-w-0">
-                <p className="font-medium">
-                  {season.name}
-                  {season.isActive ? (
-                    <span className="text-success ml-2 text-xs font-semibold">ACTIVE</span>
-                  ) : null}
-                </p>
-                <p className="text-muted text-xs">
-                  {formatDate(season.startsOn)} &ndash; {formatDate(season.endsOn)}
-                </p>
-                <p className="text-muted text-xs">
-                  Ranked on{" "}
-                  {season.tiebreakerMode === "POINTS_PER_GAME" ? "points per game" : "total points"}
-                </p>
-              </div>
-              <SeasonEditor
-                season={{
-                  id: season.id,
-                  name: season.name,
-                  slug: season.slug,
-                  startsOn: toDateInputValue(season.startsOn),
-                  endsOn: toDateInputValue(season.endsOn),
-                  isActive: season.isActive,
-                  tiebreakerMode: season.tiebreakerMode,
-                }}
-              />
-            </Card>
-          ))}
-        </ul>
-      </section>
-
-      {/* ------------------------------- Divisions -------------------------- */}
-      <section aria-labelledby="divisions">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 id="divisions" className="text-lg font-semibold">
-            Divisions
-          </h2>
-          <FormDialog
-            trigger="New division"
-            title="New division"
-            action={createDivisionAction}
-            submitLabel="Create division"
-          >
-            <Field label="Name" htmlFor="div-name">
-              <input id="div-name" name="name" className={inputClass} required />
-              <FieldError name="name" />
-            </Field>
-          </FormDialog>
-        </div>
-        <p className="text-muted mb-3 text-sm">
-          Divisions and the clubs inside them belong to the league, not to a season. Deleting a
-          season removes its fixtures and leaves every team standing.
-        </p>
-        {divisions.length === 0 ? (
-          <Card className="p-4">
-            <p className="text-muted text-sm">No divisions yet.</p>
-          </Card>
-        ) : (
+              <Field label="Name" htmlFor="season-name">
+                <input id="season-name" name="name" className={inputClass} required />
+                <FieldError name="name" />
+              </Field>
+              <Field label="Slug" htmlFor="season-slug" hint="Blank = derived from the name.">
+                <input id="season-slug" name="slug" className={inputClass} />
+                <FieldError name="slug" />
+              </Field>
+              <Field label="Starts" htmlFor="season-start">
+                <input
+                  id="season-start"
+                  name="startsOn"
+                  type="date"
+                  className={inputClass}
+                  required
+                />
+                <FieldError name="startsOn" />
+              </Field>
+              <Field label="Ends" htmlFor="season-end">
+                <input id="season-end" name="endsOn" type="date" className={inputClass} required />
+                <FieldError name="endsOn" />
+              </Field>
+              <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                <input type="checkbox" name="isActive" className="h-4 w-4" />
+                Make this the active season
+              </label>
+            </FormDialog>
+          </div>
           <ul className="space-y-3">
-            {divisions.map((d) => (
+            {seasons.map((season) => (
               <Card
                 as="li"
-                key={d.id}
+                key={season.id}
                 className="flex items-start justify-between gap-3 p-3 text-sm"
               >
                 <div className="min-w-0">
-                  <p className="truncate font-medium">{d.name}</p>
+                  <p className="font-medium">
+                    {season.name}
+                    {season.isActive ? (
+                      <span className="text-success ml-2 text-xs font-semibold">ACTIVE</span>
+                    ) : null}
+                  </p>
                   <p className="text-muted text-xs">
-                    {d._count.teams} team(s), {d._count.matches} fixture(s)
+                    {formatDate(season.startsOn)} &ndash; {formatDate(season.endsOn)}
+                  </p>
+                  <p className="text-muted text-xs">
+                    Ranked on{" "}
+                    {season.tiebreakerMode === "POINTS_PER_GAME"
+                      ? "points per game"
+                      : "total points"}
                   </p>
                 </div>
-                <DivisionEditor
-                  division={{
-                    id: d.id,
-                    name: d.name,
-                    slug: d.slug,
-                    sortOrder: d.sortOrder,
-                    teamCount: d._count.teams,
-                    matchCount: d._count.matches,
+                <SeasonEditor
+                  season={{
+                    id: season.id,
+                    name: season.name,
+                    slug: season.slug,
+                    startsOn: toDateInputValue(season.startsOn),
+                    endsOn: toDateInputValue(season.endsOn),
+                    isActive: season.isActive,
+                    tiebreakerMode: season.tiebreakerMode,
                   }}
                 />
               </Card>
             ))}
           </ul>
-        )}
-      </section>
+        </section>
+
+        {/* ------------------------------- Divisions -------------------------- */}
+        <section aria-labelledby="divisions">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 id="divisions" className="text-lg font-semibold">
+              Divisions
+            </h2>
+            <FormDialog
+              trigger="New division"
+              title="New division"
+              action={createDivisionAction}
+              submitLabel="Create division"
+            >
+              <Field label="Name" htmlFor="div-name">
+                <input id="div-name" name="name" className={inputClass} required />
+                <FieldError name="name" />
+              </Field>
+            </FormDialog>
+          </div>
+          {divisions.length === 0 ? (
+            <Card className="p-4">
+              <p className="text-muted text-sm">No divisions yet.</p>
+            </Card>
+          ) : (
+            <ul className="space-y-3">
+              {divisions.map((d) => (
+                <Card
+                  as="li"
+                  key={d.id}
+                  className="flex items-start justify-between gap-3 p-3 text-sm"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{d.name}</p>
+                    <p className="text-muted text-xs">
+                      {d._count.teams} team(s), {d._count.matches} fixture(s)
+                    </p>
+                  </div>
+                  <DivisionEditor
+                    division={{
+                      id: d.id,
+                      name: d.name,
+                      slug: d.slug,
+                      sortOrder: d.sortOrder,
+                      teamCount: d._count.teams,
+                      matchCount: d._count.matches,
+                    }}
+                  />
+                </Card>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
 
       {/* --------------------------------- Teams ---------------------------- */}
       <section aria-labelledby="teams">

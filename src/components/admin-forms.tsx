@@ -62,11 +62,18 @@ export function ActionForm({
   children,
   className,
   resetOnSuccess = true,
+  showSuccess = true,
 }: {
   action: ServerAction;
   children: ReactNode;
   className?: string;
   resetOnSuccess?: boolean;
+  /**
+   * Whether a successful result gets a banner. Forms inside a dialog set this
+   * to `false`: the dialog closes on success, so the banner would be announcing
+   * the save to a panel nobody is looking at any more.
+   */
+  showSuccess?: boolean;
 }) {
   const [state, formAction] = useActionState<ActionState, FormData>(action, {});
 
@@ -82,7 +89,7 @@ export function ActionForm({
             {state.error}
           </Alert>
         ) : null}
-        {state.ok ? (
+        {showSuccess && state.ok ? (
           <Alert tone="success" className="mb-3">
             {state.ok}
           </Alert>

@@ -152,9 +152,10 @@ export const seasonSchema = z.object({
   isActive: z.boolean().default(false),
 });
 
-export const updateSeasonSchema = seasonSchema
-  .omit({ isActive: true })
-  .extend({ seasonId: z.string().min(1) });
+export const updateSeasonSchema = seasonSchema.extend({
+  seasonId: z.string().min(1),
+  tiebreakerMode: z.enum(["POINTS", "POINTS_PER_GAME"]),
+});
 
 export const divisionSchema = z.object({
   name: trimmed(120).min(2),

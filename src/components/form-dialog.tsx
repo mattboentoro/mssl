@@ -8,6 +8,7 @@ import {
   useId,
   useMemo,
   useRef,
+  useState,
   type ReactNode,
 } from "react";
 
@@ -17,7 +18,7 @@ import {
   useActionResult,
   type ServerAction,
 } from "@/components/admin-forms";
-import { buttonClass } from "@/components/ui";
+import { buttonClass, outlineButtonClass } from "@/components/ui";
 
 const DialogCloseContext = createContext<() => void>(() => {});
 
@@ -55,6 +56,7 @@ export function Dialog({
   triggerLabel,
   title,
   description,
+  widthClassName = "w-[min(42rem,calc(100vw-2rem))]",
   children,
 }: {
   trigger: ReactNode;
@@ -62,10 +64,12 @@ export function Dialog({
   triggerLabel?: string;
   title: string;
   description?: ReactNode;
+  widthClassName?: string;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const [generation, setGeneration] = useState(0);
   const close = useCallback(() => ref.current?.close(), []);
   const open = useCallback(() => ref.current?.showModal(), []);
   const closeValue = useMemo(() => close, [close]);
@@ -83,8 +87,9 @@ export function Dialog({
 
       <dialog
         ref={ref}
+        onClose={() => setGeneration((n) => n + 1)}
         aria-labelledby={titleId}
-        className="bg-surface text-foreground border-subtle m-auto max-h-[calc(100vh-4rem)] w-[min(42rem,calc(100vw-2rem))] rounded-xl border p-0 text-left shadow-xl backdrop:bg-black/60"
+        className={`bg-surface text-foreground border-subtle m-auto max-h-[calc(100vh-4rem)] ${widthClassName} rounded-xl border p-0 text-left shadow-xl backdrop:bg-black/60`}
       >
         <DialogCloseContext.Provider value={closeValue}>
           <div className="border-subtle flex items-start justify-between gap-4 border-b p-5">
@@ -104,7 +109,9 @@ export function Dialog({
             </button>
           </div>
 
-          <div className="p-5">{children}</div>
+          <div className="p-5" key={generation}>
+            {children}
+          </div>
         </DialogCloseContext.Provider>
       </dialog>
     </>
@@ -133,8 +140,13 @@ export function FormDialog({
   children: ReactNode;
 }) {
   return (
-    <Dialog trigger={trigger} title={title} description={description}>
-      <ActionForm action={action} className="space-y-4">
+    <Dialog
+      trigger={trigger}
+      title={title}
+      description={description}
+      triggerClassName={outlineButtonClass}
+    >
+      <ActionForm action={action} className="space-y-4" showSuccess={false}>
         <div className={fieldsClassName}>{children}</div>
         <div className="border-subtle flex items-center justify-end gap-2 border-t pt-4">
           <DialogCancel />

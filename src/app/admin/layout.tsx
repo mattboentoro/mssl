@@ -12,7 +12,6 @@ const TABS: AdminTab[] = [
   { href: "/admin/league", label: "League setup" },
   { href: "/admin/standings", label: "Standings" },
   { href: "/admin/discipline", label: "Discipline" },
-  { href: "/admin/import", label: "CSV import" },
   { href: "/admin/content", label: "Content" },
   { href: "/admin/audit", label: "Audit log" },
 ];

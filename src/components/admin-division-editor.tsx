@@ -30,7 +30,12 @@ export function DivisionEditor({ division }: { division: EditableDivision }) {
       title={`Edit ${division.name}`}
     >
       <div className="space-y-4">
-        <ActionForm action={updateDivisionAction} resetOnSuccess={false} className="space-y-3">
+        <ActionForm
+          action={updateDivisionAction}
+          resetOnSuccess={false}
+          showSuccess={false}
+          className="space-y-3"
+        >
           <input type="hidden" name="divisionId" value={division.id} />
           {/* The web address is set once, at creation, so a rename never breaks
               a link that already points here. */}
@@ -63,7 +68,12 @@ export function DivisionEditor({ division }: { division: EditableDivision }) {
             those fixtures has a filed report.
           */}
         <div className="border-subtle border-t pt-3">
-          <ActionForm action={deleteDivisionAction} resetOnSuccess={false} className="space-y-2">
+          <ActionForm
+            action={deleteDivisionAction}
+            resetOnSuccess={false}
+            showSuccess={false}
+            className="space-y-2"
+          >
             <input type="hidden" name="divisionId" value={division.id} />
             <Field
               label="Delete division"

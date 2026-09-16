@@ -43,6 +43,7 @@ export function TeamEditor({
         <ActionForm
           action={updateTeamAction}
           resetOnSuccess={false}
+          showSuccess={false}
           className="grid gap-3 sm:grid-cols-2"
         >
           <input type="hidden" name="teamId" value={team.id} />
@@ -153,7 +154,12 @@ export function TeamEditor({
         </ActionForm>
 
         <div className="border-subtle border-t pt-3">
-          <ActionForm action={deleteTeamAction} resetOnSuccess={false} className="space-y-2">
+          <ActionForm
+            action={deleteTeamAction}
+            resetOnSuccess={false}
+            showSuccess={false}
+            className="space-y-2"
+          >
             <input type="hidden" name="teamId" value={team.id} />
             <Field
               label="Delete team"

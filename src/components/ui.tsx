@@ -157,6 +157,14 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
 const BUTTON_BASE =
   "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50";
 
+/**
+ * The bare-outline control used for page-level secondary actions: no fill, just
+ * a hairline on the page background. Shared so "Download CSV" and the "New …"
+ * dialog triggers stay identical.
+ */
+export const outlineButtonClass =
+  "border-subtle hover:bg-surface-muted inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition";
+
 export function buttonClass(variant: ButtonVariant = "primary", className?: string) {
   return cn(BUTTON_BASE, BUTTON_VARIANTS[variant], className);
 }
