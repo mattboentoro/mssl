@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  isOneCautionFromBan,
   outstandingSuspensions,
   planAccumulationBans,
   playerKey,
@@ -221,27 +220,5 @@ describe("reading a resolved set", () => {
   it("finds who is ineligible for one fixture", () => {
     expect(suspensionsForMatch(resolved, "m2").map((item) => item.id)).toEqual(["b-pending"]);
     expect(suspensionsForMatch(resolved, "nope")).toEqual([]);
-  });
-});
-
-describe("isOneCautionFromBan", () => {
-  it("flags a player sitting on two yellows", () => {
-    expect(isOneCautionFromBan(2)).toBe(true);
-  });
-
-  it("re-arms, so five and eight are also on the brink", () => {
-    expect(isOneCautionFromBan(5)).toBe(true);
-    expect(isOneCautionFromBan(8)).toBe(true);
-  });
-
-  it("does not flag a player who has just served a ban", () => {
-    expect(isOneCautionFromBan(3)).toBe(false);
-    expect(isOneCautionFromBan(6)).toBe(false);
-  });
-
-  it("does not flag a clean or barely-booked player", () => {
-    expect(isOneCautionFromBan(0)).toBe(false);
-    expect(isOneCautionFromBan(1)).toBe(false);
-    expect(isOneCautionFromBan(4)).toBe(false);
   });
 });

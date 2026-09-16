@@ -6,10 +6,10 @@ import { GameReportForm } from "@/components/game-report-form";
 import { ActionButton } from "@/components/match-actions";
 import { Alert, Badge, Card, MatchStatusBadge, PageHeader } from "@/components/ui";
 import { KitSwatch } from "@/components/team-colors";
-import { WarningBoard } from "@/components/warning-board";
+import { SuspensionBoard } from "@/components/suspension-board";
 import { AuthzError, requireReferee } from "@/lib/authz";
 import { formatDateTime } from "@/lib/dates";
-import { CARD_LABELS, SUSPENSION_REASON_LABELS, type CardType } from "@/lib/enums";
+import { CARD_LABELS, type CardType } from "@/lib/enums";
 import { kitColorName, resolveKit } from "@/lib/kits";
 import { isForfeit } from "@/lib/match-status";
 import { prisma } from "@/lib/prisma";
@@ -178,7 +178,7 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
       ) : null}
 
       {/* --------------------------- Suspensions ----------------------------- */}
-      {canAct && bans.length > 0 ? (
+      {canAct ? (
         <section aria-labelledby="suspended-players" className="mt-8">
           <h2 id="suspended-players" className="mb-1 text-lg font-semibold">
             Suspended for this fixture
@@ -187,43 +187,12 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
             These players are serving a ban and must not take the field. Report anyone who plays
             anyway in your incident notes.
           </p>
-          <Card className="divide-subtle divide-y">
-            {bans.map((ban) => (
-              <div key={ban.id} className="flex flex-wrap items-center gap-3 p-3 text-sm">
-                <span aria-hidden className="bg-danger h-6 w-4 shrink-0 rounded-sm" />
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium">
-                    {ban.playerName}
-                    <span className="text-muted font-normal"> &middot; {ban.teamName}</span>
-                  </p>
-                  <p className="text-muted text-xs">
-                    {SUSPENSION_REASON_LABELS[ban.reason] ?? ban.reason}
-                    {` \u00b7 game ${ban.matchIds.indexOf(match.id) + 1} of ${ban.games}`}
-                  </p>
-                </div>
-                <Badge tone="danger">Suspended</Badge>
-              </div>
-            ))}
-          </Card>
-        </section>
-      ) : null}
-
-      {/* --------------------------- Warning board --------------------------- */}
-      {canAct ? (
-        <section aria-labelledby="warning-board" className="mt-8">
-          <h2 id="warning-board" className="mb-1 text-lg font-semibold">
-            Warning board
-          </h2>
-          <p className="text-muted mb-3 text-sm">
-            Players from either side carrying a card this season. Anyone serving a suspension is
-            listed first and may not take the field. League sanctions issued by the Game
-            Administrator appear at the top.
-          </p>
-          <WarningBoard
-            entries={warnings}
+          <SuspensionBoard
+            bans={bans}
+            cards={warnings}
+            matchId={match.id}
             homeTeamName={match.homeTeam.name}
             awayTeamName={match.awayTeam.name}
-            bans={bans}
           />
         </section>
       ) : null}
