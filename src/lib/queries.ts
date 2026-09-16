@@ -1,6 +1,7 @@
 import type { DbClient } from "@/lib/audit";
 import { config } from "@/lib/config";
 import { prisma } from "@/lib/prisma";
+import { getSeasonDivisionMap } from "@/lib/season-teams";
 import {
   calculateStandingsByDivision,
   forfeitScoreline,
@@ -192,7 +193,16 @@ export async function getStandingsForSeason(seasonId: string): Promise<DivisionS
     select: { teamId: true, points: true, reason: true },
   });
 
-  const teams: StandingsTeamInput[] = divisions.flatMap((division) => division.teams);
+  // A club is bucketed into the division it played in *that season*, not the
+  // one it sits in today -- otherwise promoting a side would retroactively move
+  // its old results up a tier. See src/lib/season-teams.ts.
+  const seasonDivisions = await getSeasonDivisionMap(seasonId);
+  const teams: StandingsTeamInput[] = divisions
+    .flatMap((division) => division.teams)
+    .map((team) => ({
+      ...team,
+      divisionId: seasonDivisions.get(team.id) ?? team.divisionId,
+    }));
   // The season owns its ranking rule, so every table for that season -- public,
   // admin, mini-snippet -- agrees without the caller having to remember.
   const season = await prisma.season.findUnique({
@@ -443,4 +453,25 @@ export async function getTeamDetail(slugOrId: string) {
 
 export async function getTeamMatches(teamId: string) {
   return listMatches({ OR: [{ homeTeamId: teamId }, { awayTeamId: teamId }] });
+}
+
+/**
+ * Split a club's fixture list into results and fixtures still to come.
+ *
+ * "Upcoming" means the kickoff is genuinely ahead of us: a past date with no
+ * report is a missing report, not something to look forward to. `now` is a
+ * parameter so the split stays pure — components must not read the clock
+ * themselves (the `react-hooks/purity` lint rule enforces this).
+ */
+export function splitTeamMatches<T extends { kickoffAt: Date; status: string; report: unknown }>(
+  matches: T[],
+  now: Date = new Date(),
+): { played: T[]; upcoming: T[] } {
+  const cutoff = now.getTime();
+  return {
+    played: matches.filter((m) => m.report),
+    upcoming: matches.filter(
+      (m) => !m.report && m.status !== "CANCELLED" && m.kickoffAt.getTime() >= cutoff,
+    ),
+  };
 }

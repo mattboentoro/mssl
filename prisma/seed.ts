@@ -301,6 +301,7 @@ async function reset() {
   await prisma.gameReport.deleteMany();
   await prisma.match.deleteMany();
   await prisma.pointsAdjustment.deleteMany();
+  await prisma.seasonTeam.deleteMany();
   await prisma.team.deleteMany();
   await prisma.division.deleteMany();
   await prisma.announcement.deleteMany();
@@ -322,6 +323,9 @@ type SeededTeam = {
   colorAlternate: string;
 };
 
+/** The divisions and who is in them, for one season. */
+type League = { id: string; name: string; teams: SeededTeam[] }[];
+
 function makeSquad(seedText: string): string[] {
   const base = [...seedText].reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
   return Array.from({ length: 11 }, (_, i) => {
@@ -338,7 +342,7 @@ function makeSquad(seedText: string): string[] {
  * league rather than an entry in one year's competition. Every season then
  * plays its fixtures between these same teams.
  */
-async function seedLeague() {
+async function seedLeague(): Promise<League> {
   const divisionSpecs = [
     { name: "Premier League", slug: "premier-league", sortOrder: 1, teams: PREMIER_LEAGUE_TEAMS },
     { name: "First Division", slug: "first-division", sortOrder: 2, teams: FIRST_DIVISION_TEAMS },
@@ -381,6 +385,44 @@ async function seedLeague() {
   return league;
 }
 
+/**
+ * The league as it stood a season ago: one club up, one club down.
+ *
+ * `seedLeague` writes each club's *current* division. Replaying that same
+ * structure for every season would make per-season membership look like dead
+ * weight — and it is precisely the promoted club's old table that goes wrong
+ * when a season's divisions are read from `Team.divisionId`. Swapping a pair
+ * here means the archived table can be eyeballed: the promoted side should
+ * still appear in the division it won, not the one it now plays in.
+ *
+ * Swapping one-for-one keeps both divisions the size they already are, so the
+ * fixture generator produces the same shape of season either way.
+ */
+function previousSeasonLeague(league: League): {
+  league: League;
+  promoted: string;
+  relegated: string;
+} {
+  const [top, second] = league;
+  if (!top || !second || top.teams.length === 0 || second.teams.length === 0) {
+    return { league, promoted: "", relegated: "" };
+  }
+
+  // Bottom of the top flight goes down; champion of the tier below comes up.
+  const promoted = top.teams[top.teams.length - 1];
+  const relegated = second.teams[0];
+
+  return {
+    league: [
+      { ...top, teams: [...top.teams.slice(0, -1), relegated] },
+      { ...second, teams: [promoted, ...second.teams.slice(1)] },
+      ...league.slice(2),
+    ],
+    promoted: promoted.name,
+    relegated: relegated.name,
+  };
+}
+
 async function seedSeason(options: {
   name: string;
   slug: string;
@@ -389,7 +431,7 @@ async function seedSeason(options: {
   firstMatchweekOffsetDays: number;
   venueNames: string[];
   refereeIds: string[];
-  league: { id: string; name: string; teams: SeededTeam[] }[];
+  league: League;
 }) {
   const { name, slug, isActive, firstMatchweekOffsetDays, venueNames, refereeIds, league } =
     options;
@@ -404,6 +446,20 @@ async function seedSeason(options: {
       startsOn: new Date(firstKickoff.getTime() - 7 * DAY),
       endsOn: new Date(firstKickoff.getTime() + 42 * DAY),
     },
+  });
+
+  // Pin who played where. The fixtures below are generated from this same
+  // structure, so recording it makes the season's division membership an
+  // explicit fact rather than something inferred from where a club sits today
+  // -- which is what lets a later promotion leave this season alone.
+  await prisma.seasonTeam.createMany({
+    data: league.flatMap((entry) =>
+      entry.teams.map((team) => ({
+        seasonId: season.id,
+        teamId: team.id,
+        divisionId: entry.id,
+      })),
+    ),
   });
 
   for (const entry of league) {
@@ -818,6 +874,7 @@ async function main() {
   const league = await seedLeague();
 
   console.log("Seeding previous season...");
+  const previous = previousSeasonLeague(league);
   await seedSeason({
     name: "2026 Spring",
     slug: "2026-spring",
@@ -825,7 +882,7 @@ async function main() {
     firstMatchweekOffsetDays: -170,
     venueNames: VENUE_NAMES,
     refereeIds,
-    league,
+    league: previous.league,
   });
 
   console.log("Seeding active season...");
@@ -869,6 +926,12 @@ async function main() {
     "\nSign in with DEV_AUTH_BYPASS=true as 'Referee' to claim one of the " +
       `${counts.openMatches} open fixtures.\n`,
   );
+  if (previous.promoted) {
+    console.log(
+      `${previous.promoted} came up and ${previous.relegated} went down between the two seasons.\n` +
+        "Switch seasons on /standings: each table shows the divisions as they were played.\n",
+    );
+  }
 }
 
 main()

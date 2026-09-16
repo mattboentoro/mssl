@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { CalendarViewToggle, FixtureCalendar, parseView } from "@/components/fixture-calendar";
 import { MatchList } from "@/components/match-display";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { CARD_LABELS, type CardType } from "@/lib/enums";
-import { formatDate } from "@/lib/dates";
+import { formatDate, parseMonthValue, shiftMonth } from "@/lib/dates";
+import { zonedToUtc } from "@/lib/timezone";
 import { kitColorName, resolveKit } from "@/lib/kits";
 import {
   getActiveSeason,
@@ -12,6 +14,7 @@ import {
   getStandingsForSeason,
   getTeamDetail,
   getTeamMatches,
+  splitTeamMatches,
 } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
@@ -26,8 +29,15 @@ export async function generateMetadata({
   return { title: team ? team.name : "Team not found" };
 }
 
-export default async function TeamPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function TeamPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ view?: string; month?: string }>;
+}) {
   const { id } = await params;
+  const { view: viewParam, month: monthParam } = await searchParams;
   const team = await getTeamDetail(id);
   if (!team) notFound();
   // Referee appointments stay behind sign-in.
@@ -46,9 +56,20 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
     .find((d) => d.divisionId === team.division.id)
     ?.rows.find((r) => r.teamId === team.id);
 
-  const played = matches.filter((m) => m.report);
-  const upcoming = matches.filter((m) => !m.report && m.status !== "CANCELLED");
+  const { played, upcoming } = splitTeamMatches(matches);
   const teamCards = discipline.filter((d) => d.teamId === team.id);
+
+  const view = parseView(viewParam);
+  // The calendar shows every fixture in the month, played or not, because a
+  // month grid is read as "what happened / what is coming" rather than as a
+  // filtered list. Month boundaries are league-time midnights.
+  const monthValue = parseMonthValue(monthParam);
+  const nextMonth = shiftMonth(monthValue.year, monthValue.month, 1);
+  const monthStart = zonedToUtc(monthValue.year, monthValue.month, 1).getTime();
+  const monthEnd = zonedToUtc(nextMonth.year, nextMonth.month, 1).getTime();
+  const calendarMatches = matches.filter(
+    (m) => m.kickoffAt.getTime() >= monthStart && m.kickoffAt.getTime() < monthEnd,
+  );
 
   const summary: { label: string; value: string }[] = row
     ? [
@@ -135,10 +156,22 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
           </section>
 
           <section aria-labelledby="team-fixtures">
-            <h2 id="team-fixtures" className="mb-3 text-lg font-semibold">
-              Upcoming fixtures
-            </h2>
-            {upcoming.length === 0 ? (
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h2 id="team-fixtures" className="text-lg font-semibold">
+                Upcoming fixtures
+              </h2>
+              <CalendarViewToggle view={view} basePath={`/teams/${id}`} />
+            </div>
+            {view === "calendar" ? (
+              <FixtureCalendar
+                matches={calendarMatches}
+                year={monthValue.year}
+                month={monthValue.month}
+                basePath={`/teams/${id}`}
+                query={{ view: "calendar" }}
+                emptyHint={`${team.name} have nothing scheduled this month.`}
+              />
+            ) : upcoming.length === 0 ? (
               <EmptyState title="No fixtures scheduled" />
             ) : (
               <MatchList matches={upcoming} />

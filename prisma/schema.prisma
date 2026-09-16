@@ -43,6 +43,37 @@ model Season {
   announcements Announcement[]
   discipline    DisciplinaryAction[]
   adjustments   PointsAdjustment[]
+  teamEntries   SeasonTeam[]
+}
+
+/// Which division a club played in for one particular season.
+///
+/// Promotion and relegation mean a club's division is a fact *about a season*,
+/// not a standing fact about the club. Without this table, moving a team would
+/// silently rewrite history: last season's table is built from the club's
+/// current division, so a promoted side would retroactively appear in the tier
+/// it was promoted into, carrying results it earned in the tier below.
+///
+/// `Team.divisionId` remains the club's present-day division -- the default
+/// used for a season that has no explicit entry, and the value new fixtures and
+/// the team page read. This table overrides it wherever a season is in scope.
+model SeasonTeam {
+  id         String   @id @default(cuid())
+  seasonId   String
+  teamId     String
+  divisionId String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  season   Season   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  division Division @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+
+  /// One division per club per season.
+  @@unique([seasonId, teamId])
+  @@index([seasonId, divisionId])
+  @@index([teamId])
+  @@index([divisionId])
 }
 
 /// A competitive tier, e.g. "Premier League".
@@ -61,6 +92,7 @@ model Division {
 
   teams   Team[]
   matches Match[]
+  entries SeasonTeam[]
 }
 
 model Team {
@@ -83,6 +115,7 @@ model Team {
   awayMatches Match[]              @relation("AwayTeam")
   discipline  DisciplinaryAction[]
   adjustments PointsAdjustment[]
+  seasons     SeasonTeam[]
 
   @@index([divisionId])
 }

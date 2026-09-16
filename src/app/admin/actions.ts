@@ -9,6 +9,7 @@ import { AuthzError, requireAdmin } from "@/lib/authz";
 import { pickKitsForFixture, pickKitsForNewTeam } from "@/lib/kits";
 import { addDisciplinaryAction, deleteDisciplinaryAction } from "@/lib/matches";
 import { prisma } from "@/lib/prisma";
+import { pinSeasonDivisions, setSeasonDivision } from "@/lib/season-teams";
 import { parseLeagueDateTime } from "@/lib/timezone";
 import {
   announcementSchema,
@@ -443,7 +444,21 @@ export async function createTeamAction(_prev: ActionState, form: FormData): Prom
         throw new Error(`“${clash.name}” already uses the web address “/teams/${data.slug}”.`);
       }
 
-      const team = await prisma.team.create({ data });
+      const team = await prisma.$transaction(async (tx) => {
+        const created = await tx.team.create({ data });
+        // Record the club against the running season straight away, so a later
+        // promotion has something concrete to move away from.
+        const active = await tx.season.findFirst({
+          where: { isActive: true },
+          select: { id: true },
+        });
+        if (active) {
+          await tx.seasonTeam.create({
+            data: { seasonId: active.id, teamId: created.id, divisionId: data.divisionId },
+          });
+        }
+        return created;
+      });
       await writeAudit(prisma, {
         actor: actorFrom(actor),
         action: "team.create",
@@ -495,7 +510,27 @@ export async function updateTeamAction(_prev: ActionState, form: FormData): Prom
         throw new Error(`“${clash.name}” already uses the web address “/teams/${data.slug}”.`);
       }
 
-      const team = await prisma.team.update({ where: { id: teamId }, data });
+      const team = await prisma.$transaction(async (tx) => {
+        // A division change is a promotion or a relegation, so it must not
+        // touch seasons that have already been played. Pinning first freezes
+        // every existing season at the club's current division; the move then
+        // applies to the active season alone.
+        if (data.divisionId !== before.divisionId) {
+          const active = await tx.season.findFirst({
+            where: { isActive: true },
+            select: { id: true },
+          });
+          await pinSeasonDivisions(tx, teamId);
+          if (active) {
+            await setSeasonDivision(tx, {
+              seasonId: active.id,
+              teamId,
+              divisionId: data.divisionId,
+            });
+          }
+        }
+        return tx.team.update({ where: { id: teamId }, data });
+      });
       await writeAudit(prisma, {
         actor: actorFrom(actor),
         action: "team.update",
