@@ -15,6 +15,7 @@
  */
 import { prisma } from "../src/lib/prisma";
 import { toDateTimeInputValue } from "../src/lib/dates";
+import { MATCH_STATUSES } from "../src/lib/enums";
 import { kitsClash, resolveKit } from "../src/lib/kits";
 import { getStandingsForSeason } from "../src/lib/queries";
 
@@ -872,6 +873,56 @@ async function main(): Promise<void> {
       where: { id: importedMatch.id },
       data: { matchweek: MW, countsForStandings: true },
     });
+
+    /*
+      Confirm and Cancel are the only status decisions Match Control offers.
+      The placeholder matters as much as the options: without it, saving any
+      other field on a fixture that is neither would confirm it by accident.
+    */
+    const statusForm = await (await req(`/admin/matches/${importedMatch.id}`)).text();
+    const offered = MATCH_STATUSES.filter((s) => statusForm.includes(`value="${s}"`));
+    check(
+      "the status dropdown offers only Confirmed and Cancelled",
+      offered.slice().sort().join(",") === "CANCELLED,CONFIRMED",
+      `offers ${offered.join(",") || "nothing"}`,
+    );
+
+    const beforeCancel = reflagged?.status;
+    await req(`/api/matches/${importedMatch.id}/schedule`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ venueName: "Field 4", reason: "Pitch swap" }),
+    });
+    const untouched = await prisma.match.findUnique({ where: { id: importedMatch.id } });
+    check(
+      "saving another field leaves the status alone",
+      untouched?.status === beforeCancel,
+      `status ${untouched?.status}, expected ${beforeCancel}`,
+    );
+
+    await req(`/api/matches/${importedMatch.id}/schedule`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: "CANCELLED", reason: "Pitch frozen" }),
+    });
+    const outOfPlay = await prisma.match.findUnique({ where: { id: importedMatch.id } });
+    check(
+      "admin can call a fixture off",
+      outOfPlay?.status === "CANCELLED",
+      `status ${outOfPlay?.status}`,
+    );
+
+    await req(`/api/matches/${importedMatch.id}/schedule`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: "CONFIRMED", reason: "Back on, result stands" }),
+    });
+    const signedOff = await prisma.match.findUnique({ where: { id: importedMatch.id } });
+    check(
+      "admin can sign a result off",
+      signedOff?.status === "CONFIRMED",
+      `status ${signedOff?.status}`,
+    );
   }
 
   console.log("\nDestructive deletes");

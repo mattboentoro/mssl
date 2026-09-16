@@ -497,7 +497,8 @@ export async function updateMatchSchedule(
   if (params.venueName !== undefined) {
     data.venueName = params.venueName?.trim() || null;
   }
-  if (params.status) data.status = params.status;
+  const nextStatus = params.status ?? match.status;
+  if (params.status) data.status = nextStatus;
   if (params.matchweek) data.matchweek = params.matchweek;
   if (params.countsForStandings !== undefined) {
     data.countsForStandings = params.countsForStandings;
@@ -558,7 +559,7 @@ export async function updateMatchSchedule(
       },
       after: {
         kickoffAt: params.kickoffAt ?? match.kickoffAt,
-        status: params.status ?? match.status,
+        status: nextStatus,
         venueName: params.venueName === undefined ? match.venueName : params.venueName,
         matchweek: params.matchweek ?? match.matchweek,
         countsForStandings: params.countsForStandings ?? match.countsForStandings,

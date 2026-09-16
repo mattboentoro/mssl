@@ -116,6 +116,11 @@ export const matchUpdateSchema = z.object({
   kickoffAt: z.string().min(1).max(40).optional(),
   /** Free text, shown on the fixture exactly as typed. Never validated. */
   venueName: z.string().max(200).nullable().optional(),
+  /*
+    Any status is accepted here, but Match Control only offers the two an admin
+    owns outright plus the fixture's own workflow status — see
+    ADMIN_SETTABLE_MATCH_STATUSES and deriveMatchStatus.
+  */
   status: z.enum(MATCH_STATUSES).optional(),
   matchweek: trimmed(40).min(1, "Give the fixture a matchweek, such as 7 or Final.").optional(),
   countsForStandings: z.boolean().optional(),

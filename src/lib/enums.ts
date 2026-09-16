@@ -84,6 +84,19 @@ export const MATCH_STATUS_LABELS: Record<MatchStatus, string> = {
   FORFEIT: "Forfeit",
 };
 
+/**
+ * The only statuses an admin picks by hand.
+ *
+ * The others say where a fixture has reached in the referee workflow, and each
+ * one is already written on the match: SCHEDULED/ASSIGNED is the referee field,
+ * REPORT_SUBMITTED is whether a report exists, FORFEIT is what that report
+ * says. Offering them as choices only let an admin set a status the rest of the
+ * row contradicts, so Match Control leaves the dropdown on a placeholder until
+ * one of these two decisions is actually made.
+ */
+export const ADMIN_SETTABLE_MATCH_STATUSES = ["CONFIRMED", "CANCELLED"] as const;
+export type AdminSettableMatchStatus = (typeof ADMIN_SETTABLE_MATCH_STATUSES)[number];
+
 export const CARD_LABELS: Record<CardType, string> = {
   YELLOW: "Yellow card",
   RED: "Red card",

@@ -7,9 +7,9 @@ import { postJson, type ApiResult } from "@/components/match-actions";
 import { Alert, Card, Field, buttonClass, inputClass } from "@/components/ui";
 import { toDateTimeInputValue } from "@/lib/dates";
 import {
+  ADMIN_SETTABLE_MATCH_STATUSES,
   KIT_CHOICES,
   KIT_LABELS,
-  MATCH_STATUSES,
   MATCH_STATUS_LABELS,
   type KitChoice,
 } from "@/lib/enums";
@@ -127,7 +127,7 @@ export function AdminMatchForms({
               // league (Redmond) time regardless of where the admin is.
               kickoffAt: local || undefined,
               venueName: (data.get("venueName") as string) || null,
-              status: String(data.get("status") ?? ""),
+              status: String(data.get("status") ?? "") || undefined,
               matchweek: String(data.get("matchweek") ?? "") || undefined,
               // A cleared checkbox is simply absent from the FormData.
               countsForStandings: data.get("countsForStandings") === "on",
@@ -170,9 +170,30 @@ export function AdminMatchForms({
               className={inputClass}
             />
           </Field>
-          <Field label="Status" htmlFor="status">
-            <select id="status" name="status" defaultValue={status} className={inputClass}>
-              {MATCH_STATUSES.map((s) => (
+          {/*
+            Confirming a result and calling a match off are the only two status
+            decisions an admin makes; everything else about a fixture's state is
+            read off the referee and the report. The placeholder keeps that true
+            both ways — a fixture that is neither cannot be silently confirmed
+            just because someone saved a venue change.
+          */}
+          <Field
+            label="Status"
+            htmlFor="status"
+            hint="Leave it alone unless you are signing the result off or calling the fixture off."
+          >
+            <select
+              id="status"
+              name="status"
+              defaultValue={
+                (ADMIN_SETTABLE_MATCH_STATUSES as readonly string[]).includes(status) ? status : ""
+              }
+              className={inputClass}
+            >
+              <option value="" hidden>
+                No change
+              </option>
+              {ADMIN_SETTABLE_MATCH_STATUSES.map((s) => (
                 <option key={s} value={s}>
                   {MATCH_STATUS_LABELS[s]}
                 </option>
