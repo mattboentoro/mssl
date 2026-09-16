@@ -4,7 +4,6 @@ import { KitSwatch, TeamColorBar } from "@/components/team-colors";
 import { Badge, Card, FormGuide, MatchStatusBadge } from "@/components/ui";
 import { formatDateTime } from "@/lib/dates";
 import { kitColorName, resolveKit } from "@/lib/kits";
-import { isForfeit } from "@/lib/match-status";
 import { scoreText, type MatchListItem } from "@/lib/queries";
 import { pointsPerGame, type PrimaryMetric, type StandingsRow } from "@/lib/standings";
 
@@ -30,24 +29,21 @@ export function MatchRow({ match }: { match: MatchListItem }) {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
-        <TeamCell team={match.homeTeam} kit={match.homeKit} />
-        <div>
-          {score ? (
-            <span className="text-xl font-bold tabular-nums">{score}</span>
-          ) : (
-            <span className="text-muted text-sm font-semibold">vs</span>
-          )}
-          {/*
-            The scoreline above is the awarded one, so say why it looks the way
-            it does rather than leaving a 3-0 nobody played.
-          */}
-          {isForfeit(match.report) ? (
-            <span className="text-danger block text-[10px] font-semibold uppercase">
-              Awarded on forfeit
-            </span>
-          ) : null}
-        </div>
-        <TeamCell team={match.awayTeam} kit={match.awayKit} />
+        <TeamCell
+          team={match.homeTeam}
+          kit={match.homeKit}
+          forfeited={Boolean(match.report?.homeForfeit)}
+        />
+        {score ? (
+          <span className="text-xl font-bold tabular-nums">{score}</span>
+        ) : (
+          <span className="text-muted text-sm font-semibold">vs</span>
+        )}
+        <TeamCell
+          team={match.awayTeam}
+          kit={match.awayKit}
+          forfeited={Boolean(match.report?.awayForfeit)}
+        />
       </div>
 
       <div className="text-muted mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
@@ -59,15 +55,33 @@ export function MatchRow({ match }: { match: MatchListItem }) {
 
 type TeamCellTeam = MatchListItem["homeTeam"];
 
-function TeamCell({ team, kit }: { team: TeamCellTeam; kit: string }) {
+function TeamCell({
+  team,
+  kit,
+  forfeited = false,
+}: {
+  team: TeamCellTeam;
+  kit: string;
+  forfeited?: boolean;
+}) {
   return (
-    <Link
-      href={`/teams/${team.slug}`}
-      className="flex min-w-0 items-center gap-1.5 text-left font-semibold hover:underline"
-    >
-      <KitSwatch team={team} kit={kit} teamName={team.name} />
-      <span className="truncate">{team.name}</span>
-    </Link>
+    <span className="flex min-w-0 items-center gap-1.5">
+      <Link
+        href={`/teams/${team.slug}`}
+        className="flex min-w-0 items-center gap-1.5 text-left font-semibold hover:underline"
+      >
+        <KitSwatch team={team} kit={kit} teamName={team.name} />
+        <span className="truncate">{team.name}</span>
+      </Link>
+      {/*
+        The awarded scoreline is nobody's actual result, so the side that gave
+        the fixture up is named beside the team rather than left for the reader
+        to infer from a 3-0 nobody played.
+      */}
+      {forfeited ? (
+        <span className="text-danger text-[10px] font-semibold uppercase">Forfeit</span>
+      ) : null}
+    </span>
   );
 }
 
