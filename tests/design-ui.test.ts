@@ -3,9 +3,26 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { ColorPalettePicker } from "@/components/color-palette-picker";
+import { MatchList } from "@/components/match-display";
 import { TeamColorBar } from "@/components/team-colors";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { DEFAULT_ALTERNATE, DEFAULT_PRIMARY } from "@/lib/kits";
+
+describe("MatchList layout", () => {
+  it("keeps the default layout for schedule and team pages", () => {
+    const html = renderToStaticMarkup(createElement(MatchList, { matches: [] }));
+
+    expect(html).toBe('<ul class="grid gap-3"></ul>');
+  });
+
+  it("allows the home page to share four equal-height rows", () => {
+    const html = renderToStaticMarkup(
+      createElement(MatchList, { matches: [], className: "flex-1 grid-rows-4" }),
+    );
+
+    expect(html).toBe('<ul class="grid gap-3 flex-1 grid-rows-4"></ul>');
+  });
+});
 
 describe("TeamColorBar", () => {
   const team = { colorPrimary: "#123456", colorAlternate: "#fedcba" };

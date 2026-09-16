@@ -155,19 +155,19 @@ export default async function HomePage() {
       ) : null}
 
       {/* Fixtures + results */}
-      <section className="grid gap-8 lg:grid-cols-2">
-        <div>
+      <section className="grid auto-rows-fr gap-8 lg:grid-cols-2">
+        <div className="flex flex-col">
           <SectionHeading title="Next fixtures" href="/schedule" />
           {upcoming.length > 0 ? (
-            <MatchList matches={upcoming} />
+            <MatchList matches={upcoming} className="flex-1 grid-rows-4" />
           ) : (
             <EmptyState title="No upcoming fixtures scheduled." />
           )}
         </div>
-        <div>
+        <div className="flex flex-col">
           <SectionHeading title="Latest results" href="/schedule?view=all" />
           {results.length > 0 ? (
-            <MatchList matches={results} />
+            <MatchList matches={results} className="flex-1 grid-rows-4" />
           ) : (
             <EmptyState
               title="No results filed yet."

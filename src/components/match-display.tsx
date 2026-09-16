@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { KitSwatch, TeamColorBar } from "@/components/team-colors";
 import { Badge, Card, FormGuide, MatchStatusBadge } from "@/components/ui";
+import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/dates";
 import { kitColorName, resolveKit } from "@/lib/kits";
 import { scoreText, type MatchListItem } from "@/lib/queries";
@@ -35,7 +36,7 @@ export function MatchRow({ match }: { match: MatchListItem }) {
           forfeited={Boolean(match.report?.homeForfeit)}
         />
         {score ? (
-          <span className="text-xl font-bold tabular-nums">{score}</span>
+          <span className="text-xl leading-5 font-bold tabular-nums">{score}</span>
         ) : (
           <span className="text-muted text-sm font-semibold">vs</span>
         )}
@@ -85,9 +86,15 @@ function TeamCell({
   );
 }
 
-export function MatchList({ matches }: { matches: MatchListItem[] }) {
+export function MatchList({
+  matches,
+  className,
+}: {
+  matches: MatchListItem[];
+  className?: string;
+}) {
   return (
-    <ul className="grid gap-3">
+    <ul className={cn("grid gap-3", className)}>
       {matches.map((match) => (
         <MatchRow key={match.id} match={match} />
       ))}
