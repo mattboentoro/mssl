@@ -200,7 +200,10 @@ export const teamSchema = z.object({
   shortName: trimmed(24).min(1),
   colorPrimary: hexColor("#0f766e"),
   colorAlternate: hexColor("#ffffff"),
-  captains: z.array(teamCaptainSchema).max(5, "A team can have at most 5 captains."),
+  captains: z
+    .array(teamCaptainSchema)
+    .min(1, "A team must have at least 1 captain.")
+    .max(5, "A team can have at most 5 captains."),
 });
 
 export const updateTeamSchema = teamSchema.extend({ teamId: z.string().min(1) });
