@@ -323,11 +323,11 @@ export default async function AdminMatchesPage({
           </Card>
         ) : (
           <Card className="overflow-x-auto">
-            <table className="w-full min-w-[46rem] text-sm">
+            <table className="data-table w-full min-w-[46rem] text-sm">
               <caption className="sr-only">
                 Fixtures for the selected filters. Selecting a row opens its management page.
               </caption>
-              <thead className="bg-surface-muted text-muted text-xs uppercase">
+              <thead className="text-muted text-xs uppercase">
                 <tr>
                   <th className="px-3 py-2 text-left">MW</th>
                   <th className="px-3 py-2 text-left">Kick-off</th>
@@ -337,7 +337,7 @@ export default async function AdminMatchesPage({
                   <th className="px-3 py-2 text-left">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-subtle divide-y">
+              <tbody>
                 {matches.map((match) => {
                   const score = scoreText(match.report);
                   return (

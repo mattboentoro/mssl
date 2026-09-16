@@ -20,7 +20,9 @@ export function MatchRow({ match }: { match: MatchListItem }) {
   return (
     <Card as="li" className="p-4">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-        <span className="text-muted">{formatDateTime(match.kickoffAt)}</span>
+        <time className="text-muted" dateTime={match.kickoffAt.toISOString()}>
+          {formatDateTime(match.kickoffAt)}
+        </time>
         <Badge tone="neutral">{match.division.name}</Badge>
         <Badge tone="neutral">MW {match.matchweek}</Badge>
         {ASSIGNMENT_ONLY_STATUSES.includes(match.status) ? null : (
@@ -72,7 +74,7 @@ function TeamCell({
         className="flex min-w-0 items-center gap-1.5 text-left font-semibold hover:underline"
       >
         <KitSwatch team={team} kit={kit} teamName={team.name} />
-        <span className="truncate">{team.name}</span>
+        <span className="break-words">{team.name}</span>
       </Link>
       {/*
         The awarded scoreline is nobody's actual result, so the side that gave
@@ -182,10 +184,15 @@ export function StandingsTable({
   // the points column and finding it out of sequence.
   const showPpg = primaryMetric === "pointsPerGame";
   return (
-    <div className="border-subtle overflow-x-auto rounded-xl border">
-      <table className="w-full min-w-[36rem] text-sm">
+    <div className="overflow-x-auto">
+      <table
+        className={cn(
+          "data-table w-full text-sm",
+          compact ? "standings-table-compact min-w-[20rem]" : "min-w-[36rem]",
+        )}
+      >
         <caption className="sr-only">{caption}</caption>
-        <thead className="bg-surface-muted text-muted text-xs uppercase">
+        <thead className="text-muted text-xs uppercase">
           <tr>
             <th scope="col" className="px-3 py-2 text-left">
               #
@@ -235,15 +242,15 @@ export function StandingsTable({
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.teamId} className="border-subtle border-t">
-              <td className="text-muted px-3 py-2 tabular-nums">{row.rank}</td>
-              <th scope="row" className="px-3 py-2 text-left font-medium">
+            <tr key={row.teamId}>
+              <td className="text-muted px-3 py-3 tabular-nums">{row.rank}</td>
+              <th scope="row" className="px-3 py-3 text-left font-medium">
                 <Link
                   href={`/teams/${row.teamSlug}`}
                   className="flex items-center gap-2 hover:underline"
                 >
                   <TeamColorBar team={row} />
-                  <span className="truncate">{row.teamName}</span>
+                  <span>{row.teamName}</span>
                 </Link>
                 {/*
                   A tiebreaker note only tells the reader something they cannot

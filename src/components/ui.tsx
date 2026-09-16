@@ -28,9 +28,11 @@ export function PageHeader({
     <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="max-w-2xl">
         {eyebrow ? (
-          <p className="text-brand text-xs font-semibold tracking-[0.18em] uppercase">{eyebrow}</p>
+          <p className="text-muted text-xs font-medium tracking-wider uppercase">{eyebrow}</p>
         ) : null}
-        <h1 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
+        <h1 className="font-display mt-2 text-4xl font-bold tracking-tight uppercase sm:text-5xl">
+          {title}
+        </h1>
         {description ? (
           <div className="text-muted mt-2 text-sm sm:text-base">{description}</div>
         ) : null}
@@ -49,11 +51,7 @@ export function Card({
   className?: string;
   as?: "div" | "section" | "article" | "li";
 }) {
-  return (
-    <As className={cn("bg-surface border-subtle rounded-xl border shadow-sm", className)}>
-      {children}
-    </As>
-  );
+  return <As className={cn("bg-surface-muted rounded-sm", className)}>{children}</As>;
 }
 
 export function SectionHeading({
@@ -69,11 +67,14 @@ export function SectionHeading({
 }) {
   return (
     <div className="mb-4 flex items-baseline justify-between gap-4">
-      <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+      <h2 className="font-display text-2xl font-bold tracking-tight uppercase">{title}</h2>
       {children}
       {href ? (
-        <Link href={href} className="text-accent text-sm font-medium hover:underline">
-          {linkLabel} &rarr;
+        <Link
+          href={href}
+          className="text-muted hover:text-brand shrink-0 py-1 text-xs hover:underline"
+        >
+          {linkLabel}
         </Link>
       ) : null}
     </div>
@@ -82,7 +83,7 @@ export function SectionHeading({
 
 export function EmptyState({ title, hint }: { title: string; hint?: ReactNode }) {
   return (
-    <div className="border-subtle text-muted rounded-xl border border-dashed p-8 text-center text-sm">
+    <div className="bg-surface-muted text-muted rounded-sm p-6 text-sm">
       <p className="font-medium">{title}</p>
       {hint ? <p className="mt-1">{hint}</p> : null}
     </div>
@@ -116,7 +117,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap",
+        "inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-xs font-medium whitespace-nowrap",
         BADGE_TONES[tone],
         className,
       )}
@@ -148,9 +149,9 @@ export function MatchStatusBadge({ match }: { match: MatchDisplayInput }) {
 export type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "danger";
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
-  primary: "bg-brand text-brand-contrast hover:opacity-90",
+  primary: "bg-brand text-brand-contrast hover:bg-brand-strong",
   secondary: "bg-surface border-subtle border hover:bg-surface-muted",
-  outline: "border-subtle border-2 hover:bg-surface-muted",
+  outline: "border-subtle border hover:bg-surface-muted",
   ghost: "hover:bg-surface-muted",
   danger: "bg-danger text-white hover:opacity-90",
 };
@@ -196,8 +197,7 @@ export function ButtonLink({
 /* Form primitives                                                            */
 /* -------------------------------------------------------------------------- */
 
-export const inputClass =
-  "bg-surface border-subtle w-full rounded-lg border px-3 py-2 text-sm shadow-sm";
+export const inputClass = "bg-surface border-subtle w-full rounded-sm border px-3 py-2 text-sm";
 
 export const labelClass = "text-muted mb-1 block text-xs font-semibold uppercase tracking-wide";
 

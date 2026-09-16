@@ -114,9 +114,9 @@ export default async function AdminAuditPage({
         <EmptyState title="No audit entries" hint="Nothing matches those filters yet." />
       ) : (
         <Card className="overflow-x-auto">
-          <table className="w-full min-w-[52rem] text-sm">
+          <table className="data-table w-full min-w-[52rem] text-sm">
             <caption className="sr-only">Audit log entries</caption>
-            <thead className="bg-surface-muted text-muted text-xs uppercase">
+            <thead className="text-muted text-xs uppercase">
               <tr>
                 <th scope="col" className="px-3 py-2 text-left">
                   When
@@ -135,7 +135,7 @@ export default async function AdminAuditPage({
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-subtle divide-y">
+            <tbody>
               {entries.map((entry) => (
                 <tr key={entry.id} className="align-top">
                   <td className="px-3 py-2 whitespace-nowrap">

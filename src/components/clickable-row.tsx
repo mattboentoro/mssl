@@ -25,7 +25,7 @@ export function ClickableRow({
 
   return (
     <tr
-      className={`hover:bg-surface-muted cursor-pointer ${className}`.trim()}
+      className={`cursor-pointer ${className}`.trim()}
       onClick={(event) => {
         const target = event.target as HTMLElement | null;
         if (target?.closest("a, button, input, select, textarea, label")) return;
