@@ -163,9 +163,11 @@ export const divisionSchema = z.object({
 export const teamSchema = z.object({
   divisionId: z.string().min(1),
   name: trimmed(120).min(2),
+  // Now typed by hand on the create form, so the failure has to say what a
+  // legal address looks like rather than Zod's bare "Invalid".
   slug: trimmed(120)
     .min(1)
-    .regex(/^[a-z0-9-]+$/),
+    .regex(/^[a-z0-9-]+$/, "Use lower-case letters, numbers and hyphens only — rcs-united."),
   shortName: trimmed(24).min(1),
   colorPrimary: hexColor("#0f766e"),
   colorAlternate: hexColor("#ffffff"),

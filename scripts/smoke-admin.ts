@@ -162,6 +162,38 @@ async function main(): Promise<void> {
     team?.colorPrimary === "#6d28d9" && team?.colorAlternate === "#facc15",
     `${team?.colorPrimary} / ${team?.colorAlternate}`,
   );
+  check(
+    "createTeamAction derives a web address when the field is blank",
+    /^[a-z0-9-]+$/.test(team?.slug ?? ""),
+    String(team?.slug),
+  );
+
+  // The create form exposes the slug now, so a hand-typed address has to win
+  // over the one derived from the name.
+  const chosenSlug = `smoke-chosen-${stamp}`;
+  await submit("/admin/league", 'id="team-name"', {
+    divisionId: division.id,
+    name: `Smoke Chosen ${stamp}`,
+    shortName: "SMC",
+    slug: chosenSlug,
+    contactEmail: "",
+  });
+  const chosen = await prisma.team.findFirst({ where: { slug: chosenSlug } });
+  check("createTeamAction honours a hand-typed web address", chosen !== null, chosenSlug);
+
+  const badSlug = await submit("/admin/league", 'id="team-name"', {
+    divisionId: division.id,
+    name: `Smoke Bad ${stamp}`,
+    shortName: "SMB",
+    slug: "Not A Slug",
+    contactEmail: "",
+  });
+  check(
+    "a malformed web address is refused and says why",
+    (await prisma.team.count({ where: { name: `Smoke Bad ${stamp}` } })) === 0 &&
+      badSlug.html.includes("lower-case letters, numbers and hyphens"),
+  );
+  if (chosen) await prisma.team.delete({ where: { id: chosen.id } });
 
   // A club's address is league-wide now, so the same name in a different
   // division has to be refused rather than quietly shadowing the first club.

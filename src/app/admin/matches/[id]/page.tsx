@@ -82,11 +82,6 @@ export default async function AdminMatchDetailPage({
               {formatDateTime(match.kickoffAt)}
               {match.venueName ? ` \u00b7 ${match.venueName}` : ""}
             </p>
-            <p className="text-muted mt-1 text-xs">
-              Referee: {match.referee?.name ?? "unassigned"}
-              {match.assignedAt ? ` \u00b7 claimed ${formatDateTime(match.assignedAt)}` : ""}
-              {` \u00b7 v${match.version}`}
-            </p>
           </div>
           <MatchStatusBadge match={match} />
         </div>
