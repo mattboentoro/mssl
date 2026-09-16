@@ -531,7 +531,10 @@ export async function getWarningBoard(
 /** Every team in the league, ordered by division. Teams are not season-scoped. */
 export async function getTeams() {
   return prisma.team.findMany({
-    include: { division: { select: { id: true, name: true, slug: true } } },
+    include: {
+      division: { select: { id: true, name: true, slug: true } },
+      captains: { orderBy: { sortOrder: "asc" } },
+    },
     orderBy: [{ division: { sortOrder: "asc" } }, { name: "asc" }],
   });
 }
@@ -545,7 +548,10 @@ export async function getTeams() {
 export async function getTeamDetail(slugOrId: string) {
   return prisma.team.findFirst({
     where: { OR: [{ slug: slugOrId }, { id: slugOrId }] },
-    include: { division: { select: { id: true, name: true } } },
+    include: {
+      division: { select: { id: true, name: true } },
+      captains: { orderBy: { sortOrder: "asc" } },
+    },
   });
 }
 

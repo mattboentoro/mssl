@@ -2,6 +2,7 @@
 
 import { deleteTeamAction, updateTeamAction } from "@/app/admin/actions";
 import { ActionForm, FieldError, SubmitButton } from "@/components/admin-forms";
+import { CaptainFields, type CaptainInput } from "@/components/captain-fields";
 import { ColorPalettePicker } from "@/components/color-palette-picker";
 import { CloseOnSuccess, Dialog, DialogCancel } from "@/components/form-dialog";
 import { Field, buttonClass, inputClass } from "@/components/ui";
@@ -14,8 +15,7 @@ export interface EditableTeam {
   divisionId: string;
   colorPrimary: string;
   colorAlternate: string;
-  captainName: string | null;
-  contactEmail: string | null;
+  captains: CaptainInput[];
 }
 
 /**
@@ -126,25 +126,7 @@ export function TeamEditor({
             <FieldError name="colorAlternate" />
           </Field>
 
-          <Field label="Captain" htmlFor={`team-${team.id}-captain`}>
-            <input
-              id={`team-${team.id}-captain`}
-              name="captainName"
-              defaultValue={team.captainName ?? ""}
-              className={inputClass}
-            />
-          </Field>
-
-          <Field label="Contact e-mail" htmlFor={`team-${team.id}-email`}>
-            <input
-              id={`team-${team.id}-email`}
-              name="contactEmail"
-              type="email"
-              defaultValue={team.contactEmail ?? ""}
-              className={inputClass}
-            />
-            <FieldError name="contactEmail" />
-          </Field>
+          <CaptainFields idPrefix={`team-${team.id}`} defaultCaptains={team.captains} />
 
           <div className="border-subtle flex items-center justify-end gap-2 border-t pt-3 sm:col-span-2">
             <DialogCancel />

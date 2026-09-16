@@ -52,8 +52,12 @@ export default async function TeamsPage() {
                         <TeamColorBar team={team} size="lg" />
                         <div className="min-w-0">
                           <p className="truncate font-semibold">{team.name}</p>
-                          <p className="text-muted text-xs">
-                            {team.captainName ? `Captain: ${team.captainName}` : team.shortName}
+                          <p className="text-muted truncate text-xs">
+                            {team.captains.length > 0
+                              ? `${team.captains.length === 1 ? "Captain" : "Captains"}: ${team.captains
+                                  .map((captain) => captain.name)
+                                  .join(", ")}`
+                              : team.shortName}
                           </p>
                         </div>
                       </div>
