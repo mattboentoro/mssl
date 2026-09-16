@@ -169,7 +169,7 @@ export default async function HomePage() {
           )}
         </div>
         <div>
-          <SectionHeading title="Latest results" href="/schedule?view=results" />
+          <SectionHeading title="Latest results" href="/schedule?view=all" />
           {results.length > 0 ? (
             <MatchList matches={results} />
           ) : (
