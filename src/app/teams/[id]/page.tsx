@@ -90,13 +90,31 @@ export default async function TeamPage({
       <PageHeader
         eyebrow={team.division.name}
         title={team.name}
-        description={
-          <>
-            {team.shortName ? `Also known as ${team.shortName}. ` : ""}
-            {team.captainName ? `Captain: ${team.captainName}.` : "No captain on record."}
-          </>
-        }
+        description={team.shortName ? `Also known as ${team.shortName}.` : undefined}
       />
+
+      {team.captains.length > 0 ? (
+        <section
+          aria-labelledby="team-captains"
+          className="border-subtle mb-6 rounded-xl border p-4"
+        >
+          <h2
+            id="team-captains"
+            className="text-brand text-sm font-bold tracking-[0.16em] uppercase"
+          >
+            {team.captains.length === 1 ? "Team captain" : "Team captains"}
+          </h2>
+          <ul className="mt-2 space-y-1">
+            {team.captains.map((captain) => (
+              <li key={captain.id} className="text-xs font-medium">
+                {captain.name}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : (
+        <p className="text-muted mb-6 text-sm">No captains on record.</p>
+      )}
 
       <div className="mb-8 flex flex-wrap items-center gap-4">
         <dl className="flex flex-wrap gap-4 text-sm">

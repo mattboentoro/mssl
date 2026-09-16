@@ -95,7 +95,7 @@ function actionFields(html: string, marker: string): Record<string, string> | nu
 async function submit(
   path: string,
   marker: string,
-  values: Record<string, string>,
+  values: Record<string, string | string[]>,
 ): Promise<{ status: number; html: string }> {
   const html = await (await req(path)).text();
   const hidden = actionFields(html, marker);
@@ -108,7 +108,13 @@ async function submit(
     if (key in values) continue;
     body.append(key, value);
   }
-  for (const [key, value] of Object.entries(values)) body.append(key, value);
+  for (const [key, value] of Object.entries(values)) {
+    if (Array.isArray(value)) {
+      for (const item of value) body.append(key, item);
+    } else {
+      body.append(key, value);
+    }
+  }
 
   const res = await req(path, { method: "POST", body });
   return { status: res.status, html: await res.text() };
@@ -153,10 +159,20 @@ async function main(): Promise<void> {
     shortName: "SMK",
     colorPrimary: "#6d28d9",
     colorAlternate: "#facc15",
-    contactEmail: "",
+    captainName: ["Smoke Captain One", "Smoke Captain Two"],
+    captainEmail: ["one@example.com", "two@example.com"],
   });
-  const team = await prisma.team.findFirst({ where: { name: teamName } });
+  const team = await prisma.team.findFirst({
+    where: { name: teamName },
+    include: { captains: { orderBy: { sortOrder: "asc" } } },
+  });
   check("createTeamAction writes a team", team !== null);
+  check(
+    "createTeamAction stores multiple captains",
+    team?.captains.length === 2 &&
+      team.captains[0]?.name === "Smoke Captain One" &&
+      team.captains[1]?.email === "two@example.com",
+  );
   check(
     "createTeamAction stores both kit colours",
     team?.colorPrimary === "#6d28d9" && team?.colorAlternate === "#facc15",
@@ -176,7 +192,7 @@ async function main(): Promise<void> {
     name: `Smoke Chosen ${stamp}`,
     shortName: "SMC",
     slug: chosenSlug,
-    contactEmail: "",
+    captainName: "Chosen Captain",
   });
   const chosen = await prisma.team.findFirst({ where: { slug: chosenSlug } });
   check("createTeamAction honours a hand-typed web address", chosen !== null, chosenSlug);
@@ -186,7 +202,7 @@ async function main(): Promise<void> {
     name: `Smoke Bad ${stamp}`,
     shortName: "SMB",
     slug: "Not A Slug",
-    contactEmail: "",
+    captainName: "Bad Slug Captain",
   });
   check(
     "a malformed web address is refused and says why",
@@ -203,6 +219,7 @@ async function main(): Promise<void> {
       divisionId: rivalDivision.id,
       name: teamName,
       shortName: "SMK",
+      captainName: "Clone Captain",
     });
     const clones = await prisma.team.count({ where: { name: teamName } });
     check(
@@ -236,10 +253,13 @@ async function main(): Promise<void> {
       slug: team.slug,
       colorPrimary: "#166534",
       colorAlternate: "#cbd5e1",
-      captainName: "Smoke Captain",
-      contactEmail: "smoke@example.com",
+      captainName: ["Smoke Captain Two", "Smoke Captain Three", "Smoke Captain Four"],
+      captainEmail: ["two@example.com", "", "four@example.com"],
     });
-    const edited = await prisma.team.findUnique({ where: { id: team.id } });
+    const edited = await prisma.team.findUnique({
+      where: { id: team.id },
+      include: { captains: { orderBy: { sortOrder: "asc" } } },
+    });
     check("updateTeamAction renames a team", edited?.name === renamed, String(edited?.name));
     check(
       "updateTeamAction recolours both kits",
@@ -247,14 +267,66 @@ async function main(): Promise<void> {
       `${edited?.colorPrimary} / ${edited?.colorAlternate}`,
     );
     check(
-      "updateTeamAction saves captain and contact",
-      edited?.captainName === "Smoke Captain" && edited?.contactEmail === "smoke@example.com",
+      "updateTeamAction replaces the ordered captain list",
+      edited?.captains.length === 3 &&
+        edited.captains.map((captain) => captain.name).join(",") ===
+          "Smoke Captain Two,Smoke Captain Three,Smoke Captain Four" &&
+        edited.captains[1]?.email === null,
+    );
+    const teamPage = await (await req(`/teams/${team.slug}`)).text();
+    check(
+      "the public team page highlights each captain on a separate line",
+      teamPage.includes("Team captains") &&
+        teamPage.includes("<li") &&
+        teamPage.includes("Smoke Captain Two") &&
+        teamPage.includes("Smoke Captain Three") &&
+        teamPage.includes("Smoke Captain Four"),
+    );
+    await submit("/admin/league", `id="team-${team.id}-name"`, {
+      divisionId: team.divisionId,
+      name: renamed,
+      shortName: "SMR",
+      slug: team.slug,
+      colorPrimary: "#166534",
+      colorAlternate: "#cbd5e1",
+      captainName: ["One", "Two", "Three", "Four", "Five", "Six"],
+      captainEmail: ["", "", "", "", "", ""],
+    });
+    check(
+      "updateTeamAction refuses more than five captains",
+      (await prisma.teamCaptain.count({ where: { teamId: team.id } })) === 3,
     );
     check(
       "the team edit is audited",
       (await prisma.auditLog.count({
         where: { action: "team.update", entityId: team.id },
       })) === 1,
+    );
+    await submit("/admin/league", `id="team-${team.id}-name"`, {
+      divisionId: team.divisionId,
+      name: renamed,
+      shortName: "SMR",
+      slug: team.slug,
+      colorPrimary: "#166534",
+      colorAlternate: "#cbd5e1",
+      captainName: "Smoke Captain Four",
+      captainEmail: "four@example.com",
+    });
+    check(
+      "updateTeamAction can reduce a team to one captain",
+      (await prisma.teamCaptain.count({ where: { teamId: team.id } })) === 1,
+    );
+    await submit("/admin/league", `id="team-${team.id}-name"`, {
+      divisionId: team.divisionId,
+      name: renamed,
+      shortName: "SMR",
+      slug: team.slug,
+      colorPrimary: "#166534",
+      colorAlternate: "#cbd5e1",
+    });
+    check(
+      "updateTeamAction refuses to remove the last captain",
+      (await prisma.teamCaptain.count({ where: { teamId: team.id } })) === 1,
     );
 
     // A second team may not steal an existing slug.
@@ -270,8 +342,8 @@ async function main(): Promise<void> {
         slug: rival.slug,
         colorPrimary: "#166534",
         colorAlternate: "#cbd5e1",
-        captainName: "",
-        contactEmail: "",
+        captainName: "Smoke Captain Four",
+        captainEmail: "four@example.com",
       });
       const clashed = await prisma.team.findUnique({ where: { id: team.id } });
       check("updateTeamAction refuses a duplicate slug", clashed?.slug === team.slug);
@@ -281,7 +353,13 @@ async function main(): Promise<void> {
     // database only requires (divisionId, slug) to be unique, so a global check
     // locked teams out of their own editor.
     const seasonTeams = await prisma.team.findMany({
-      select: { id: true, name: true, slug: true, divisionId: true },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        divisionId: true,
+        captains: { orderBy: { sortOrder: "asc" }, select: { name: true, email: true } },
+      },
     });
     let twinned: (typeof seasonTeams)[number] | undefined;
     let elsewhere = 0;
@@ -305,8 +383,8 @@ async function main(): Promise<void> {
         slug: twinned.slug,
         colorPrimary: "#0f766e",
         colorAlternate: "#ffffff",
-        captainName: "",
-        contactEmail: "",
+        captainName: twinned.captains.map((captain) => captain.name),
+        captainEmail: twinned.captains.map((captain) => captain.email ?? ""),
       });
       const saved = await prisma.team.findUnique({ where: { id: twinned.id } });
       check(

@@ -90,6 +90,17 @@ function optional(form: FormData, key: string): string | undefined {
   return value.length > 0 ? value : undefined;
 }
 
+function captainEntries(form: FormData): { name: string; email: string }[] {
+  const names = form.getAll("captainName");
+  const emails = form.getAll("captainEmail");
+  const count = Math.max(names.length, emails.length);
+
+  return Array.from({ length: count }, (_, index) => ({
+    name: typeof names[index] === "string" ? names[index].trim() : "",
+    email: typeof emails[index] === "string" ? emails[index].trim() : "",
+  })).filter(({ name, email }) => name !== "" || email !== "");
+}
+
 function bool(form: FormData, key: string): boolean {
   return form.get(key) === "on" || form.get(key) === "true";
 }
@@ -439,8 +450,7 @@ export async function createTeamAction(_prev: ActionState, form: FormData): Prom
       shortName: str(form, "shortName") || name.slice(0, 12),
       colorPrimary: str(form, "colorPrimary") || "#0f766e",
       colorAlternate: str(form, "colorAlternate") || "#ffffff",
-      captainName: optional(form, "captainName"),
-      contactEmail: str(form, "contactEmail"),
+      captains: captainEntries(form),
     },
     async (data, actor) => {
       // Slugs are the public team URL (/teams/arsenal), so they must be unique
@@ -454,7 +464,15 @@ export async function createTeamAction(_prev: ActionState, form: FormData): Prom
       }
 
       const team = await prisma.$transaction(async (tx) => {
-        const created = await tx.team.create({ data });
+        const { captains, ...teamData } = data;
+        const created = await tx.team.create({
+          data: {
+            ...teamData,
+            captains: {
+              create: captains.map((captain, sortOrder) => ({ ...captain, sortOrder })),
+            },
+          },
+        });
         // Record the club against the running season straight away, so a later
         // promotion has something concrete to move away from.
         const active = await tx.season.findFirst({
@@ -463,7 +481,7 @@ export async function createTeamAction(_prev: ActionState, form: FormData): Prom
         });
         if (active) {
           await tx.seasonTeam.create({
-            data: { seasonId: active.id, teamId: created.id, divisionId: data.divisionId },
+            data: { seasonId: active.id, teamId: created.id, divisionId: teamData.divisionId },
           });
         }
         return created;
@@ -501,11 +519,13 @@ export async function updateTeamAction(_prev: ActionState, form: FormData): Prom
       shortName: str(form, "shortName") || name.slice(0, 12),
       colorPrimary: str(form, "colorPrimary") || "#0f766e",
       colorAlternate: str(form, "colorAlternate") || "#ffffff",
-      captainName: optional(form, "captainName"),
-      contactEmail: str(form, "contactEmail"),
+      captains: captainEntries(form),
     },
-    async ({ teamId, ...data }, actor) => {
-      const before = await prisma.team.findUnique({ where: { id: teamId } });
+    async ({ teamId, captains, ...data }, actor) => {
+      const before = await prisma.team.findUnique({
+        where: { id: teamId },
+        include: { captains: { orderBy: { sortOrder: "asc" } } },
+      });
       if (!before) throw new Error("That team no longer exists.");
 
       // The slug is the team's public web address, so it has to be unique
@@ -538,7 +558,14 @@ export async function updateTeamAction(_prev: ActionState, form: FormData): Prom
             });
           }
         }
-        return tx.team.update({ where: { id: teamId }, data });
+        const team = await tx.team.update({ where: { id: teamId }, data });
+        await tx.teamCaptain.deleteMany({ where: { teamId } });
+        if (captains.length > 0) {
+          await tx.teamCaptain.createMany({
+            data: captains.map((captain, sortOrder) => ({ ...captain, sortOrder, teamId })),
+          });
+        }
+        return team;
       });
       await writeAudit(prisma, {
         actor: actorFrom(actor),
@@ -547,11 +574,17 @@ export async function updateTeamAction(_prev: ActionState, form: FormData): Prom
         entityId: team.id,
         // Record what actually moved, so the audit trail reads as a diff.
         metadata: {
-          changed: Object.fromEntries(
-            Object.entries(data).filter(
+          changed: Object.fromEntries([
+            ...Object.entries(data).filter(
               ([key, value]) => (before as Record<string, unknown>)[key] !== value,
             ),
-          ),
+            ...[
+              JSON.stringify(before.captains.map(({ name, email }) => ({ name, email }))) !==
+              JSON.stringify(captains)
+                ? (["captains", captains] as const)
+                : null,
+            ].filter((entry): entry is readonly ["captains", typeof captains] => entry !== null),
+          ]),
         },
       });
       refreshAdmin();
