@@ -490,6 +490,98 @@ async function main(): Promise<void> {
   });
   const announcement = await prisma.announcement.findFirst({ where: { title: headline } });
   check("createAnnouncementAction publishes", announcement !== null);
+  if (announcement) {
+    const editedHeadline = `${headline} edited`;
+    await submit("/admin/content", `id="ann-${announcement.id}-title"`, {
+      announcementId: announcement.id,
+      title: editedHeadline,
+      slug: announcement.slug,
+      summary: "Updated smoke summary",
+      body: "Updated smoke body",
+      seasonId: season.id,
+      pinned: "on",
+    });
+    const editedAnnouncement = await prisma.announcement.findUnique({
+      where: { id: announcement.id },
+    });
+    check(
+      "updateAnnouncementAction edits all publishable fields",
+      editedAnnouncement?.title === editedHeadline &&
+        editedAnnouncement.summary === "Updated smoke summary" &&
+        editedAnnouncement.body === "Updated smoke body" &&
+        editedAnnouncement.seasonId === season.id &&
+        editedAnnouncement.pinned,
+    );
+    check(
+      "announcement updates are audited",
+      (await prisma.auditLog.count({
+        where: { action: "announcement.update", entityId: announcement.id },
+      })) === 1,
+    );
+  }
+
+  const documentTitle = `Smoke document ${stamp}`;
+  await submit("/admin/content", 'id="doc-title"', {
+    title: documentTitle,
+    category: "OTHER",
+    url: "/faq",
+    fileType: "Page",
+    description: "Smoke document",
+    sortOrder: "99",
+  });
+  const document = await prisma.document.findFirst({ where: { title: documentTitle } });
+  check("createDocumentAction adds a document", document !== null);
+  if (document) {
+    await submit("/admin/content", `id="doc-${document.id}-title"`, {
+      documentId: document.id,
+      title: `${documentTitle} edited`,
+      category: "POLICY",
+      url: "/rules",
+      fileType: "Link",
+      description: "Updated smoke document",
+      sortOrder: "98",
+    });
+    const editedDocument = await prisma.document.findUnique({ where: { id: document.id } });
+    check(
+      "updateDocumentAction edits all document fields",
+      editedDocument?.title === `${documentTitle} edited` &&
+        editedDocument.category === "POLICY" &&
+        editedDocument.url === "/rules" &&
+        editedDocument.fileType === "Link" &&
+        editedDocument.description === "Updated smoke document" &&
+        editedDocument.sortOrder === 98,
+    );
+
+    await submit("/admin/content", `id="delete-doc-${document.id}"`, {
+      documentId: document.id,
+    });
+    check(
+      "deleteDocumentAction removes the document",
+      (await prisma.document.findUnique({ where: { id: document.id } })) === null,
+    );
+    check(
+      "document deletion is audited",
+      (await prisma.auditLog.count({
+        where: { action: "document.delete", entityId: document.id },
+      })) === 1,
+    );
+  }
+
+  if (announcement) {
+    await submit("/admin/content", `id="delete-ann-${announcement.id}"`, {
+      announcementId: announcement.id,
+    });
+    check(
+      "deleteAnnouncementAction removes the announcement",
+      (await prisma.announcement.findUnique({ where: { id: announcement.id } })) === null,
+    );
+    check(
+      "announcement deletion is audited",
+      (await prisma.auditLog.count({
+        where: { action: "announcement.delete", entityId: announcement.id },
+      })) === 1,
+    );
+  }
 
   console.log("\nMatch Control shell");
   const matchesHtml = await (await req("/admin/matches")).text();
@@ -1203,7 +1295,7 @@ async function main(): Promise<void> {
   if (team) await prisma.disciplinaryAction.deleteMany({ where: { teamId: team.id } });
   if (team) await prisma.team.deleteMany({ where: { id: team.id } });
   await prisma.season.deleteMany({ where: { id: doomedSeason.id } });
-  if (announcement) await prisma.announcement.delete({ where: { id: announcement.id } });
+  if (announcement) await prisma.announcement.deleteMany({ where: { id: announcement.id } });
 
   console.log(
     failures === 0 ? "\nAll Match Control checks passed." : `\n${failures} check(s) FAILED.`,
