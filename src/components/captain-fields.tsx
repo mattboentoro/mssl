@@ -41,6 +41,7 @@ export function CaptainFields({
   }
 
   function removeCaptain(key: string) {
+    if (captains.length <= 1) return;
     setCaptains((current) => current.filter((captain) => captain.key !== key));
   }
 
@@ -50,7 +51,7 @@ export function CaptainFields({
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="font-medium">Captains</p>
-          <p className="text-muted text-xs">Add up to {MAX_CAPTAINS} team contacts.</p>
+          <p className="text-muted text-xs">Every team needs 1 to {MAX_CAPTAINS} captains.</p>
         </div>
         <button
           type="button"
@@ -83,6 +84,7 @@ export function CaptainFields({
                     defaultValue={captain.name}
                     maxLength={120}
                     className={inputClass}
+                    required
                   />
                   <FieldError name={`captains.${index}.name`} />
                 </Field>
@@ -101,6 +103,7 @@ export function CaptainFields({
                   className={buttonClass("ghost", "self-end px-2 py-2 text-xs")}
                   onClick={() => removeCaptain(captain.key)}
                   aria-label={`Remove captain ${index + 1}`}
+                  disabled={captains.length <= 1}
                 >
                   Remove
                 </button>
