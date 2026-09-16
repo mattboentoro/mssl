@@ -125,6 +125,8 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
                   body={{ expectedVersion: match.version }}
                   label="Claim this match"
                   pendingLabel={"Claiming\u2026"}
+                  successLabel="Claimed"
+                  successDelayMs={2000}
                 />
               </span>
             </>
@@ -153,8 +155,11 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
                     <ActionButton
                       url={`/api/matches/${match.id}/unassign`}
                       label="Release match"
-                      variant="ghost"
+                      variant="danger"
                       confirm="Release this match so another referee can claim it?"
+                      confirmTitle="Drop this match?"
+                      confirmActionLabel="Drop match"
+                      confirmCancelLabel="Keep match"
                     />
                   </div>
                 ) : null}

@@ -44,7 +44,13 @@ export default async function AdminMatchDetailPage({
     prisma.referee.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
     prisma.division.findMany({ orderBy: { sortOrder: "asc" } }),
     prisma.team.findMany({
-      select: { id: true, name: true, divisionId: true },
+      select: {
+        id: true,
+        name: true,
+        divisionId: true,
+        colorPrimary: true,
+        colorAlternate: true,
+      },
       orderBy: { name: "asc" },
     }),
   ]);
@@ -173,6 +179,21 @@ export default async function AdminMatchDetailPage({
                 promptLabel="Reason for disputing this report"
                 promptField="reason"
               />
+              <ActionButton
+                url={`/api/matches/${match.id}/reopen`}
+                label="Reopen game"
+                variant="danger"
+                confirm={`This permanently removes the current score, report notes, and referee-issued cards. ${
+                  match.refereeId
+                    ? "The assigned referee will need to submit a new report."
+                    : "The match will return to the open unassigned pool."
+                }`}
+                confirmTitle="Reopen this completed game?"
+                confirmActionLabel="Reopen game"
+                confirmCancelLabel="Keep completed"
+                promptLabel="Reason for reopening this game"
+                promptField="reason"
+              />
             </div>
           </Card>
         </section>
@@ -198,16 +219,6 @@ export default async function AdminMatchDetailPage({
         awayTeamId={match.awayTeamId}
         divisions={divisions.map((d) => ({ id: d.id, name: d.name }))}
         teams={teams}
-        homeTeamName={match.homeTeam.name}
-        awayTeamName={match.awayTeam.name}
-        homeTeam={{
-          colorPrimary: match.homeTeam.colorPrimary,
-          colorAlternate: match.homeTeam.colorAlternate,
-        }}
-        awayTeam={{
-          colorPrimary: match.awayTeam.colorPrimary,
-          colorAlternate: match.awayTeam.colorAlternate,
-        }}
         homeKit={match.homeKit as KitChoice}
         awayKit={match.awayKit as KitChoice}
         currentHomeScore={match.report?.homeScore ?? 0}

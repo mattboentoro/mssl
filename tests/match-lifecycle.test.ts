@@ -9,6 +9,7 @@ import {
   confirmGameReport,
   disputeGameReport,
   overrideGameReport,
+  reopenGameReport,
   submitGameReport,
   unassignReferee,
   type ActorContext,
@@ -543,6 +544,64 @@ describe("admin review", () => {
 
     const audit = await prisma.auditLog.findFirstOrThrow({ where: { action: "report.override" } });
     expect(audit.metadata).toContain("ineligible player fielded");
+  });
+
+  it("reopens a completed game for its assigned referee", async () => {
+    await submitted();
+    await confirmGameReport(prisma, { matchId: fx.matchId, actor: adminActor });
+
+    await prisma.$transaction((tx) =>
+      reopenGameReport(tx, {
+        matchId: fx.matchId,
+        actor: adminActor,
+        reason: "referee entered the wrong score",
+      }),
+    );
+
+    expect(await prisma.gameReport.findUnique({ where: { matchId: fx.matchId } })).toBeNull();
+    expect(await prisma.disciplinaryAction.count({ where: { matchId: fx.matchId } })).toBe(0);
+
+    const match = await prisma.match.findUniqueOrThrow({ where: { id: fx.matchId } });
+    expect(match).toMatchObject({ status: "ASSIGNED", refereeId: fx.refereeA });
+
+    const audit = await prisma.auditLog.findFirstOrThrow({
+      where: { action: "report.reopen", entityId: fx.matchId },
+    });
+    expect(audit.metadata).toContain("referee entered the wrong score");
+    expect(audit.metadata).toContain('"disciplineCount":1');
+  });
+
+  it("reopens a game without a referee into the unassigned pool", async () => {
+    await overrideGameReport(prisma, {
+      matchId: fx.matchId,
+      actor: adminActor,
+      reason: "admin-entered result",
+      homeScore: 2,
+      awayScore: 0,
+    });
+
+    await prisma.$transaction((tx) =>
+      reopenGameReport(tx, {
+        matchId: fx.matchId,
+        actor: adminActor,
+        reason: "needs a new report",
+      }),
+    );
+
+    const match = await prisma.match.findUniqueOrThrow({ where: { id: fx.matchId } });
+    expect(match).toMatchObject({ status: "SCHEDULED", refereeId: null, assignedAt: null });
+    expect(await prisma.gameReport.findUnique({ where: { matchId: fx.matchId } })).toBeNull();
+  });
+
+  it("refuses to reopen a game as a referee", async () => {
+    await submitted();
+    await expect(
+      reopenGameReport(prisma, {
+        matchId: fx.matchId,
+        actor: actorFor(fx.refereeA, "Riley Whistle"),
+        reason: "trying to undo my report",
+      }),
+    ).rejects.toMatchObject({ status: 403 });
   });
 
   it("lets an admin force-assign and force-unassign a referee", async () => {

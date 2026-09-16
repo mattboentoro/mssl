@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import { isValidElement, type ComponentPropsWithoutRef, type ReactNode } from "react";
 
 import { cn } from "@/lib/cn";
 import {
@@ -145,13 +145,20 @@ export function MatchStatusBadge({ match }: { match: MatchDisplayInput }) {
 /* Buttons                                                                    */
 /* -------------------------------------------------------------------------- */
 
-export type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "danger";
+export type ButtonVariant =
+  | "primary"
+  | "secondary"
+  | "outline"
+  | "ghost"
+  | "success"
+  | "danger";
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   primary: "bg-brand text-brand-contrast hover:opacity-90",
   secondary: "bg-surface border-subtle border hover:bg-surface-muted",
   outline: "border-subtle border-2 hover:bg-surface-muted",
   ghost: "hover:bg-surface-muted",
+  success: "bg-success text-white hover:opacity-90",
   danger: "bg-danger text-white hover:opacity-90",
 };
 
@@ -205,17 +212,31 @@ export function Field({
   label,
   htmlFor,
   hint,
+  required,
   children,
 }: {
   label: string;
   htmlFor?: string;
   hint?: ReactNode;
+  required?: boolean;
   children: ReactNode;
 }) {
+  const isRequired =
+    required ??
+    (isValidElement<{ required?: boolean }>(children) && children.props.required === true);
+
   return (
     <div>
       <label className={labelClass} htmlFor={htmlFor}>
         {label}
+        {isRequired ? (
+          <>
+            <span aria-hidden="true" className="text-danger ml-0.5">
+              *
+            </span>
+            <span className="sr-only"> (required)</span>
+          </>
+        ) : null}
       </label>
       {children}
       {hint ? <p className="text-muted mt-1 text-xs">{hint}</p> : null}
