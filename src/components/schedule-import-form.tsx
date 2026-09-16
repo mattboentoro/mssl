@@ -159,8 +159,8 @@ export function ScheduleImportForm({ seasons }: { seasons: { id: string; name: s
               <strong className="text-danger">{state.errorCount}</strong> error
             </span>
           </div>
-          <table className="w-full min-w-[48rem] text-sm">
-            <thead className="bg-surface-muted text-muted text-xs uppercase">
+          <table className="data-table w-full min-w-[48rem] text-sm">
+            <thead className="text-muted text-xs uppercase">
               <tr>
                 <th className="px-3 py-2 text-left">Line</th>
                 <th className="px-3 py-2 text-left">Fixture</th>
@@ -170,7 +170,7 @@ export function ScheduleImportForm({ seasons }: { seasons: { id: string; name: s
                 <th className="px-3 py-2 text-left">Outcome</th>
               </tr>
             </thead>
-            <tbody className="divide-subtle divide-y">
+            <tbody>
               {state.rows.map((row) => (
                 <tr key={row.line}>
                   <td className="text-muted px-3 py-2 font-mono text-xs">{row.line}</td>

@@ -121,7 +121,7 @@ export default async function TeamPage({
           <div className="flex items-center gap-2">
             <span
               aria-hidden
-              className="inline-block h-5 w-5 rounded ring-1 ring-black/20 dark:ring-white/25"
+              className="inline-block h-5 w-5 rounded ring-1 ring-black/20"
               style={{ backgroundColor: resolveKit(team, "PRIMARY") }}
             />
             <div>
@@ -134,7 +134,7 @@ export default async function TeamPage({
           <div className="flex items-center gap-2">
             <span
               aria-hidden
-              className="inline-block h-5 w-5 rounded ring-1 ring-black/20 dark:ring-white/25"
+              className="inline-block h-5 w-5 rounded ring-1 ring-black/20"
               style={{ backgroundColor: resolveKit(team, "ALTERNATE") }}
             />
             <div>

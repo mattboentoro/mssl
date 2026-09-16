@@ -49,8 +49,8 @@ export default async function StandingsPage({
               aria-current={s.id === season.id ? "page" : undefined}
               className={
                 s.id === season.id
-                  ? "bg-brand text-brand-contrast rounded-full px-3 py-1.5 text-sm font-medium"
-                  : "border-subtle hover:bg-surface-muted rounded-full border px-3 py-1.5 text-sm"
+                  ? "bg-brand text-brand-contrast rounded-sm px-3 py-1.5 text-sm font-medium"
+                  : "border-subtle hover:bg-surface-muted rounded-sm border px-3 py-1.5 text-sm"
               }
             >
               {s.name}

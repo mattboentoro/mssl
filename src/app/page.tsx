@@ -25,27 +25,23 @@ const QUICK_LINKS = [
   {
     href: "/schedule",
     label: "Full schedule",
-    emoji: "\uD83D\uDCC5",
     hint: "Fixtures, results & ICS export",
   },
   {
     href: "/standings",
     label: "Standings",
-    emoji: "\uD83C\uDFC6",
     hint: "Live tables per division",
   },
-  { href: "/teams", label: "Teams", emoji: "\uD83D\uDC65", hint: "Clubs, fixtures & results" },
-  { href: "/rules", label: "Rules", emoji: "\uD83D\uDCD8", hint: "Laws, conduct & forms" },
+  { href: "/teams", label: "Teams", hint: "Clubs, fixtures & results" },
+  { href: "/rules", label: "Rules", hint: "Laws, conduct & forms" },
   {
     href: "/faq",
     label: "FAQ",
-    emoji: "\u2753",
     hint: "Eligibility, gear & rescheduling",
   },
   {
     href: "/referee",
     label: "Referee control",
-    emoji: "\uD83E\uDDE4",
     hint: "Claim matches & file reports",
   },
 ];
@@ -64,6 +60,7 @@ function AnnouncementBody({
       <Dialog
         trigger="Read full announcement"
         triggerClassName={outlineButtonClass}
+        triggerLabel={`Read full announcement: ${title}`}
         title={title}
         description={summary}
       >
@@ -99,16 +96,17 @@ export default async function HomePage() {
     getStandingsForSeason(season.id),
   ]);
 
-  const pinned = announcements.filter((a) => a.pinned);
-  const rest = announcements.filter((a) => !a.pinned);
+  const orderedAnnouncements = [
+    ...announcements.filter((item) => item.pinned),
+    ...announcements.filter((item) => !item.pinned),
+  ];
   const topDivision = standings.find((division) => division.rows.length > 0);
 
   return (
     <div className="space-y-14">
-      {/* Hero */}
-      <section className="from-brand/15 border-subtle rounded-2xl border bg-gradient-to-br to-transparent p-6 sm:p-10">
+      <section className="bg-surface-muted rounded-sm p-6 sm:p-10">
         <Badge tone="brand">{season.name}</Badge>
-        <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
+        <h1 className="font-display mt-4 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
           Microsoft Soccer League
         </h1>
         <p className="text-muted mt-4 max-w-2xl text-base sm:text-lg">
@@ -130,25 +128,18 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Announcements */}
-      {announcements.length > 0 ? (
+      {orderedAnnouncements.length > 0 ? (
         <section>
           <SectionHeading title="Announcements" />
           <div className="grid gap-4 md:grid-cols-2">
-            {pinned.map((item) => (
-              <Card key={item.id} className="border-brand/40 p-5">
-                <div className="flex items-center gap-2">
-                  <Badge tone="brand">Pinned</Badge>
-                  <span className="text-muted text-xs">{formatLongDate(item.publishedAt)}</span>
+            {orderedAnnouncements.map((item) => (
+              <Card key={item.id} as="article" className="p-5">
+                <div className="flex flex-wrap items-center gap-2">
+                  {item.pinned ? <Badge tone="brand">Pinned</Badge> : null}
+                  <time dateTime={item.publishedAt.toISOString()} className="text-muted text-xs">
+                    {formatLongDate(item.publishedAt)}
+                  </time>
                 </div>
-                <h3 className="mt-2 font-semibold">{item.title}</h3>
-                <p className="text-muted mt-1 text-sm">{item.summary}</p>
-                <AnnouncementBody title={item.title} summary={item.summary} body={item.body} />
-              </Card>
-            ))}
-            {rest.map((item) => (
-              <Card key={item.id} className="p-5">
-                <span className="text-muted text-xs">{formatLongDate(item.publishedAt)}</span>
                 <h3 className="mt-2 font-semibold">{item.title}</h3>
                 <p className="text-muted mt-1 text-sm">{item.summary}</p>
                 <AnnouncementBody title={item.title} summary={item.summary} body={item.body} />
@@ -158,20 +149,19 @@ export default async function HomePage() {
         </section>
       ) : null}
 
-      {/* Fixtures + results */}
-      <section className="grid gap-8 lg:grid-cols-2">
-        <div>
+      <section className="grid auto-rows-fr gap-8 lg:grid-cols-2">
+        <div className="flex min-w-0 flex-col">
           <SectionHeading title="Next fixtures" href="/schedule" />
           {upcoming.length > 0 ? (
-            <MatchList matches={upcoming} />
+            <MatchList matches={upcoming} className="flex-1 grid-rows-4" />
           ) : (
             <EmptyState title="No upcoming fixtures scheduled." />
           )}
         </div>
-        <div>
+        <div className="flex min-w-0 flex-col">
           <SectionHeading title="Latest results" href="/schedule?view=all" />
           {results.length > 0 ? (
-            <MatchList matches={results} />
+            <MatchList matches={results} className="flex-1 grid-rows-4" />
           ) : (
             <EmptyState
               title="No results filed yet."
@@ -181,7 +171,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Standings snippet */}
       {topDivision ? (
         <section>
           <SectionHeading title={`${topDivision.divisionName} snapshot`} href="/standings" />
@@ -194,17 +183,15 @@ export default async function HomePage() {
         </section>
       ) : null}
 
-      {/* Quick links */}
       <section>
         <SectionHeading title="Quick links" />
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {QUICK_LINKS.map((link) => (
-            <Card as="li" key={link.href} className="hover:border-brand/50 transition">
-              <Link href={link.href} className="block p-4">
-                <span aria-hidden className="text-xl">
-                  {link.emoji}
-                </span>
-                <p className="mt-2 font-semibold">{link.label}</p>
+            <Card as="li" key={link.href}>
+              <Link href={link.href} className="group block p-4">
+                <p className="group-hover:text-brand text-sm font-semibold group-hover:underline">
+                  {link.label}
+                </p>
                 <p className="text-muted text-sm">{link.hint}</p>
               </Link>
             </Card>

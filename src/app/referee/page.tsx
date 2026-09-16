@@ -1,3 +1,4 @@
+import { Check } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { forbidden, redirect } from "next/navigation";
@@ -279,8 +280,8 @@ export default async function RefereePage({
         {view === "calendar" ? (
           <p className="text-muted mb-3 text-sm">
             Open fixtures, plus your own assignments marked{" "}
-            <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-              <span aria-hidden="true">&#10003;</span>
+            <span className="font-semibold text-emerald-600">
+              <Check aria-hidden="true" size={14} className="inline-block align-text-bottom" />
             </span>{" "}
             so you can spot a clash before claiming.
           </p>

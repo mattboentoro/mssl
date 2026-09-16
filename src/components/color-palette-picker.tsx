@@ -1,5 +1,6 @@
 "use client";
 
+import { Check } from "lucide-react";
 import { useState } from "react";
 
 import { KIT_PALETTE, normalizeHex, readableTextOn } from "@/lib/kits";
@@ -50,7 +51,7 @@ export function ColorPalettePicker({
                 active ? "border-fg scale-110 border-2" : "border-subtle hover:scale-105"
               }`}
             >
-              {active ? <span aria-hidden="true">&#10003;</span> : null}
+              {active ? <Check aria-hidden="true" size={16} className="mx-auto" /> : null}
             </button>
           );
         })}

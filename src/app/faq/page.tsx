@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -491,12 +492,11 @@ export default function FaqPage() {
                 <Card key={item.q} as="article">
                   <details className="group">
                     <summary className="hover:bg-surface-muted cursor-pointer list-none rounded-xl p-4 text-sm font-medium">
-                      <span
-                        aria-hidden
-                        className="text-brand mr-2 inline-block transition-transform group-open:rotate-90"
-                      >
-                        &rsaquo;
-                      </span>
+                      <ChevronRight
+                        aria-hidden="true"
+                        size={14}
+                        className="text-brand mr-2 inline-block align-text-bottom transition-transform group-open:rotate-90"
+                      />
                       {item.q}
                     </summary>
                     <div className="space-y-3 px-4 pb-4 pl-9 text-sm">{item.a}</div>

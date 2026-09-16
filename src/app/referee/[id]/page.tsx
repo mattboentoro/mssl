@@ -1,3 +1,4 @@
+import { Check } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { forbidden, notFound, redirect } from "next/navigation";
@@ -315,7 +316,7 @@ function StepMarker({ done, n }: { done: boolean; n: number }) {
           : "bg-surface-muted text-muted inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold"
       }
     >
-      {done ? "\u2713" : n}
+      {done ? <Check aria-hidden="true" size={14} /> : n}
     </span>
   );
 }

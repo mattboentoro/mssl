@@ -28,21 +28,19 @@ const COLUMNS = [
 
 export function SiteFooter() {
   return (
-    <footer className="border-subtle bg-surface mt-16 border-t">
-      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:grid-cols-2 lg:grid-cols-4">
+    <footer className="bg-surface-muted mt-10">
+      <div className="site-width grid gap-8 py-8 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <p className="flex items-center gap-2 font-bold">
-            <span aria-hidden>&#9917;</span> Microsoft Soccer League
-          </p>
-          <p className="text-muted mt-2 text-sm">
+          <p className="font-display text-2xl font-bold uppercase">Microsoft Soccer League</p>
+          <p className="text-muted mt-3 max-w-xs text-xs leading-relaxed">
             The employee-run soccer league for the Microsoft community. Fixtures, results and
             standings are generated from referee match reports.
           </p>
         </div>
         {COLUMNS.map((column) => (
           <div key={column.title}>
-            <h2 className="text-xs font-semibold tracking-[0.18em] uppercase">{column.title}</h2>
-            <ul className="mt-3 space-y-2 text-sm">
+            <h2 className="text-lg font-semibold">{column.title}</h2>
+            <ul className="mt-3 space-y-2 text-xs">
               {column.links.map((link) => (
                 <li key={link.href}>
                   <Link href={link.href} className="text-muted hover:text-foreground">
@@ -54,7 +52,7 @@ export function SiteFooter() {
           </div>
         ))}
       </div>
-      <div className="border-subtle text-muted border-t px-4 py-4 text-center text-xs">
+      <div className="site-width text-muted pb-6 text-xs">
         Internal Microsoft community site. Not an official Microsoft product.
       </div>
     </footer>

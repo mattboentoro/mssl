@@ -1,5 +1,6 @@
 "use client";
 
+import { X } from "lucide-react";
 import {
   createContext,
   useCallback,
@@ -110,7 +111,7 @@ export function Dialog({
               aria-label={`Close ${title}`}
               className="text-muted hover:text-foreground text-lg leading-none"
             >
-              {"\u00d7"}
+              <X aria-hidden="true" size={18} />
             </button>
           </div>
 
