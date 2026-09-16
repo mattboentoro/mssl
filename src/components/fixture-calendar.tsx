@@ -1,3 +1,4 @@
+import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 import { KitSwatch } from "@/components/team-colors";
@@ -86,13 +87,13 @@ export function FixtureCalendar({
         </h3>
         <div className="flex items-center gap-2">
           <Link href={linkTo(previous.value)} className={navClass} rel="prev">
-            <span aria-hidden="true">&larr;</span>
+            <ChevronLeft aria-hidden="true" size={16} />
             <span className="sr-only">
               Previous month, {monthLabel(previous.year, previous.month)}
             </span>
           </Link>
           <Link href={linkTo(next.value)} className={navClass} rel="next">
-            <span aria-hidden="true">&rarr;</span>
+            <ChevronRight aria-hidden="true" size={16} />
             <span className="sr-only">Next month, {monthLabel(next.year, next.month)}</span>
           </Link>
         </div>
@@ -212,7 +213,7 @@ function FixtureChip({
       {mark ? (
         <span className="ml-auto shrink-0 font-semibold text-emerald-600 dark:text-emerald-400">
           <span className="sr-only">{mark}</span>
-          <span aria-hidden="true">&#10003;</span>
+          <Check aria-hidden="true" size={12} />
         </span>
       ) : null}
     </>

@@ -25,27 +25,23 @@ const QUICK_LINKS = [
   {
     href: "/schedule",
     label: "Full schedule",
-    emoji: "\uD83D\uDCC5",
     hint: "Fixtures, results & ICS export",
   },
   {
     href: "/standings",
     label: "Standings",
-    emoji: "\uD83C\uDFC6",
     hint: "Live tables per division",
   },
-  { href: "/teams", label: "Teams", emoji: "\uD83D\uDC65", hint: "Clubs, fixtures & results" },
-  { href: "/rules", label: "Rules", emoji: "\uD83D\uDCD8", hint: "Laws, conduct & forms" },
+  { href: "/teams", label: "Teams", hint: "Clubs, fixtures & results" },
+  { href: "/rules", label: "Rules", hint: "Laws, conduct & forms" },
   {
     href: "/faq",
     label: "FAQ",
-    emoji: "\u2753",
     hint: "Eligibility, gear & rescheduling",
   },
   {
     href: "/referee",
     label: "Referee control",
-    emoji: "\uD83E\uDDE4",
     hint: "Claim matches & file reports",
   },
 ];
@@ -106,7 +102,7 @@ export default async function HomePage() {
   return (
     <div className="space-y-14">
       {/* Hero */}
-      <section className="from-brand/15 border-subtle rounded-2xl border bg-gradient-to-br to-transparent p-6 sm:p-10">
+      <section className="bg-surface border-subtle rounded-2xl border p-6 sm:p-10">
         <Badge tone="brand">{season.name}</Badge>
         <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
           Microsoft Soccer League
@@ -201,10 +197,7 @@ export default async function HomePage() {
           {QUICK_LINKS.map((link) => (
             <Card as="li" key={link.href} className="hover:border-brand/50 transition">
               <Link href={link.href} className="block p-4">
-                <span aria-hidden className="text-xl">
-                  {link.emoji}
-                </span>
-                <p className="mt-2 font-semibold">{link.label}</p>
+                <p className="font-semibold">{link.label}</p>
                 <p className="text-muted text-sm">{link.hint}</p>
               </Link>
             </Card>

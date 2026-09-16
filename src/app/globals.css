@@ -58,6 +58,25 @@
   --color-success: var(--success);
   --font-sans: var(--font-geist-sans), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  /* Reduce type sizes without scaling down rem-based spacing or controls. */
+  --text-xs: 0.75rem;
+  --text-xs--line-height: calc(1rem / 0.75rem);
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: calc(1.125rem / 0.8125rem);
+  --text-base: 0.875rem;
+  --text-base--line-height: calc(1.25rem / 0.875rem);
+  --text-lg: 1rem;
+  --text-lg--line-height: 1.5;
+  --text-xl: 1.125rem;
+  --text-xl--line-height: calc(1.625rem / 1.125rem);
+  --text-2xl: 1.25rem;
+  --text-2xl--line-height: 1.4;
+  --text-3xl: 1.5rem;
+  --text-3xl--line-height: 1.25;
+  --text-4xl: 1.75rem;
+  --text-4xl--line-height: calc(2.125rem / 1.75rem);
+  --text-5xl: 2rem;
+  --text-5xl--line-height: 1.1875;
 }
 
 html {
@@ -77,6 +96,8 @@ body {
     -apple-system,
     "Segoe UI",
     sans-serif;
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
   -webkit-font-smoothing: antialiased;
 }
 

@@ -22,11 +22,11 @@ export function TeamColorBar({
   return (
     <span
       aria-hidden
-      className={`inline-block shrink-0 rounded-full ring-1 ring-black/10 dark:ring-white/15 ${dimension}`}
-      style={{
-        background: `linear-gradient(180deg, ${primary} 0%, ${primary} 50%, ${alternate} 50%, ${alternate} 100%)`,
-      }}
-    />
+      className={`inline-flex shrink-0 flex-col overflow-hidden rounded-full ring-1 ring-black/10 dark:ring-white/15 ${dimension}`}
+    >
+      <span className="w-full flex-1" style={{ backgroundColor: primary }} />
+      <span className="w-full flex-1" style={{ backgroundColor: alternate }} />
+    </span>
   );
 }
 

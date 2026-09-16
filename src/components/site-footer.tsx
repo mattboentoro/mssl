@@ -31,9 +31,7 @@ export function SiteFooter() {
     <footer className="border-subtle bg-surface mt-16 border-t">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <p className="flex items-center gap-2 font-bold">
-            <span aria-hidden>&#9917;</span> Microsoft Soccer League
-          </p>
+          <p className="font-bold">Microsoft Soccer League</p>
           <p className="text-muted mt-2 text-sm">
             The employee-run soccer league for the Microsoft community. Fixtures, results and
             standings are generated from referee match reports.

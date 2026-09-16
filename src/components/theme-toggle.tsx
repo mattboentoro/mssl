@@ -1,5 +1,6 @@
 "use client";
 
+import { Moon, Sun } from "lucide-react";
 import { useCallback, useSyncExternalStore } from "react";
 
 const STORAGE_KEY = "mssl-theme";
@@ -47,7 +48,7 @@ export function ThemeToggle() {
       title={label}
       className="hover:bg-surface-muted border-subtle inline-flex h-9 w-9 items-center justify-center rounded-lg border text-base"
     >
-      <span aria-hidden>{isDark ? "\u2600\ufe0f" : "\ud83c\udf19"}</span>
+      {isDark ? <Sun aria-hidden="true" size={18} /> : <Moon aria-hidden="true" size={18} />}
     </button>
   );
 }

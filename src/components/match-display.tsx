@@ -47,7 +47,7 @@ export function MatchRow({ match }: { match: MatchListItem }) {
       </div>
 
       <div className="text-muted mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-        {match.venueName ? <span>&#128205; {match.venueName}</span> : <span>&#128205; TBD</span>}
+        <span>Venue: {match.venueName || "TBD"}</span>
       </div>
     </Card>
   );

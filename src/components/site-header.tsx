@@ -1,5 +1,6 @@
 "use client";
 
+import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -56,9 +57,6 @@ export function SiteHeader({ user }: { user: HeaderUser | null }) {
       </a>
       <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
         <Link href="/" className="flex items-center gap-2 font-bold tracking-tight">
-          <span aria-hidden className="text-xl">
-            &#9917;
-          </span>
           <span>
             MSSL
             <span className="text-muted ml-2 hidden text-xs font-medium sm:inline">
@@ -96,7 +94,7 @@ export function SiteHeader({ user }: { user: HeaderUser | null }) {
             aria-label="Toggle navigation"
             onClick={() => setOpen((v) => !v)}
           >
-            <span aria-hidden>{open ? "\u2715" : "\u2630"}</span>
+            {open ? <X aria-hidden="true" size={18} /> : <Menu aria-hidden="true" size={18} />}
           </button>
         </div>
       </div>
