@@ -33,6 +33,7 @@ export function FixtureCalendar({
   query,
   hrefForMatch,
   markFor,
+  showFixtureDetails = false,
   monthParam = "month",
   emptyHint,
 }: {
@@ -50,6 +51,8 @@ export function FixtureCalendar({
    * ticked; it is read out to screen readers and shown as a tooltip.
    */
   markFor?: (match: MatchListItem) => string | undefined;
+  /** Show the admin-oriented kit, team, and venue layout on each fixture. */
+  showFixtureDetails?: boolean;
   monthParam?: string;
   emptyHint?: string;
 }) {
@@ -156,6 +159,7 @@ export function FixtureCalendar({
                                 match={match}
                                 href={hrefForMatch?.(match)}
                                 mark={markFor?.(match)}
+                                showFixtureDetails={showFixtureDetails}
                               />
                             </li>
                           ))}
@@ -185,21 +189,44 @@ function FixtureChip({
   match,
   href,
   mark,
+  showFixtureDetails,
 }: {
   match: MatchListItem;
   href?: string;
   mark?: string;
+  showFixtureDetails: boolean;
 }) {
   const label = `${match.homeTeam.shortName} v ${match.awayTeam.shortName}`;
+  const venue = match.venueName ?? "Venue TBD";
   // The swatches are tiny, so the tooltip spells the kits out in words. It is
   // the only place a referee can check the strip without opening the fixture.
   const detail =
     `${formatTime(match.kickoffAt)} ${label} \u2014 ` +
     `${match.homeTeam.name} in ${kitColorName(resolveKit(match.homeTeam, match.homeKit))}, ` +
-    `${match.awayTeam.name} in ${kitColorName(resolveKit(match.awayTeam, match.awayKit))}` +
+    `${match.awayTeam.name} in ${kitColorName(resolveKit(match.awayTeam, match.awayKit))}, ` +
+    `at ${venue}` +
     (mark ? ` \u2014 ${mark}` : "");
 
-  const body = (
+  const body = showFixtureDetails ? (
+    <>
+      <span className="flex min-w-0 items-center gap-1">
+        <span className="shrink-0 tabular-nums">{formatTime(match.kickoffAt)}</span>
+        <KitSwatch team={match.homeTeam} kit={match.homeKit} teamName={match.homeTeam.name} />
+        <span className="truncate">{match.homeTeam.shortName}:</span>
+        <span className="truncate">{match.awayTeam.shortName}</span>
+        <KitSwatch team={match.awayTeam} kit={match.awayKit} teamName={match.awayTeam.name} />
+        {mark ? (
+          <span className="ml-auto shrink-0 font-semibold text-emerald-600 dark:text-emerald-400">
+            <span className="sr-only">{mark}</span>
+            <span aria-hidden="true">&#10003;</span>
+          </span>
+        ) : null}
+      </span>
+      <span className="text-muted mt-0.5 block truncate" title={venue}>
+        {venue}
+      </span>
+    </>
+  ) : (
     <>
       <span className="tabular-nums">{formatTime(match.kickoffAt)}</span>
       <KitSwatch team={match.homeTeam} kit={match.homeKit} teamName={match.homeTeam.name} />
@@ -224,8 +251,9 @@ function FixtureChip({
     ? "bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/40"
     : "bg-surface-muted hover:bg-brand/10";
 
-  const shared =
-    "flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-[11px] leading-tight";
+  const shared = showFixtureDetails
+    ? "block w-full rounded px-1 py-0.5 text-left text-[11px] leading-tight"
+    : "flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-[11px] leading-tight";
 
   if (!href) {
     return (

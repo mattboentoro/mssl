@@ -169,6 +169,7 @@ export default async function TeamPage({
                 month={monthValue.month}
                 basePath={`/teams/${id}`}
                 query={{ view: "calendar" }}
+                showFixtureDetails
                 emptyHint={`${team.name} have nothing scheduled this month.`}
               />
             ) : upcoming.length === 0 ? (

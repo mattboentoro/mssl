@@ -308,6 +308,7 @@ export default async function AdminMatchesPage({
             basePath="/admin/matches"
             query={{ ...carried, month: undefined, view: "calendar" }}
             hrefForMatch={(match) => `/admin/matches/${match.id}`}
+            showFixtureDetails
             emptyHint="No fixtures are scheduled this month for the current filters."
           />
         ) : matches.length === 0 ? (
