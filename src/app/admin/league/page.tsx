@@ -1,19 +1,13 @@
-import { ActionForm, FieldError, SubmitButton } from "@/components/admin-forms";
+import { FieldError } from "@/components/admin-forms";
+import { DivisionEditor } from "@/components/admin-division-editor";
+import { SeasonEditor } from "@/components/admin-season-editor";
 import { TeamEditor } from "@/components/admin-team-editor";
 import { ColorPalettePicker } from "@/components/color-palette-picker";
 import { FormDialog } from "@/components/form-dialog";
 import { TeamColorBar } from "@/components/team-colors";
 import { Card, Field, inputClass } from "@/components/ui";
-import {
-  activateSeasonAction,
-  createDivisionAction,
-  createSeasonAction,
-  createTeamAction,
-  deleteDivisionAction,
-  deleteSeasonAction,
-  setSeasonTiebreakerAction,
-} from "@/app/admin/actions";
-import { formatDate } from "@/lib/dates";
+import { createDivisionAction, createSeasonAction, createTeamAction } from "@/app/admin/actions";
+import { formatDate, toDateInputValue } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -74,11 +68,15 @@ export default async function AdminLeaguePage() {
             </label>
           </FormDialog>
         </div>
-        <Card className="divide-subtle divide-y">
+        <ul className="space-y-3">
           {seasons.map((season) => (
-            <div key={season.id} className="flex items-start justify-between gap-3 p-3">
-              <div>
-                <p className="text-sm font-medium">
+            <Card
+              as="li"
+              key={season.id}
+              className="flex items-start justify-between gap-3 p-3 text-sm"
+            >
+              <div className="min-w-0">
+                <p className="font-medium">
                   {season.name}
                   {season.isActive ? (
                     <span className="text-success ml-2 text-xs font-semibold">ACTIVE</span>
@@ -87,65 +85,25 @@ export default async function AdminLeaguePage() {
                 <p className="text-muted text-xs">
                   {formatDate(season.startsOn)} &ndash; {formatDate(season.endsOn)}
                 </p>
-                <ActionForm
-                  action={setSeasonTiebreakerAction}
-                  resetOnSuccess={false}
-                  className="mt-2 flex flex-wrap items-center gap-2"
-                >
-                  <input type="hidden" name="seasonId" value={season.id} />
-                  <label
-                    htmlFor={`tiebreak-${season.id}`}
-                    className="text-muted text-[11px] font-medium"
-                  >
-                    Ranked on
-                  </label>
-                  <select
-                    id={`tiebreak-${season.id}`}
-                    name="tiebreakerMode"
-                    defaultValue={season.tiebreakerMode}
-                    className={`${inputClass} w-auto py-1 text-xs`}
-                  >
-                    <option value="POINTS">Total points</option>
-                    <option value="POINTS_PER_GAME">Points per game</option>
-                  </select>
-                  <SubmitButton variant="ghost">Save</SubmitButton>
-                </ActionForm>
-              </div>
-              {season.isActive ? (
-                <p className="text-muted max-w-40 text-right text-[11px]">
-                  Activate another season before this one can be deleted.
+                <p className="text-muted text-xs">
+                  Ranked on{" "}
+                  {season.tiebreakerMode === "POINTS_PER_GAME" ? "points per game" : "total points"}
                 </p>
-              ) : (
-                <div className="flex flex-col items-end gap-2">
-                  <ActionForm action={activateSeasonAction} resetOnSuccess={false}>
-                    <input type="hidden" name="seasonId" value={season.id} />
-                    <SubmitButton variant="ghost">Make active</SubmitButton>
-                  </ActionForm>
-                  <ActionForm
-                    action={deleteSeasonAction}
-                    resetOnSuccess={false}
-                    className="flex flex-col items-end gap-1"
-                  >
-                    <input type="hidden" name="seasonId" value={season.id} />
-                    <input
-                      name="confirmName"
-                      aria-label={`Type ${season.name} to confirm deletion`}
-                      placeholder={`Type “${season.name}”`}
-                      className={`${inputClass} w-44 text-xs`}
-                      required
-                    />
-                    <SubmitButton
-                      variant="danger"
-                      confirm={`Delete ${season.name} and every division, team, fixture and report inside it? This cannot be undone.`}
-                    >
-                      Delete season
-                    </SubmitButton>
-                  </ActionForm>
-                </div>
-              )}
-            </div>
+              </div>
+              <SeasonEditor
+                season={{
+                  id: season.id,
+                  name: season.name,
+                  slug: season.slug,
+                  startsOn: toDateInputValue(season.startsOn),
+                  endsOn: toDateInputValue(season.endsOn),
+                  isActive: season.isActive,
+                  tiebreakerMode: season.tiebreakerMode,
+                }}
+              />
+            </Card>
           ))}
-        </Card>
+        </ul>
       </section>
 
       {/* ------------------------------- Divisions -------------------------- */}
@@ -164,63 +122,44 @@ export default async function AdminLeaguePage() {
               <input id="div-name" name="name" className={inputClass} required />
               <FieldError name="name" />
             </Field>
-            <Field label="Sort order" htmlFor="div-sort">
-              <input
-                id="div-sort"
-                name="sortOrder"
-                type="number"
-                min={0}
-                defaultValue={divisions.length}
-                className={inputClass}
-              />
-            </Field>
           </FormDialog>
         </div>
         <p className="text-muted mb-3 text-sm">
           Divisions and the clubs inside them belong to the league, not to a season. Deleting a
           season removes its fixtures and leaves every team standing.
         </p>
-        <Card className="divide-subtle divide-y">
-          {divisions.length === 0 ? (
-            <p className="text-muted p-4 text-sm">No divisions yet.</p>
-          ) : (
-            divisions.map((d) => (
-              <div key={d.id} className="flex items-start justify-between gap-3 p-3 text-sm">
-                <div>
-                  <p>{d.name}</p>
+        {divisions.length === 0 ? (
+          <Card className="p-4">
+            <p className="text-muted text-sm">No divisions yet.</p>
+          </Card>
+        ) : (
+          <ul className="space-y-3">
+            {divisions.map((d) => (
+              <Card
+                as="li"
+                key={d.id}
+                className="flex items-start justify-between gap-3 p-3 text-sm"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{d.name}</p>
                   <p className="text-muted text-xs">
                     {d._count.teams} team(s), {d._count.matches} fixture(s)
                   </p>
                 </div>
-                {/*
-                    Deleting a division takes its clubs and their fixtures with
-                    it, so the name has to be retyped. The action refuses
-                    outright once any of those fixtures has a filed report.
-                  */}
-                <ActionForm
-                  action={deleteDivisionAction}
-                  resetOnSuccess={false}
-                  className="flex flex-col items-end gap-1"
-                >
-                  <input type="hidden" name="divisionId" value={d.id} />
-                  <input
-                    name="confirmName"
-                    aria-label={`Type ${d.name} to confirm deletion`}
-                    placeholder={`Type “${d.name}”`}
-                    className={`${inputClass} w-44 text-xs`}
-                    required
-                  />
-                  <SubmitButton
-                    variant="danger"
-                    confirm={`Delete ${d.name}, its ${d._count.teams} club(s) and ${d._count.matches} fixture(s)? This cannot be undone.`}
-                  >
-                    Delete division
-                  </SubmitButton>
-                </ActionForm>
-              </div>
-            ))
-          )}
-        </Card>
+                <DivisionEditor
+                  division={{
+                    id: d.id,
+                    name: d.name,
+                    slug: d.slug,
+                    sortOrder: d.sortOrder,
+                    teamCount: d._count.teams,
+                    matchCount: d._count.matches,
+                  }}
+                />
+              </Card>
+            ))}
+          </ul>
+        )}
       </section>
 
       {/* --------------------------------- Teams ---------------------------- */}
@@ -293,24 +232,30 @@ export default async function AdminLeaguePage() {
             </Field>
           </FormDialog>
         </div>
-        <Card className="divide-subtle max-h-96 divide-y overflow-y-auto">
-          {teams.length === 0 ? (
-            <p className="text-muted p-4 text-sm">No teams yet.</p>
-          ) : (
-            teams.map((team) => (
-              <div key={team.id} className="p-3 text-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <span className="flex min-w-0 items-center gap-2">
-                    <TeamColorBar team={team} size="sm" />
-                    <span className="min-w-0">
-                      <span className="block truncate">{team.name}</span>
-                      <span className="text-muted block text-xs">{team.division.name}</span>
-                    </span>
+        {teams.length === 0 ? (
+          <Card className="p-4">
+            <p className="text-muted text-sm">No teams yet.</p>
+          </Card>
+        ) : (
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {teams.map((team) => (
+              <Card
+                as="li"
+                key={team.id}
+                className="flex items-start justify-between gap-3 p-3 text-sm"
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <TeamColorBar team={team} size="sm" />
+                  <span className="min-w-0">
+                    <a
+                      href={`/teams/${team.slug}`}
+                      className="hover:text-brand block truncate font-medium hover:underline"
+                    >
+                      {team.name}
+                    </a>
+                    <span className="text-muted block text-xs">{team.division.name}</span>
                   </span>
-                  <a href={`/teams/${team.slug}`} className="text-muted shrink-0 text-xs underline">
-                    View
-                  </a>
-                </div>
+                </span>
                 <TeamEditor
                   team={{
                     id: team.id,
@@ -325,10 +270,10 @@ export default async function AdminLeaguePage() {
                   }}
                   divisions={divisions.map((d) => ({ id: d.id, name: d.name }))}
                 />
-              </div>
-            ))
-          )}
-        </Card>
+              </Card>
+            ))}
+          </ul>
+        )}
       </section>
     </div>
   );

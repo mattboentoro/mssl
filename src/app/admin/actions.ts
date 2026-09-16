@@ -25,6 +25,8 @@ import {
   pointsAdjustmentSchema,
   seasonSchema,
   teamSchema,
+  updateDivisionSchema,
+  updateSeasonSchema,
   updateTeamSchema,
 } from "@/lib/validation";
 import { z } from "zod";
@@ -139,6 +141,53 @@ export async function createSeasonAction(_prev: ActionState, form: FormData): Pr
       });
       refreshAdmin();
       return `Season “${data.name}” created.`;
+    },
+  );
+}
+
+/**
+ * Rename a season or move its dates.
+ *
+ * Which season is active and how it ranks its table stay on their own buttons:
+ * both have side effects well beyond the row being edited.
+ */
+export async function updateSeasonAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  return run(
+    updateSeasonSchema,
+    {
+      seasonId: str(form, "seasonId"),
+      name: str(form, "name"),
+      slug: str(form, "slug"),
+      startsOn: str(form, "startsOn"),
+      endsOn: str(form, "endsOn"),
+    },
+    async ({ seasonId, ...data }, actor) => {
+      const before = await prisma.season.findUnique({ where: { id: seasonId } });
+      if (!before) throw new Error("That season no longer exists.");
+
+      const startsOn = new Date(data.startsOn);
+      const endsOn = new Date(data.endsOn);
+      if (endsOn <= startsOn) throw new Error("The season has to end after it starts.");
+
+      const clash = await prisma.season.findFirst({
+        where: { name: data.name, id: { not: seasonId } },
+        select: { name: true },
+      });
+      if (clash) throw new Error(`There is already a season called “${clash.name}”.`);
+
+      const season = await prisma.season.update({
+        where: { id: seasonId },
+        data: { name: data.name, slug: data.slug, startsOn, endsOn },
+      });
+      await writeAudit(prisma, {
+        actor: actorFrom(actor),
+        action: "season.update",
+        entity: "Season",
+        entityId: season.id,
+        metadata: { name: data.name, startsOn: data.startsOn, endsOn: data.endsOn },
+      });
+      refreshAdmin();
+      return `Season “${data.name}” updated.`;
     },
   );
 }
@@ -267,12 +316,15 @@ export async function createDivisionAction(
   form: FormData,
 ): Promise<ActionState> {
   const name = str(form, "name");
+  // Position is no longer asked for on the form: a new division simply lands at
+  // the bottom of the list, and the admin can reorder later if that ever ships.
+  const sortOrder = num(form, "sortOrder") ?? (await prisma.division.count());
   return run(
     divisionSchema,
     {
       name,
       slug: str(form, "slug") || slugify(name),
-      sortOrder: num(form, "sortOrder") ?? 0,
+      sortOrder,
     },
     async (data, actor) => {
       const division = await prisma.division.create({ data });
@@ -285,6 +337,55 @@ export async function createDivisionAction(
       });
       refreshAdmin();
       return `Division “${data.name}” created.`;
+    },
+  );
+}
+
+/**
+ * Rename a division or move it up and down the list.
+ *
+ * The slug is deliberately left alone: it is only ever derived once, at
+ * creation, and anything already pointing at the division keeps working after
+ * a rename.
+ */
+export async function updateDivisionAction(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  return run(
+    updateDivisionSchema,
+    {
+      divisionId: str(form, "divisionId"),
+      name: str(form, "name"),
+      slug: str(form, "slug"),
+      sortOrder: num(form, "sortOrder") ?? 0,
+    },
+    async ({ divisionId, ...data }, actor) => {
+      const before = await prisma.division.findUnique({ where: { id: divisionId } });
+      if (!before) throw new Error("That division no longer exists.");
+
+      const clash = await prisma.division.findFirst({
+        where: { name: data.name, id: { not: divisionId } },
+        select: { name: true },
+      });
+      if (clash) throw new Error(`There is already a division called “${clash.name}”.`);
+
+      const division = await prisma.division.update({ where: { id: divisionId }, data });
+      await writeAudit(prisma, {
+        actor: actorFrom(actor),
+        action: "division.update",
+        entity: "Division",
+        entityId: division.id,
+        metadata: {
+          changed: Object.fromEntries(
+            Object.entries(data).filter(
+              ([key, value]) => (before as Record<string, unknown>)[key] !== value,
+            ),
+          ),
+        },
+      });
+      refreshAdmin();
+      return `Division “${data.name}” updated.`;
     },
   );
 }

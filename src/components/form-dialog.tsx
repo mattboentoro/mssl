@@ -1,6 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  type ReactNode,
+} from "react";
 
 import {
   ActionForm,
@@ -10,22 +19,101 @@ import {
 } from "@/components/admin-forms";
 import { buttonClass } from "@/components/ui";
 
+const DialogCloseContext = createContext<() => void>(() => {});
+
 /** Dismisses the surrounding dialog once the server action reports success. */
-function CloseOnSuccess({ onSuccess }: { onSuccess: () => void }) {
+export function CloseOnSuccess() {
+  const close = useContext(DialogCloseContext);
   const { ok } = useActionResult();
   useEffect(() => {
-    if (ok) onSuccess();
-  }, [ok, onSuccess]);
+    if (ok) close();
+  }, [ok, close]);
   return null;
 }
 
+/** A "leave it alone" button for a dialog footer. */
+export function DialogCancel({ children = "Cancel" }: { children?: ReactNode }) {
+  const close = useContext(DialogCloseContext);
+  return (
+    <button type="button" onClick={close} className={buttonClass("ghost")}>
+      {children}
+    </button>
+  );
+}
+
 /**
- * A "create" form tucked behind a button and shown in a modal.
+ * A titled modal behind a trigger button.
  *
  * Built on the native `<dialog>` so focus trapping, Escape and the inert
- * backdrop come from the platform. The form is always rendered — never mounted
- * on open — so it stays in the server HTML and keeps working for anything that
- * reads the page without running scripts.
+ * backdrop come from the platform. The contents are always rendered — never
+ * mounted on open — so they stay in the server HTML and keep working for
+ * anything that reads the page without running scripts.
+ */
+export function Dialog({
+  trigger,
+  triggerClassName,
+  triggerLabel,
+  title,
+  description,
+  children,
+}: {
+  trigger: ReactNode;
+  triggerClassName?: string;
+  triggerLabel?: string;
+  title: string;
+  description?: ReactNode;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  const close = useCallback(() => ref.current?.close(), []);
+  const open = useCallback(() => ref.current?.showModal(), []);
+  const closeValue = useMemo(() => close, [close]);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={open}
+        aria-label={triggerLabel}
+        className={triggerClassName ?? buttonClass("primary")}
+      >
+        {trigger}
+      </button>
+
+      <dialog
+        ref={ref}
+        aria-labelledby={titleId}
+        className="bg-surface text-foreground border-subtle m-auto max-h-[calc(100vh-4rem)] w-[min(42rem,calc(100vw-2rem))] rounded-xl border p-0 text-left shadow-xl backdrop:bg-black/60"
+      >
+        <DialogCloseContext.Provider value={closeValue}>
+          <div className="border-subtle flex items-start justify-between gap-4 border-b p-5">
+            <div>
+              <h3 id={titleId} className="font-semibold">
+                {title}
+              </h3>
+              {description ? <p className="text-muted mt-1 text-xs">{description}</p> : null}
+            </div>
+            <button
+              type="button"
+              onClick={close}
+              aria-label={`Close ${title}`}
+              className="text-muted hover:text-foreground text-lg leading-none"
+            >
+              {"\u00d7"}
+            </button>
+          </div>
+
+          <div className="p-5">{children}</div>
+        </DialogCloseContext.Provider>
+      </dialog>
+    </>
+  );
+}
+
+/**
+ * A single server-action form tucked behind a button and shown in a modal.
+ * Owns its own footer, so callers pass fields and a submit label.
  */
 export function FormDialog({
   trigger,
@@ -44,55 +132,16 @@ export function FormDialog({
   fieldsClassName?: string;
   children: ReactNode;
 }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
-  const close = useCallback(() => ref.current?.close(), []);
-
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => ref.current?.showModal()}
-        className={buttonClass("primary")}
-      >
-        {trigger}
-      </button>
-
-      <dialog
-        ref={ref}
-        aria-labelledby={titleId}
-        className="bg-surface text-foreground border-subtle m-auto w-[min(42rem,calc(100vw-2rem))] rounded-xl border p-0 shadow-xl backdrop:bg-black/60"
-      >
-        <div className="border-subtle flex items-start justify-between gap-4 border-b p-5">
-          <div>
-            <h3 id={titleId} className="font-semibold">
-              {title}
-            </h3>
-            {description ? <p className="text-muted mt-1 text-xs">{description}</p> : null}
-          </div>
-          <button
-            type="button"
-            onClick={close}
-            aria-label={`Close ${title}`}
-            className="text-muted hover:text-foreground text-lg leading-none"
-          >
-            {"\u00d7"}
-          </button>
+    <Dialog trigger={trigger} title={title} description={description}>
+      <ActionForm action={action} className="space-y-4">
+        <div className={fieldsClassName}>{children}</div>
+        <div className="border-subtle flex items-center justify-end gap-2 border-t pt-4">
+          <DialogCancel />
+          <SubmitButton>{submitLabel}</SubmitButton>
         </div>
-
-        <div className="p-5">
-          <ActionForm action={action} className="space-y-4">
-            <div className={fieldsClassName}>{children}</div>
-            <div className="border-subtle flex items-center justify-end gap-2 border-t pt-4">
-              <button type="button" onClick={close} className={buttonClass("ghost")}>
-                Cancel
-              </button>
-              <SubmitButton>{submitLabel}</SubmitButton>
-            </div>
-            <CloseOnSuccess onSuccess={close} />
-          </ActionForm>
-        </div>
-      </dialog>
-    </>
+        <CloseOnSuccess />
+      </ActionForm>
+    </Dialog>
   );
 }

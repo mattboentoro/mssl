@@ -152,6 +152,10 @@ export const seasonSchema = z.object({
   isActive: z.boolean().default(false),
 });
 
+export const updateSeasonSchema = seasonSchema
+  .omit({ isActive: true })
+  .extend({ seasonId: z.string().min(1) });
+
 export const divisionSchema = z.object({
   name: trimmed(120).min(2),
   slug: trimmed(120)
@@ -159,6 +163,8 @@ export const divisionSchema = z.object({
     .regex(/^[a-z0-9-]+$/),
   sortOrder: z.number().int().min(0).max(99).default(0),
 });
+
+export const updateDivisionSchema = divisionSchema.extend({ divisionId: z.string().min(1) });
 
 export const teamSchema = z.object({
   divisionId: z.string().min(1),
