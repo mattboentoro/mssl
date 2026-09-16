@@ -11,7 +11,7 @@ import { AuthzError, requireReferee } from "@/lib/authz";
 import { formatDateTime, parseMonthValue, shiftMonth } from "@/lib/dates";
 import { zonedToUtc } from "@/lib/timezone";
 import { MATCH_STATUS_LABELS, type MatchStatus } from "@/lib/enums";
-import { getActiveSeason, getDivisions, listMatches } from "@/lib/queries";
+import { getActiveSeason, getDivisions, listMatches, scoreText } from "@/lib/queries";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = { title: "Referee Control" };
@@ -217,7 +217,7 @@ export default async function RefereePage({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <MatchStatusBadge match={{ ...match, hasResult: Boolean(match.report) }} />
+                      <MatchStatusBadge match={match} />
                       <span className="text-muted text-xs">{match.division.name}</span>
                     </div>
                     <FixtureLine className="mt-1" match={match} href={`/referee/${match.id}`} />
@@ -451,7 +451,7 @@ export default async function RefereePage({
                 <div className="flex items-center gap-3">
                   {match.report ? (
                     <span className="font-mono text-sm font-semibold">
-                      {match.report.homeScore}&ndash;{match.report.awayScore}
+                      {scoreText(match.report)}
                     </span>
                   ) : null}
                   <span className="text-muted text-xs">

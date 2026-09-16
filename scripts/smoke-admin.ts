@@ -728,7 +728,7 @@ async function main(): Promise<void> {
 
     // The panel posts the raw datetime-local value so the server can read it as
     // Redmond wall-clock time. Demanding an ISO offset here made every single
-    // "Save schedule" 422 before the route ever ran.
+    // "Save fixture" 422 before the route ever ran.
     const WALL = "2031-03-09T19:45";
     const rescheduled = await req(`/api/matches/${importedMatch.id}/schedule`, {
       method: "POST",
@@ -952,6 +952,62 @@ async function main(): Promise<void> {
       "filtering by Need a referee returns only unclaimed future fixtures",
       listed.length > 0 && strays.length === 0,
       `${listed.length} listed, ${strays.length} that should not be`,
+    );
+
+    /*
+      A forfeit is filed against the played score, normally 0-0. Every fixture
+      list has to print the awarded scoreline instead, or the table and the
+      schedule contradict each other in public.
+    */
+    await req(`/api/matches/${importedMatch.id}/override`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        homeScore: 0,
+        awayScore: 0,
+        homeForfeit: false,
+        awayForfeit: true,
+        reason: "Away side did not field a team",
+      }),
+    });
+    const forfeited = await prisma.match.findUnique({
+      where: { id: importedMatch.id },
+      include: { report: true },
+    });
+    check(
+      "recording a forfeit files it against the played score",
+      forfeited?.report?.awayForfeit === true && forfeited.report.homeScore === 0,
+      `filed ${forfeited?.report?.homeScore}-${forfeited?.report?.awayScore}`,
+    );
+
+    const forfeitRow = await (await req("/admin/matches?status=FORFEITED&when=all")).text();
+    check(
+      "a forfeited fixture is listed under Forfeited",
+      forfeitRow.includes(importedMatch.id),
+      "not in the Forfeited bucket",
+    );
+    /*
+      Scoped to this fixture's own row: the bucket holds every forfeit in the
+      league, and a double forfeit is legitimately awarded 0-0.
+    */
+    const at = forfeitRow.indexOf(importedMatch.id);
+    const row = forfeitRow.slice(Math.max(0, at - 400), at + 2000);
+    check(
+      "the list awards the forfeit rather than printing 0-0",
+      row.includes("3\u20130") && !row.includes("0\u20130"),
+      "awarded scoreline missing",
+    );
+    check(
+      "the badge calls it Forfeited, not Completed",
+      row.includes("Forfeited"),
+      "badge missing",
+    );
+
+    const completedRows = await (await req("/admin/matches?status=COMPLETED&when=all")).text();
+    check(
+      "a forfeit does not also show up as a played result",
+      !completedRows.includes(importedMatch.id),
+      "still listed under Completed",
     );
   }
 

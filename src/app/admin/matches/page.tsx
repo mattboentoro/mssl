@@ -15,7 +15,7 @@ import {
   matchDisplayWhere,
 } from "@/lib/match-status";
 import { prisma } from "@/lib/prisma";
-import { getActiveSeason, listMatches } from "@/lib/queries";
+import { getActiveSeason, listMatches, scoreText } from "@/lib/queries";
 import { zonedToUtc } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
@@ -78,7 +78,15 @@ export default async function AdminMatchesPage({
         awayTeam: { select: { name: true, colorPrimary: true, colorAlternate: true } },
         division: { select: { name: true } },
         referee: { select: { name: true } },
-        report: { select: { homeScore: true, awayScore: true, status: true } },
+        report: {
+          select: {
+            homeScore: true,
+            awayScore: true,
+            homeForfeit: true,
+            awayForfeit: true,
+            status: true,
+          },
+        },
       },
     }),
   ]);
@@ -237,83 +245,84 @@ export default async function AdminMatchesPage({
                 </tr>
               </thead>
               <tbody className="divide-subtle divide-y">
-                {matches.map((match) => (
-                  <ClickableRow key={match.id} href={`/admin/matches/${match.id}`}>
-                    <td className="text-muted px-3 py-2">
-                      {match.matchweek}
-                      {match.countsForStandings ? null : (
-                        <span
-                          className="ml-1 rounded bg-amber-100 px-1 py-px text-[10px] font-semibold tracking-wide text-amber-900 dark:bg-amber-900/50 dark:text-amber-100"
-                          title="This fixture is excluded from the league table."
-                        >
-                          <span className="sr-only">Does not count towards the standings, </span>
-                          NL
-                        </span>
-                      )}
-                    </td>
-                    <td className="text-muted px-3 py-2 whitespace-nowrap">
-                      {formatDateTime(match.kickoffAt)}
-                    </td>
-                    <td className="px-3 py-2">
-                      {/*
+                {matches.map((match) => {
+                  const score = scoreText(match.report);
+                  return (
+                    <ClickableRow key={match.id} href={`/admin/matches/${match.id}`}>
+                      <td className="text-muted px-3 py-2">
+                        {match.matchweek}
+                        {match.countsForStandings ? null : (
+                          <span
+                            className="ml-1 rounded bg-amber-100 px-1 py-px text-[10px] font-semibold tracking-wide text-amber-900 dark:bg-amber-900/50 dark:text-amber-100"
+                            title="This fixture is excluded from the league table."
+                          >
+                            <span className="sr-only">Does not count towards the standings, </span>
+                            NL
+                          </span>
+                        )}
+                      </td>
+                      <td className="text-muted px-3 py-2 whitespace-nowrap">
+                        {formatDateTime(match.kickoffAt)}
+                      </td>
+                      <td className="px-3 py-2">
+                        {/*
                         The whole row is clickable, but this link is what
                         keyboard users tab to and what still works with
                         JavaScript disabled.
                       */}
-                      <Link
-                        href={`/admin/matches/${match.id}`}
-                        className="hover:text-brand inline-flex flex-wrap items-center gap-x-2 gap-y-1 font-medium hover:underline"
-                      >
-                        {/*
+                        <Link
+                          href={`/admin/matches/${match.id}`}
+                          className="hover:text-brand inline-flex flex-wrap items-center gap-x-2 gap-y-1 font-medium hover:underline"
+                        >
+                          {/*
                           "FT" leads the line so a scanned column of fixtures
                           separates played from scheduled at a glance, without
                           reading the status badge at the far right.
                         */}
-                        {match.report ? (
-                          <span className="rounded bg-emerald-100 px-1 py-px text-[10px] font-semibold tracking-wide text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
-                            <span className="sr-only">Full time, </span>FT
+                          {match.report ? (
+                            <span className="rounded bg-emerald-100 px-1 py-px text-[10px] font-semibold tracking-wide text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
+                              <span className="sr-only">Full time, </span>FT
+                            </span>
+                          ) : null}
+                          <span className="inline-flex items-center gap-1.5">
+                            <KitSwatch
+                              team={match.homeTeam}
+                              kit={match.homeKit}
+                              teamName={match.homeTeam.name}
+                            />
+                            {match.homeTeam.name}
                           </span>
-                        ) : null}
-                        <span className="inline-flex items-center gap-1.5">
-                          <KitSwatch
-                            team={match.homeTeam}
-                            kit={match.homeKit}
-                            teamName={match.homeTeam.name}
-                          />
-                          {match.homeTeam.name}
-                        </span>
-                        {/*
+                          {/*
                           The result reads inline with the fixture — "Home 2–1
                           Away" — so a separate score column is not needed and
                           the table stays narrow enough for a laptop.
                         */}
-                        {match.report ? (
-                          <span className="font-mono font-semibold tabular-nums">
-                            {`${match.report.homeScore}\u2013${match.report.awayScore}`}
+                          {score ? (
+                            <span className="font-mono font-semibold tabular-nums">{score}</span>
+                          ) : (
+                            <span className="text-muted text-xs font-normal">vs</span>
+                          )}
+                          <span className="inline-flex items-center gap-1.5">
+                            <KitSwatch
+                              team={match.awayTeam}
+                              kit={match.awayKit}
+                              teamName={match.awayTeam.name}
+                            />
+                            {match.awayTeam.name}
                           </span>
-                        ) : (
-                          <span className="text-muted text-xs font-normal">vs</span>
-                        )}
-                        <span className="inline-flex items-center gap-1.5">
-                          <KitSwatch
-                            team={match.awayTeam}
-                            kit={match.awayKit}
-                            teamName={match.awayTeam.name}
-                          />
-                          {match.awayTeam.name}
-                        </span>
-                      </Link>
-                      {match.venueName ? (
-                        <span className="text-muted block text-xs">{match.venueName}</span>
-                      ) : null}
-                    </td>
-                    <td className="text-muted px-3 py-2">{match.division.name}</td>
-                    <td className="text-muted px-3 py-2">{match.referee?.name ?? "\u2014"}</td>
-                    <td className="px-3 py-2">
-                      <MatchStatusBadge match={{ ...match, hasResult: Boolean(match.report) }} />
-                    </td>
-                  </ClickableRow>
-                ))}
+                        </Link>
+                        {match.venueName ? (
+                          <span className="text-muted block text-xs">{match.venueName}</span>
+                        ) : null}
+                      </td>
+                      <td className="text-muted px-3 py-2">{match.division.name}</td>
+                      <td className="text-muted px-3 py-2">{match.referee?.name ?? "\u2014"}</td>
+                      <td className="px-3 py-2">
+                        <MatchStatusBadge match={match} />
+                      </td>
+                    </ClickableRow>
+                  );
+                })}
               </tbody>
             </table>
           </Card>

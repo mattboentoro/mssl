@@ -11,10 +11,17 @@
  */
 
 export type MatchDisplayStatus =
-  "COMPLETED" | "WAITING_REPORT" | "NOT_STARTED" | "NEEDS_REFEREE" | "POSTPONED" | "CANCELLED";
+  | "COMPLETED"
+  | "FORFEITED"
+  | "WAITING_REPORT"
+  | "NOT_STARTED"
+  | "NEEDS_REFEREE"
+  | "POSTPONED"
+  | "CANCELLED";
 
 export const MATCH_DISPLAY_LABELS: Record<MatchDisplayStatus, string> = {
   COMPLETED: "Completed",
+  FORFEITED: "Forfeited",
   WAITING_REPORT: "Waiting report",
   NOT_STARTED: "Not started",
   NEEDS_REFEREE: "Need a referee",
@@ -22,13 +29,23 @@ export const MATCH_DISPLAY_LABELS: Record<MatchDisplayStatus, string> = {
   CANCELLED: "Cancelled",
 };
 
+/** The part of a report that changes what a fixture shows. */
+export type ReportOutcome = { homeForfeit: boolean; awayForfeit: boolean };
+
 export type MatchDisplayInput = {
   status: string;
   refereeId: string | null;
   kickoffAt: Date | string;
-  /** Whether a score has been filed, by the referee or by an admin override. */
-  hasResult: boolean;
+  /**
+   * The filed report, by the referee or by an admin override. Passed whole
+   * rather than as a `hasResult` flag so a caller cannot say a score exists
+   * while leaving out how it was reached.
+   */
+  report: ReportOutcome | null;
 };
+
+export const isForfeit = (report: ReportOutcome | null): boolean =>
+  Boolean(report && (report.homeForfeit || report.awayForfeit));
 
 export function matchDisplayStatus(
   match: MatchDisplayInput,
@@ -39,7 +56,8 @@ export function matchDisplayStatus(
 
   // A score is the end of the story regardless of the clock: an admin can file
   // one early, and a confirmed result must not drop back to "waiting".
-  if (match.hasResult) return "COMPLETED";
+  if (isForfeit(match.report)) return "FORFEITED";
+  if (match.report) return "COMPLETED";
 
   const kickoff = match.kickoffAt instanceof Date ? match.kickoffAt : new Date(match.kickoffAt);
   if (kickoff.getTime() <= now.getTime()) return "WAITING_REPORT";
@@ -47,12 +65,20 @@ export function matchDisplayStatus(
   return match.refereeId ? "NOT_STARTED" : "NEEDS_REFEREE";
 }
 
+/**
+ * The buckets Match Control offers as a filter, in the order a fixture moves
+ * through them.
+ *
+ * `POSTPONED` is deliberately absent. The badge still says it when a fixture
+ * is called off to a later date, but a postponed match is a scheduling note
+ * rather than a state anyone filters a fixture list by.
+ */
 export const MATCH_DISPLAY_STATUSES = [
   "NEEDS_REFEREE",
   "NOT_STARTED",
   "WAITING_REPORT",
   "COMPLETED",
-  "POSTPONED",
+  "FORFEITED",
   "CANCELLED",
 ] as const satisfies readonly MatchDisplayStatus[];
 
@@ -62,6 +88,8 @@ export function isMatchDisplayStatus(value: string): value is MatchDisplayStatus
 
 /** Statuses that settle a fixture outright, so no amount of clock-watching applies. */
 const OFF_STATUSES = ["CANCELLED", "POSTPONED"];
+
+const FORFEITED_BY_EITHER = { OR: [{ homeForfeit: true }, { awayForfeit: true }] };
 
 /**
  * The same rules as `matchDisplayStatus`, expressed as a Prisma filter.
@@ -77,7 +105,10 @@ export function matchDisplayWhere(
   if (display === "CANCELLED" || display === "POSTPONED") return { status: display };
 
   const inPlay = { status: { notIn: OFF_STATUSES } };
-  if (display === "COMPLETED") return { ...inPlay, report: { isNot: null } };
+  if (display === "FORFEITED") return { ...inPlay, report: { is: FORFEITED_BY_EITHER } };
+  if (display === "COMPLETED") {
+    return { ...inPlay, report: { is: { homeForfeit: false, awayForfeit: false } } };
+  }
 
   const awaiting = { ...inPlay, report: { is: null } };
   if (display === "WAITING_REPORT") return { ...awaiting, kickoffAt: { lte: now } };

@@ -128,6 +128,7 @@ export function Badge({
 
 const DISPLAY_TONES: Record<MatchDisplayStatus, BadgeTone> = {
   COMPLETED: "success",
+  FORFEITED: "danger",
   WAITING_REPORT: "warning",
   NOT_STARTED: "warning",
   NEEDS_REFEREE: "neutral",

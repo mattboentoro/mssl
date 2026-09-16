@@ -11,8 +11,9 @@ import { AuthzError, requireReferee } from "@/lib/authz";
 import { formatDateTime } from "@/lib/dates";
 import { CARD_LABELS, type CardType } from "@/lib/enums";
 import { kitColorName, resolveKit } from "@/lib/kits";
+import { isForfeit } from "@/lib/match-status";
 import { prisma } from "@/lib/prisma";
-import { getWarningBoard } from "@/lib/queries";
+import { getWarningBoard, scoreText } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Match" };
@@ -94,7 +95,7 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
             </span>
           </>
         }
-        actions={<MatchStatusBadge match={{ ...match, hasResult: Boolean(match.report) }} />}
+        actions={<MatchStatusBadge match={match} />}
       />
 
       {!canAct ? (
@@ -196,9 +197,18 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
           </h2>
           <Card className="p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-3xl font-bold tabular-nums">
-                {match.report.homeScore} &ndash; {match.report.awayScore}
-              </p>
+              <div>
+                <p className="text-3xl font-bold tabular-nums">{scoreText(match.report)}</p>
+                {/*
+                  A forfeit is filed against the played score, usually 0-0, so
+                  show both rather than let the awarded figures look invented.
+                */}
+                {isForfeit(match.report) ? (
+                  <p className="text-muted text-xs">
+                    {`Awarded on forfeit \u00b7 filed ${match.report.homeScore}\u2013${match.report.awayScore}`}
+                  </p>
+                ) : null}
+              </div>
               <div className="flex flex-wrap gap-2">
                 <Badge tone={match.report.status === "CONFIRMED" ? "success" : "brand"}>
                   {match.report.status}

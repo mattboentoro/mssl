@@ -3,6 +3,7 @@ import { config } from "@/lib/config";
 import { prisma } from "@/lib/prisma";
 import {
   calculateStandingsByDivision,
+  forfeitScoreline,
   type PrimaryMetric,
   type StandingsMatchInput,
   type StandingsOptions,
@@ -20,6 +21,38 @@ export const standingsOptionsFromConfig = (): StandingsOptions => ({
   includeUnconfirmed: config.standings.includeUnconfirmed,
   forfeitScore: config.standings.forfeit,
 });
+
+/** The bits of a report that decide what scoreline a fixture shows. */
+type ScoredReport = {
+  homeScore: number;
+  awayScore: number;
+  homeForfeit: boolean;
+  awayForfeit: boolean;
+};
+
+/**
+ * The scoreline to print for a fixture: the awarded one when a side forfeited,
+ * otherwise the one the referee reported.
+ *
+ * A forfeit is a ruling rather than a result, and referees file it against a
+ * 0-0. Printing that 0-0 would contradict the standings, which count the
+ * awarded score — so every fixture list runs the report through here first.
+ */
+export function displayedScore(
+  report: ScoredReport | null | undefined,
+): { home: number; away: number } | null {
+  if (!report) return null;
+  const awarded = forfeitScoreline(report, config.standings.forfeit);
+  return awarded
+    ? { home: awarded.homeGoals, away: awarded.awayGoals }
+    : { home: report.homeScore, away: report.awayScore };
+}
+
+/** `displayedScore` written out, e.g. "3–0", or `null` when no report exists. */
+export function scoreText(report: ScoredReport | null | undefined): string | null {
+  const score = displayedScore(report);
+  return score ? `${score.home}\u2013${score.away}` : null;
+}
 
 /** Exactly the columns `calculateStandings` needs — nothing more. */
 const STANDINGS_MATCH_SELECT = {
