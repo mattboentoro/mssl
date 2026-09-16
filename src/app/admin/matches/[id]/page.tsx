@@ -9,7 +9,9 @@ import { Alert, Badge, Card, MatchStatusBadge } from "@/components/ui";
 import { deleteMatchAction } from "@/app/admin/actions";
 import { formatDateTime } from "@/lib/dates";
 import { CARD_LABELS, type CardType, type KitChoice } from "@/lib/enums";
+import { isForfeit } from "@/lib/match-status";
 import { prisma } from "@/lib/prisma";
+import { scoreText } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -80,13 +82,8 @@ export default async function AdminMatchDetailPage({
               {formatDateTime(match.kickoffAt)}
               {match.venueName ? ` \u00b7 ${match.venueName}` : ""}
             </p>
-            <p className="text-muted mt-1 text-xs">
-              Referee: {match.referee?.name ?? "unassigned"}
-              {match.assignedAt ? ` \u00b7 claimed ${formatDateTime(match.assignedAt)}` : ""}
-              {` \u00b7 v${match.version}`}
-            </p>
           </div>
-          <MatchStatusBadge status={match.status} />
+          <MatchStatusBadge match={match} />
         </div>
       </Card>
 
@@ -97,9 +94,18 @@ export default async function AdminMatchDetailPage({
           </h2>
           <Card className="p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-3xl font-bold tabular-nums">
-                {match.report.homeScore} &ndash; {match.report.awayScore}
-              </p>
+              <div>
+                <p className="text-3xl font-bold tabular-nums">{scoreText(match.report)}</p>
+                {/*
+                  A forfeit is filed against the played score, usually 0-0, so
+                  show both rather than let the awarded figures look invented.
+                */}
+                {isForfeit(match.report) ? (
+                  <p className="text-muted text-xs">
+                    {`Awarded on forfeit \u00b7 filed ${match.report.homeScore}\u2013${match.report.awayScore}`}
+                  </p>
+                ) : null}
+              </div>
               <div className="flex flex-wrap gap-2">
                 <Badge tone={match.report.status === "CONFIRMED" ? "success" : "brand"}>
                   {match.report.status}
@@ -206,6 +212,8 @@ export default async function AdminMatchDetailPage({
         awayKit={match.awayKit as KitChoice}
         currentHomeScore={match.report?.homeScore ?? 0}
         currentAwayScore={match.report?.awayScore ?? 0}
+        currentHomeForfeit={match.report?.homeForfeit ?? false}
+        currentAwayForfeit={match.report?.awayForfeit ?? false}
         referees={referees.map((r) => ({ id: r.id, name: r.name }))}
       />
 

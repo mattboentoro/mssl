@@ -33,7 +33,7 @@ To load it into the local database:
 
 1. Start the site with `npm run dev` and open <http://localhost:3000/signin>.
 2. Sign in as the `admin` development persona.
-3. Open <http://localhost:3000/admin/import>.
+3. Open <http://localhost:3000/admin/matches> and select **Upload CSV**.
 4. Choose the target season and upload `tests/MSSL schedule.csv`.
 5. Select **Dry run**. Review every row and resolve any errors.
 6. Select **Import valid rows** to save the fixtures.
@@ -322,7 +322,8 @@ The report form is mobile-first: referees file from a phone at the pitch.
   rescind one. Admin-issued rows are tagged `ADMIN`, surface on the **referee's
   warning board** for that team's next fixture, and count towards the standings
   tiebreaker. Rows that arrived on a game report are tagged `REFEREE`.
-- `/admin/import` — bulk CSV schedule import with a **dry-run preview**.
+- **Upload CSV** on `/admin/matches` — bulk CSV schedule import with a
+  **dry-run preview**, in a banner opened by the button next to Download CSV.
   Columns: `matchweek`, `kickoff`, `division`, `home`, `away`, `venue`, and
   optional `counts`. Matchweek is free text, and kick-off accepts ISO-like or
   month-first values interpreted in Redmond time. Teams and divisions match by
@@ -332,8 +333,8 @@ The report form is mobile-first: referees file from a phone at the pitch.
   matchweek, same two teams) are skipped as duplicates.
 - `/admin/schedule.csv?season=<id>` — exports the season's fixtures. The export
   is **a valid import template**: download it, edit or append rows, and feed it
-  straight back into `/admin/import`. The admin smoke test proves the round trip
-  rather than asserting a fixed header string.
+  straight back into the Upload CSV dialog. The admin smoke test proves the
+  round trip rather than asserting a fixed header string.
 - `/admin/content` — announcements and documents.
 - `/admin/standings` — apply or reverse a **points adjustment** against a team,
   filtered by league so a deduction can't land on the right name in the wrong

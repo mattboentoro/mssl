@@ -85,6 +85,17 @@ export const disciplinaryActionSchema = z.object({
   type: z.enum(CARD_TYPES),
   minute: minuteSchema.nullable().optional(),
   note: optionalText(500).nullable().optional(),
+  /**
+   * Ban length in fixtures. Left blank a red card lands in the review queue,
+   * which is the whole point of the queue — an administrator has to decide.
+   */
+  gamesSuspended: z.number().int().min(0).max(50).nullable().optional(),
+});
+
+export const suspensionLengthSchema = z.object({
+  id: z.string().min(1),
+  gamesSuspended: z.number().int().min(0, "Enter zero or more games.").max(50),
+  note: optionalText(500).nullable().optional(),
 });
 
 export const assignSchema = z.object({
@@ -116,6 +127,11 @@ export const matchUpdateSchema = z.object({
   kickoffAt: z.string().min(1).max(40).optional(),
   /** Free text, shown on the fixture exactly as typed. Never validated. */
   venueName: z.string().max(200).nullable().optional(),
+  /*
+    Any status is accepted here, but Match Control only offers the two an admin
+    owns outright plus the fixture's own workflow status — see
+    ADMIN_SETTABLE_MATCH_STATUSES and deriveMatchStatus.
+  */
   status: z.enum(MATCH_STATUSES).optional(),
   matchweek: trimmed(40).min(1, "Give the fixture a matchweek, such as 7 or Final.").optional(),
   countsForStandings: z.boolean().optional(),
@@ -147,6 +163,11 @@ export const seasonSchema = z.object({
   isActive: z.boolean().default(false),
 });
 
+export const updateSeasonSchema = seasonSchema.extend({
+  seasonId: z.string().min(1),
+  tiebreakerMode: z.enum(["POINTS", "POINTS_PER_GAME"]),
+});
+
 export const divisionSchema = z.object({
   name: trimmed(120).min(2),
   slug: trimmed(120)
@@ -155,12 +176,16 @@ export const divisionSchema = z.object({
   sortOrder: z.number().int().min(0).max(99).default(0),
 });
 
+export const updateDivisionSchema = divisionSchema.extend({ divisionId: z.string().min(1) });
+
 export const teamSchema = z.object({
   divisionId: z.string().min(1),
   name: trimmed(120).min(2),
+  // Now typed by hand on the create form, so the failure has to say what a
+  // legal address looks like rather than Zod's bare "Invalid".
   slug: trimmed(120)
     .min(1)
-    .regex(/^[a-z0-9-]+$/),
+    .regex(/^[a-z0-9-]+$/, "Use lower-case letters, numbers and hyphens only — rcs-united."),
   shortName: trimmed(24).min(1),
   colorPrimary: hexColor("#0f766e"),
   colorAlternate: hexColor("#ffffff"),

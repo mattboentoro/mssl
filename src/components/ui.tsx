@@ -1,8 +1,13 @@
 import Link from "next/link";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 
-import { MATCH_STATUS_LABELS, type MatchStatus } from "@/lib/enums";
 import { cn } from "@/lib/cn";
+import {
+  MATCH_DISPLAY_LABELS,
+  matchDisplayStatus,
+  type MatchDisplayInput,
+  type MatchDisplayStatus,
+} from "@/lib/match-status";
 
 /* -------------------------------------------------------------------------- */
 /* Layout primitives                                                          */
@@ -121,36 +126,45 @@ export function Badge({
   );
 }
 
-const STATUS_TONES: Record<MatchStatus, BadgeTone> = {
-  SCHEDULED: "neutral",
-  ASSIGNED: "accent",
-  REPORT_SUBMITTED: "brand",
-  CONFIRMED: "success",
+const DISPLAY_TONES: Record<MatchDisplayStatus, BadgeTone> = {
+  COMPLETED: "success",
+  FORFEITED: "danger",
+  WAITING_REPORT: "warning",
+  NOT_STARTED: "warning",
+  NEEDS_REFEREE: "neutral",
   POSTPONED: "warning",
   CANCELLED: "danger",
-  FORFEIT: "danger",
 };
 
-export function MatchStatusBadge({ status }: { status: string }) {
-  const key = (MATCH_STATUS_LABELS[status as MatchStatus] ? status : "SCHEDULED") as MatchStatus;
-  return <Badge tone={STATUS_TONES[key]}>{MATCH_STATUS_LABELS[key]}</Badge>;
+export function MatchStatusBadge({ match }: { match: MatchDisplayInput }) {
+  const key = matchDisplayStatus(match);
+  return <Badge tone={DISPLAY_TONES[key]}>{MATCH_DISPLAY_LABELS[key]}</Badge>;
 }
 
 /* -------------------------------------------------------------------------- */
 /* Buttons                                                                    */
 /* -------------------------------------------------------------------------- */
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+export type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "danger";
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   primary: "bg-brand text-brand-contrast hover:opacity-90",
   secondary: "bg-surface border-subtle border hover:bg-surface-muted",
+  outline: "border-subtle border-2 hover:bg-surface-muted",
   ghost: "hover:bg-surface-muted",
   danger: "bg-danger text-white hover:opacity-90",
 };
 
 const BUTTON_BASE =
   "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50";
+
+/**
+ * The bare-outline control used for page-level secondary actions: no fill, just
+ * a hairline on the page background. Shared so "Download CSV" and the "New …"
+ * dialog triggers stay identical.
+ */
+export const outlineButtonClass =
+  "border-subtle hover:bg-surface-muted inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition";
 
 export function buttonClass(variant: ButtonVariant = "primary", className?: string) {
   return cn(BUTTON_BASE, BUTTON_VARIANTS[variant], className);

@@ -62,11 +62,18 @@ export function ActionForm({
   children,
   className,
   resetOnSuccess = true,
+  showSuccess = true,
 }: {
   action: ServerAction;
   children: ReactNode;
   className?: string;
   resetOnSuccess?: boolean;
+  /**
+   * Whether a successful result gets a banner. Forms inside a dialog set this
+   * to `false`: the dialog closes on success, so the banner would be announcing
+   * the save to a panel nobody is looking at any more.
+   */
+  showSuccess?: boolean;
 }) {
   const [state, formAction] = useActionState<ActionState, FormData>(action, {});
 
@@ -82,7 +89,7 @@ export function ActionForm({
             {state.error}
           </Alert>
         ) : null}
-        {state.ok ? (
+        {showSuccess && state.ok ? (
           <Alert tone="success" className="mb-3">
             {state.ok}
           </Alert>
@@ -93,8 +100,22 @@ export function ActionForm({
   );
 }
 
-/** Inline validation message for a single field, read from the enclosing form. */
-export function FieldError({ name }: { name: string }) {
+/**
+ * Current server-action result for the enclosing {@link ActionForm}.
+ *
+ * Lets a wrapper — a dialog, say — react to a submission it did not render,
+ * since the state lives inside `ActionForm` and cannot be lifted without
+ * pushing `useActionState` across the RSC boundary.
+ */
+export function useActionResult() {
+  return useContext(ActionStateContext);
+}
+
+/** Inline validation message for a single field, read from the enclosing form. */ export function FieldError({
+  name,
+}: {
+  name: string;
+}) {
   const state = useContext(ActionStateContext);
   const message = state.fieldErrors?.[name];
   if (!message) return null;

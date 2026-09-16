@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 
 import { kitsClash } from "../src/lib/kits";
+import { YELLOW_CARDS_PER_BAN, planAccumulationBans, playerKey } from "../src/lib/suspensions";
 
 /**
  * Deterministic seed data.
@@ -301,6 +302,7 @@ async function reset() {
   await prisma.gameReport.deleteMany();
   await prisma.match.deleteMany();
   await prisma.pointsAdjustment.deleteMany();
+  await prisma.seasonTeam.deleteMany();
   await prisma.team.deleteMany();
   await prisma.division.deleteMany();
   await prisma.announcement.deleteMany();
@@ -322,6 +324,9 @@ type SeededTeam = {
   colorAlternate: string;
 };
 
+/** The divisions and who is in them, for one season. */
+type League = { id: string; name: string; teams: SeededTeam[] }[];
+
 function makeSquad(seedText: string): string[] {
   const base = [...seedText].reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
   return Array.from({ length: 11 }, (_, i) => {
@@ -338,7 +343,7 @@ function makeSquad(seedText: string): string[] {
  * league rather than an entry in one year's competition. Every season then
  * plays its fixtures between these same teams.
  */
-async function seedLeague() {
+async function seedLeague(): Promise<League> {
   const divisionSpecs = [
     { name: "Premier League", slug: "premier-league", sortOrder: 1, teams: PREMIER_LEAGUE_TEAMS },
     { name: "First Division", slug: "first-division", sortOrder: 2, teams: FIRST_DIVISION_TEAMS },
@@ -381,6 +386,44 @@ async function seedLeague() {
   return league;
 }
 
+/**
+ * The league as it stood a season ago: one club up, one club down.
+ *
+ * `seedLeague` writes each club's *current* division. Replaying that same
+ * structure for every season would make per-season membership look like dead
+ * weight — and it is precisely the promoted club's old table that goes wrong
+ * when a season's divisions are read from `Team.divisionId`. Swapping a pair
+ * here means the archived table can be eyeballed: the promoted side should
+ * still appear in the division it won, not the one it now plays in.
+ *
+ * Swapping one-for-one keeps both divisions the size they already are, so the
+ * fixture generator produces the same shape of season either way.
+ */
+function previousSeasonLeague(league: League): {
+  league: League;
+  promoted: string;
+  relegated: string;
+} {
+  const [top, second] = league;
+  if (!top || !second || top.teams.length === 0 || second.teams.length === 0) {
+    return { league, promoted: "", relegated: "" };
+  }
+
+  // Bottom of the top flight goes down; champion of the tier below comes up.
+  const promoted = top.teams[top.teams.length - 1];
+  const relegated = second.teams[0];
+
+  return {
+    league: [
+      { ...top, teams: [...top.teams.slice(0, -1), relegated] },
+      { ...second, teams: [promoted, ...second.teams.slice(1)] },
+      ...league.slice(2),
+    ],
+    promoted: promoted.name,
+    relegated: relegated.name,
+  };
+}
+
 async function seedSeason(options: {
   name: string;
   slug: string;
@@ -389,7 +432,7 @@ async function seedSeason(options: {
   firstMatchweekOffsetDays: number;
   venueNames: string[];
   refereeIds: string[];
-  league: { id: string; name: string; teams: SeededTeam[] }[];
+  league: League;
 }) {
   const { name, slug, isActive, firstMatchweekOffsetDays, venueNames, refereeIds, league } =
     options;
@@ -404,6 +447,20 @@ async function seedSeason(options: {
       startsOn: new Date(firstKickoff.getTime() - 7 * DAY),
       endsOn: new Date(firstKickoff.getTime() + 42 * DAY),
     },
+  });
+
+  // Pin who played where. The fixtures below are generated from this same
+  // structure, so recording it makes the season's division membership an
+  // explicit fact rather than something inferred from where a club sits today
+  // -- which is what lets a later promotion leave this season alone.
+  await prisma.seasonTeam.createMany({
+    data: league.flatMap((entry) =>
+      entry.teams.map((team) => ({
+        seasonId: season.id,
+        teamId: team.id,
+        divisionId: entry.id,
+      })),
+    ),
   });
 
   for (const entry of league) {
@@ -670,6 +727,109 @@ async function seedLeagueSanctions(seasonId: string) {
   return issued;
 }
 
+/**
+ * Apply the yellow-accumulation rule across everything seeded so far, and
+ * decide one red card so the sample league shows a ban actually being served.
+ *
+ * The rule normally runs inside `submitGameReport`, but the seed writes cards
+ * straight to the database, so it has to be swept afterwards.
+ */
+async function seedSuspensions(seasonId: string) {
+  // Cards are dealt at random across ~165 players, so a natural hat-trick of
+  // yellows is unlikely. Top the busiest offender up to three so the automatic
+  // ban is visible in the sample league.
+  const busiest = await prisma.disciplinaryAction.groupBy({
+    by: ["teamId", "playerName"],
+    where: { seasonId, type: "YELLOW" },
+    _count: { _all: true },
+    orderBy: [{ _count: { id: "desc" } }, { playerName: "asc" }],
+    take: 1,
+  });
+
+  if (busiest.length > 0) {
+    const target = busiest[0];
+    const shortfall = YELLOW_CARDS_PER_BAN - target._count._all;
+    const played = await prisma.match.findMany({
+      where: {
+        seasonId,
+        OR: [{ homeTeamId: target.teamId }, { awayTeamId: target.teamId }],
+        report: { isNot: null },
+      },
+      orderBy: { kickoffAt: "asc" },
+      select: { id: true, kickoffAt: true },
+    });
+
+    for (let index = 0; index < shortfall && index < played.length; index += 1) {
+      await prisma.disciplinaryAction.create({
+        data: {
+          seasonId,
+          teamId: target.teamId,
+          matchId: played[index].id,
+          playerName: target.playerName,
+          type: "YELLOW",
+          minute: 20 + index * 15,
+          issuedBy: "REFEREE",
+          createdAt: played[index].kickoffAt,
+        },
+      });
+    }
+  }
+
+  const yellows = await prisma.disciplinaryAction.findMany({
+    where: { seasonId, type: "YELLOW" },
+    select: {
+      id: true,
+      teamId: true,
+      playerName: true,
+      gamesSuspended: true,
+      suspensionReason: true,
+      createdAt: true,
+    },
+  });
+
+  const byPlayer = new Map<string, typeof yellows>();
+  for (const card of yellows) {
+    const key = playerKey(card.teamId, card.playerName);
+    const bucket = byPlayer.get(key);
+    if (bucket) bucket.push(card);
+    else byPlayer.set(key, [card]);
+  }
+
+  let automatic = 0;
+  for (const bucket of byPlayer.values()) {
+    for (const change of planAccumulationBans(bucket)) {
+      await prisma.disciplinaryAction.update({
+        where: { id: change.id },
+        data: {
+          gamesSuspended: change.gamesSuspended,
+          suspensionReason: change.suspensionReason,
+        },
+      });
+      if (change.gamesSuspended) automatic += 1;
+    }
+  }
+
+  // Leave every other red card undecided so the review queue on
+  // /admin/discipline has something in it.
+  const reviewed = await prisma.disciplinaryAction.findFirst({
+    where: { seasonId, type: "RED", gamesSuspended: null },
+    orderBy: { createdAt: "asc" },
+  });
+  if (reviewed) {
+    await prisma.disciplinaryAction.update({
+      where: { id: reviewed.id },
+      data: { gamesSuspended: 3, suspensionReason: "RED_CARD" },
+    });
+  }
+
+  return {
+    automatic,
+    pending: await prisma.disciplinaryAction.count({
+      where: { seasonId, type: "RED", gamesSuspended: null },
+    }),
+  };
+}
+
 async function seedContent(seasonId: string) {
   const announcements = [
     {
@@ -818,6 +978,7 @@ async function main() {
   const league = await seedLeague();
 
   console.log("Seeding previous season...");
+  const previous = previousSeasonLeague(league);
   await seedSeason({
     name: "2026 Spring",
     slug: "2026-spring",
@@ -825,7 +986,7 @@ async function main() {
     firstMatchweekOffsetDays: -170,
     venueNames: VENUE_NAMES,
     refereeIds,
-    league,
+    league: previous.league,
   });
 
   console.log("Seeding active season...");
@@ -848,6 +1009,9 @@ async function main() {
   console.log("Seeding a sample points deduction...");
   await seedPointsAdjustment(active.id);
 
+  console.log("Applying suspensions...");
+  const suspensions = await seedSuspensions(active.id);
+
   const counts = {
     seasons: await prisma.season.count(),
     divisions: await prisma.division.count(),
@@ -859,6 +1023,8 @@ async function main() {
     cards: await prisma.disciplinaryAction.count(),
     sanctions: await prisma.disciplinaryAction.count({ where: { issuedBy: "ADMIN" } }),
     adjustments: await prisma.pointsAdjustment.count(),
+    autoBans: suspensions.automatic,
+    redsToReview: suspensions.pending,
   };
 
   console.log("\nSeed complete:");
@@ -869,6 +1035,12 @@ async function main() {
     "\nSign in with DEV_AUTH_BYPASS=true as 'Referee' to claim one of the " +
       `${counts.openMatches} open fixtures.\n`,
   );
+  if (previous.promoted) {
+    console.log(
+      `${previous.promoted} came up and ${previous.relegated} went down between the two seasons.\n` +
+        "Switch seasons on /standings: each table shows the divisions as they were played.\n",
+    );
+  }
 }
 
 main()

@@ -4,14 +4,9 @@ import { KitSwatch, TeamColorBar } from "@/components/team-colors";
 import { Badge, Card, FormGuide, MatchStatusBadge } from "@/components/ui";
 import { formatDateTime } from "@/lib/dates";
 import { kitColorName, resolveKit } from "@/lib/kits";
-import type { MatchListItem } from "@/lib/queries";
+import { isForfeit } from "@/lib/match-status";
+import { scoreText, type MatchListItem } from "@/lib/queries";
 import { pointsPerGame, type PrimaryMetric, type StandingsRow } from "@/lib/standings";
-
-/** Score if a report exists, otherwise the kickoff time. */
-function scoreLabel(match: MatchListItem): string | null {
-  if (!match.report) return null;
-  return `${match.report.homeScore} \u2013 ${match.report.awayScore}`;
-}
 
 /*
   Whether a fixture has a referee yet is league business, not fixture news, so
@@ -20,7 +15,7 @@ function scoreLabel(match: MatchListItem): string | null {
 const ASSIGNMENT_ONLY_STATUSES: readonly MatchListItem["status"][] = ["SCHEDULED", "ASSIGNED"];
 
 export function MatchRow({ match }: { match: MatchListItem }) {
-  const score = scoreLabel(match);
+  const score = scoreText(match.report);
 
   return (
     <Card as="li" className="p-4">
@@ -29,7 +24,7 @@ export function MatchRow({ match }: { match: MatchListItem }) {
         <Badge tone="neutral">{match.division.name}</Badge>
         <Badge tone="neutral">MW {match.matchweek}</Badge>
         {ASSIGNMENT_ONLY_STATUSES.includes(match.status) ? null : (
-          <MatchStatusBadge status={match.status} />
+          <MatchStatusBadge match={match} />
         )}
         {match.report?.status === "DISPUTED" ? <Badge tone="danger">Disputed</Badge> : null}
       </div>
@@ -42,8 +37,14 @@ export function MatchRow({ match }: { match: MatchListItem }) {
           ) : (
             <span className="text-muted text-sm font-semibold">vs</span>
           )}
-          {match.report?.homeForfeit || match.report?.awayForfeit ? (
-            <span className="text-danger block text-[10px] font-semibold uppercase">Forfeit</span>
+          {/*
+            The scoreline above is the awarded one, so say why it looks the way
+            it does rather than leaving a 3-0 nobody played.
+          */}
+          {isForfeit(match.report) ? (
+            <span className="text-danger block text-[10px] font-semibold uppercase">
+              Awarded on forfeit
+            </span>
           ) : null}
         </div>
         <TeamCell team={match.awayTeam} kit={match.awayKit} />

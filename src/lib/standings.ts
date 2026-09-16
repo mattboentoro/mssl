@@ -160,6 +160,24 @@ export interface EffectiveResult {
 }
 
 /**
+ * The scoreline a forfeit awards, or `null` when neither side forfeited.
+ *
+ * The reported score is ignored: a forfeit is a ruling, not a result. Exported
+ * so the fixture lists can print the same scoreline the table counts, instead
+ * of the 0-0 a referee usually types alongside the forfeit box.
+ */
+export function forfeitScoreline(
+  report: { homeForfeit: boolean; awayForfeit: boolean },
+  forfeitScore: { winner: number; loser: number },
+): { homeGoals: number; awayGoals: number } | null {
+  const { winner, loser } = forfeitScore;
+  if (report.homeForfeit && report.awayForfeit) return { homeGoals: loser, awayGoals: loser };
+  if (report.homeForfeit) return { homeGoals: loser, awayGoals: winner };
+  if (report.awayForfeit) return { homeGoals: winner, awayGoals: loser };
+  return null;
+}
+
+/**
  * Decide whether a match counts and what its effective scoreline is.
  * Returns `null` when the match should be ignored by the table.
  */
@@ -179,16 +197,13 @@ export function resolveResult(
     return null;
   }
 
-  const { winner, loser } = options.forfeitScore;
-
-  if (report.homeForfeit && report.awayForfeit) {
-    return { homeGoals: loser, awayGoals: loser, doubleForfeit: true, byForfeit: true };
-  }
-  if (report.homeForfeit) {
-    return { homeGoals: loser, awayGoals: winner, doubleForfeit: false, byForfeit: true };
-  }
-  if (report.awayForfeit) {
-    return { homeGoals: winner, awayGoals: loser, doubleForfeit: false, byForfeit: true };
+  const awarded = forfeitScoreline(report, options.forfeitScore);
+  if (awarded) {
+    return {
+      ...awarded,
+      doubleForfeit: report.homeForfeit && report.awayForfeit,
+      byForfeit: true,
+    };
   }
 
   return {

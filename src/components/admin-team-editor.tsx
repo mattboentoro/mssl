@@ -3,7 +3,8 @@
 import { deleteTeamAction, updateTeamAction } from "@/app/admin/actions";
 import { ActionForm, FieldError, SubmitButton } from "@/components/admin-forms";
 import { ColorPalettePicker } from "@/components/color-palette-picker";
-import { Field, inputClass } from "@/components/ui";
+import { CloseOnSuccess, Dialog, DialogCancel } from "@/components/form-dialog";
+import { Field, buttonClass, inputClass } from "@/components/ui";
 
 export interface EditableTeam {
   id: string;
@@ -20,9 +21,9 @@ export interface EditableTeam {
 /**
  * Edit or delete one team.
  *
- * Collapsed behind a disclosure so a twenty-team list stays scannable; the
- * destructive delete lives inside the same panel, where it cannot be hit by
- * accident from the list view.
+ * Tucked behind a modal so a twenty-team list stays scannable; the destructive
+ * delete lives inside the same dialog, where it cannot be hit by accident from
+ * the list view.
  */
 export function TeamEditor({
   team,
@@ -32,15 +33,17 @@ export function TeamEditor({
   divisions: { id: string; name: string }[];
 }) {
   return (
-    <details className="mt-2">
-      <summary className="text-muted hover:text-fg cursor-pointer text-xs underline">
-        Edit details
-      </summary>
-
-      <div className="border-subtle mt-3 space-y-4 rounded-lg border p-3">
+    <Dialog
+      trigger="Edit"
+      triggerLabel={`Edit ${team.name}`}
+      triggerClassName={`${buttonClass("ghost")} shrink-0 px-2 py-1 text-xs`}
+      title={`Edit ${team.name}`}
+    >
+      <div className="space-y-4">
         <ActionForm
           action={updateTeamAction}
           resetOnSuccess={false}
+          showSuccess={false}
           className="grid gap-3 sm:grid-cols-2"
         >
           <input type="hidden" name="teamId" value={team.id} />
@@ -143,13 +146,20 @@ export function TeamEditor({
             <FieldError name="contactEmail" />
           </Field>
 
-          <div className="sm:col-span-2">
+          <div className="border-subtle flex items-center justify-end gap-2 border-t pt-3 sm:col-span-2">
+            <DialogCancel />
             <SubmitButton>Save changes</SubmitButton>
           </div>
+          <CloseOnSuccess />
         </ActionForm>
 
         <div className="border-subtle border-t pt-3">
-          <ActionForm action={deleteTeamAction} resetOnSuccess={false} className="space-y-2">
+          <ActionForm
+            action={deleteTeamAction}
+            resetOnSuccess={false}
+            showSuccess={false}
+            className="space-y-2"
+          >
             <input type="hidden" name="teamId" value={team.id} />
             <Field
               label="Delete team"
@@ -171,9 +181,10 @@ export function TeamEditor({
             >
               Delete team
             </SubmitButton>
+            <CloseOnSuccess />
           </ActionForm>
         </div>
       </div>
-    </details>
+    </Dialog>
   );
 }

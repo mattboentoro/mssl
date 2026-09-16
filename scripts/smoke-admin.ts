@@ -14,7 +14,9 @@
  * and cleans up after itself.
  */
 import { prisma } from "../src/lib/prisma";
-import { toDateTimeInputValue } from "../src/lib/dates";
+import { toDateInputValue, toDateTimeInputValue } from "../src/lib/dates";
+import { MATCH_STATUSES } from "../src/lib/enums";
+import { MATCH_DISPLAY_STATUSES } from "../src/lib/match-status";
 import { kitsClash, resolveKit } from "../src/lib/kits";
 import { getStandingsForSeason } from "../src/lib/queries";
 
@@ -160,6 +162,38 @@ async function main(): Promise<void> {
     team?.colorPrimary === "#6d28d9" && team?.colorAlternate === "#facc15",
     `${team?.colorPrimary} / ${team?.colorAlternate}`,
   );
+  check(
+    "createTeamAction derives a web address when the field is blank",
+    /^[a-z0-9-]+$/.test(team?.slug ?? ""),
+    String(team?.slug),
+  );
+
+  // The create form exposes the slug now, so a hand-typed address has to win
+  // over the one derived from the name.
+  const chosenSlug = `smoke-chosen-${stamp}`;
+  await submit("/admin/league", 'id="team-name"', {
+    divisionId: division.id,
+    name: `Smoke Chosen ${stamp}`,
+    shortName: "SMC",
+    slug: chosenSlug,
+    contactEmail: "",
+  });
+  const chosen = await prisma.team.findFirst({ where: { slug: chosenSlug } });
+  check("createTeamAction honours a hand-typed web address", chosen !== null, chosenSlug);
+
+  const badSlug = await submit("/admin/league", 'id="team-name"', {
+    divisionId: division.id,
+    name: `Smoke Bad ${stamp}`,
+    shortName: "SMB",
+    slug: "Not A Slug",
+    contactEmail: "",
+  });
+  check(
+    "a malformed web address is refused and says why",
+    (await prisma.team.count({ where: { name: `Smoke Bad ${stamp}` } })) === 0 &&
+      badSlug.html.includes("lower-case letters, numbers and hyphens"),
+  );
+  if (chosen) await prisma.team.delete({ where: { id: chosen.id } });
 
   // A club's address is league-wide now, so the same name in a different
   // division has to be refused rather than quietly shadowing the first club.
@@ -390,15 +424,23 @@ async function main(): Promise<void> {
   console.log("\nSeason ranking rule");
   const tbBefore = await prisma.season.findUniqueOrThrow({
     where: { id: season.id },
-    select: { tiebreakerMode: true },
+    select: { tiebreakerMode: true, name: true, startsOn: true, endsOn: true },
   });
-  await submit("/admin/league", `id="tiebreak-${season.id}"`, {
+  // The ranking rule rides along with the rest of the season editor now, so the
+  // whole form has to go up with it.
+  const seasonFields = {
     seasonId: season.id,
+    name: tbBefore.name,
+    startsOn: toDateInputValue(tbBefore.startsOn),
+    endsOn: toDateInputValue(tbBefore.endsOn),
+  };
+  await submit("/admin/league", `id="tiebreak-${season.id}"`, {
+    ...seasonFields,
     tiebreakerMode: "POINTS_PER_GAME",
   });
   const tbAfter = await prisma.season.findUniqueOrThrow({
     where: { id: season.id },
-    select: { tiebreakerMode: true },
+    select: { tiebreakerMode: true, isActive: true },
   });
   check(
     "an admin can rank a season on points per game",
@@ -406,9 +448,14 @@ async function main(): Promise<void> {
     tbAfter.tiebreakerMode,
   );
   check(
+    "saving the active season leaves it active",
+    tbAfter.isActive,
+    "the league lost its active season",
+  );
+  check(
     "the ranking change is audited",
     (await prisma.auditLog.count({
-      where: { action: "season.tiebreaker", entityId: season.id },
+      where: { action: "season.update", entityId: season.id },
     })) > 0,
   );
 
@@ -426,7 +473,7 @@ async function main(): Promise<void> {
   );
 
   await submit("/admin/league", `id="tiebreak-${season.id}"`, {
-    seasonId: season.id,
+    ...seasonFields,
     tiebreakerMode: tbBefore.tiebreakerMode,
   });
   check(
@@ -542,10 +589,15 @@ async function main(): Promise<void> {
     "the active admin tab is flagged for assistive tech",
     matchesHtml.includes('aria-current="page"'),
   );
-  check(
-    "fixtures list matchweek before kick-off",
-    matchesHtml.includes(">MW<") && matchesHtml.indexOf(">MW<") < matchesHtml.indexOf("Kick-off"),
-  );
+  {
+    // Scope this to the table head: "Kick-off" is also a field label inside the
+    // Add-a-fixture dialog, which renders earlier in the document.
+    const head = matchesHtml.slice(matchesHtml.indexOf("<thead"));
+    check(
+      "fixtures list matchweek before kick-off",
+      head.includes(">MW<") && head.indexOf(">MW<") < head.indexOf(">Kick-off<"),
+    );
+  }
   check("the fixture list offers a CSV export", matchesHtml.includes("/admin/schedule.csv"));
   check(
     "upcoming-only is the default filter",
@@ -616,7 +668,7 @@ async function main(): Promise<void> {
   );
   // The real claim is "the export is a valid import template", so feed the
   // exported file straight back through the importer's dry run.
-  const roundTrip = await submit("/admin/import", 'id="import-csv"', {
+  const roundTrip = await submit("/admin/matches", 'id="import-csv"', {
     csv: csvBody.split("\n").slice(0, 4).join("\n"),
     seasonId: season.id,
     mode: "dry-run",
@@ -636,7 +688,7 @@ async function main(): Promise<void> {
   const brokenRow = `${MW},not-a-date,${division.name},${division.teams[2].name},${division.teams[3].name},Smoke Pitch`;
   const header = "matchweek,kickoff,division,home,away,venue";
 
-  const dry = await submit("/admin/import", 'id="import-csv"', {
+  const dry = await submit("/admin/matches", 'id="import-csv"', {
     csv: `${header}\n${goodRow}\n${newTeamRow}`,
     seasonId: season.id,
     mode: "dry-run",
@@ -648,7 +700,7 @@ async function main(): Promise<void> {
     dry.html.includes("Nobody FC") && dry.html.includes("Will be added to the league"),
   );
 
-  const refused = await submit("/admin/import", 'id="import-csv"', {
+  const refused = await submit("/admin/matches", 'id="import-csv"', {
     csv: `${header}\n${goodRow}\n${brokenRow}`,
     seasonId: season.id,
     mode: "commit",
@@ -659,7 +711,7 @@ async function main(): Promise<void> {
     stillUntouched === 0 && refused.html.includes("Fix every row error"),
   );
 
-  await submit("/admin/import", 'id="import-csv"', {
+  await submit("/admin/matches", 'id="import-csv"', {
     csv: `${header}\n${goodRow}`,
     seasonId: season.id,
     mode: "commit",
@@ -667,7 +719,7 @@ async function main(): Promise<void> {
   const imported = await prisma.match.count({ where: { matchweek: MW } });
   check("a clean batch imports", imported === 1, `${imported} fixture(s)`);
 
-  const dupe = await submit("/admin/import", 'id="import-csv"', {
+  const dupe = await submit("/admin/matches", 'id="import-csv"', {
     csv: `${header}\n${goodRow}`,
     seasonId: season.id,
     mode: "commit",
@@ -683,7 +735,7 @@ async function main(): Promise<void> {
     // alongside the league season without moving the table.
     const cupWeek = `${MW}-cup`;
     await prisma.match.deleteMany({ where: { matchweek: cupWeek } });
-    await submit("/admin/import", 'id="import-csv"', {
+    await submit("/admin/matches", 'id="import-csv"', {
       csv: [
         `${header},counts`,
         `${cupWeek},2030-06-08T18:00:00Z,${division.name},${division.teams[0].name},${division.teams[2].name},Smoke Pitch,no`,
@@ -706,7 +758,7 @@ async function main(): Promise<void> {
     // kick-off and a division nobody had created. Neither may block an import
     // any more. The venue column is free text: whatever is typed lands on
     // the match verbatim, with nothing created and nothing validated.
-    const tolerant = await submit("/admin/import", 'id="import-csv"', {
+    const tolerant = await submit("/admin/matches", 'id="import-csv"', {
       csv: [
         header,
         `${MW2},8/5/2030 5:30 pm,Sunday Invitational,Rovers Athletic,Harbour Town,A Field Nobody Registered`,
@@ -725,7 +777,7 @@ async function main(): Promise<void> {
     );
     check("the importer accepts a file as well as pasted text", dry.html.includes('type="file"'));
 
-    const committed = await submit("/admin/import", 'id="import-csv"', {
+    const committed = await submit("/admin/matches", 'id="import-csv"', {
       csv: [
         header,
         `${MW2},8/5/2030 5:30 pm,Sunday Invitational,Rovers Athletic,Harbour Town,A Field Nobody Registered`,
@@ -818,7 +870,7 @@ async function main(): Promise<void> {
 
     // The panel posts the raw datetime-local value so the server can read it as
     // Redmond wall-clock time. Demanding an ISO offset here made every single
-    // "Save schedule" 422 before the route ever ran.
+    // "Save fixture" 422 before the route ever ran.
     const WALL = "2031-03-09T19:45";
     const rescheduled = await req(`/api/matches/${importedMatch.id}/schedule`, {
       method: "POST",
@@ -964,6 +1016,141 @@ async function main(): Promise<void> {
       where: { id: importedMatch.id },
       data: { matchweek: MW, countsForStandings: true },
     });
+
+    /*
+      Confirm and Cancel are the only status decisions Match Control offers.
+      The placeholder matters as much as the options: without it, saving any
+      other field on a fixture that is neither would confirm it by accident.
+    */
+    const statusForm = await (await req(`/admin/matches/${importedMatch.id}`)).text();
+    const offered = MATCH_STATUSES.filter((s) => statusForm.includes(`value="${s}"`));
+    check(
+      "the status dropdown offers only Confirmed and Cancelled",
+      offered.slice().sort().join(",") === "CANCELLED,CONFIRMED",
+      `offers ${offered.join(",") || "nothing"}`,
+    );
+
+    const beforeCancel = reflagged?.status;
+    await req(`/api/matches/${importedMatch.id}/schedule`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ venueName: "Field 4", reason: "Pitch swap" }),
+    });
+    const untouched = await prisma.match.findUnique({ where: { id: importedMatch.id } });
+    check(
+      "an edit that names no status leaves the status alone",
+      untouched?.status === beforeCancel,
+      `status ${untouched?.status}, expected ${beforeCancel}`,
+    );
+
+    await req(`/api/matches/${importedMatch.id}/schedule`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: "CANCELLED", reason: "Pitch frozen" }),
+    });
+    const outOfPlay = await prisma.match.findUnique({ where: { id: importedMatch.id } });
+    check(
+      "admin can call a fixture off",
+      outOfPlay?.status === "CANCELLED",
+      `status ${outOfPlay?.status}`,
+    );
+
+    await req(`/api/matches/${importedMatch.id}/schedule`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: "CONFIRMED", reason: "Back on, result stands" }),
+    });
+    const signedOff = await prisma.match.findUnique({ where: { id: importedMatch.id } });
+    check(
+      "admin can sign a result off",
+      signedOff?.status === "CONFIRMED",
+      `status ${signedOff?.status}`,
+    );
+
+    /*
+      The status filter narrows by what the badge says, not by the stored
+      column. "Needs a referee" and "Not started" are both SCHEDULED in the
+      database, so a filter on the raw column could not separate them.
+    */
+    const listHtml = await (await req("/admin/matches?status=NEEDS_REFEREE&when=upcoming")).text();
+    const filterOffers = MATCH_DISPLAY_STATUSES.filter((s) =>
+      listHtml.includes(`value="${s}"`),
+    ).sort();
+    check(
+      "the status filter offers the badge's own labels",
+      filterOffers.join(",") === MATCH_DISPLAY_STATUSES.slice().sort().join(","),
+      `offers ${filterOffers.join(",") || "nothing"}`,
+    );
+
+    const listedIds = [...listHtml.matchAll(/\/admin\/matches\/([a-z0-9]{20,})/g)].map((m) => m[1]);
+    const listed = await prisma.match.findMany({
+      where: { id: { in: [...new Set(listedIds)] } },
+      include: { report: true },
+    });
+    const strays = listed.filter(
+      (m) => m.refereeId !== null || m.report !== null || m.kickoffAt <= new Date(),
+    );
+    check(
+      "filtering by Need a referee returns only unclaimed future fixtures",
+      listed.length > 0 && strays.length === 0,
+      `${listed.length} listed, ${strays.length} that should not be`,
+    );
+
+    /*
+      A forfeit is filed against the played score, normally 0-0. Every fixture
+      list has to print the awarded scoreline instead, or the table and the
+      schedule contradict each other in public.
+    */
+    await req(`/api/matches/${importedMatch.id}/override`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        homeScore: 0,
+        awayScore: 0,
+        homeForfeit: false,
+        awayForfeit: true,
+        reason: "Away side did not field a team",
+      }),
+    });
+    const forfeited = await prisma.match.findUnique({
+      where: { id: importedMatch.id },
+      include: { report: true },
+    });
+    check(
+      "recording a forfeit files it against the played score",
+      forfeited?.report?.awayForfeit === true && forfeited.report.homeScore === 0,
+      `filed ${forfeited?.report?.homeScore}-${forfeited?.report?.awayScore}`,
+    );
+
+    const forfeitRow = await (await req("/admin/matches?status=FORFEITED&when=all")).text();
+    check(
+      "a forfeited fixture is listed under Forfeited",
+      forfeitRow.includes(importedMatch.id),
+      "not in the Forfeited bucket",
+    );
+    /*
+      Scoped to this fixture's own row: the bucket holds every forfeit in the
+      league, and a double forfeit is legitimately awarded 0-0.
+    */
+    const at = forfeitRow.indexOf(importedMatch.id);
+    const row = forfeitRow.slice(Math.max(0, at - 400), at + 2000);
+    check(
+      "the list awards the forfeit rather than printing 0-0",
+      row.includes("3\u20130") && !row.includes("0\u20130"),
+      "awarded scoreline missing",
+    );
+    check(
+      "the badge calls it Forfeited, not Completed",
+      row.includes("Forfeited"),
+      "badge missing",
+    );
+
+    const completedRows = await (await req("/admin/matches?status=COMPLETED&when=all")).text();
+    check(
+      "a forfeit does not also show up as a played result",
+      !completedRows.includes(importedMatch.id),
+      "still listed under Completed",
+    );
   }
 
   console.log("\nDestructive deletes");

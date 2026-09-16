@@ -5,13 +5,21 @@ import { forbidden, redirect } from "next/navigation";
 import { ActionButton } from "@/components/match-actions";
 import { CalendarViewToggle, FixtureCalendar, parseView } from "@/components/fixture-calendar";
 import { FixtureLine } from "@/components/match-display";
-import { Alert, Card, EmptyState, PageHeader, inputClass, labelClass } from "@/components/ui";
+import {
+  Alert,
+  Card,
+  EmptyState,
+  PageHeader,
+  buttonClass,
+  inputClass,
+  labelClass,
+} from "@/components/ui";
 import { MatchStatusBadge } from "@/components/ui";
 import { AuthzError, requireReferee } from "@/lib/authz";
 import { formatDateTime, parseMonthValue, shiftMonth } from "@/lib/dates";
 import { zonedToUtc } from "@/lib/timezone";
 import { MATCH_STATUS_LABELS, type MatchStatus } from "@/lib/enums";
-import { getActiveSeason, getDivisions, listMatches } from "@/lib/queries";
+import { getActiveSeason, getDivisions, listMatches, scoreText } from "@/lib/queries";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = { title: "Referee Control" };
@@ -217,7 +225,7 @@ export default async function RefereePage({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <MatchStatusBadge status={match.status} />
+                      <MatchStatusBadge match={match} />
                       <span className="text-muted text-xs">{match.division.name}</span>
                     </div>
                     <FixtureLine className="mt-1" match={match} href={`/referee/${match.id}`} />
@@ -235,10 +243,7 @@ export default async function RefereePage({
                         confirm="Release this match so another referee can claim it?"
                       />
                     ) : null}
-                    <Link
-                      href={`/referee/${match.id}`}
-                      className="bg-brand text-brand-contrast rounded-lg px-4 py-2 text-sm font-semibold"
-                    >
+                    <Link href={`/referee/${match.id}`} className={buttonClass("outline")}>
                       {match.report ? "Open" : "File report"}
                     </Link>
                   </div>
@@ -410,6 +415,7 @@ export default async function RefereePage({
                     url={`/api/matches/${match.id}/assign`}
                     body={{ expectedVersion: match.version }}
                     label="Assign me"
+                    variant="outline"
                     pendingLabel={"Claiming\u2026"}
                   />
                 </div>
@@ -451,7 +457,7 @@ export default async function RefereePage({
                 <div className="flex items-center gap-3">
                   {match.report ? (
                     <span className="font-mono text-sm font-semibold">
-                      {match.report.homeScore}&ndash;{match.report.awayScore}
+                      {scoreText(match.report)}
                     </span>
                   ) : null}
                   <span className="text-muted text-xs">

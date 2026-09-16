@@ -1,16 +1,30 @@
 import Link from "next/link";
 
-import { ActionForm, FieldError, SubmitButton } from "@/components/admin-forms";
+import { FieldError } from "@/components/admin-forms";
 import { ClickableRow } from "@/components/clickable-row";
 import { CalendarViewToggle, FixtureCalendar, parseView } from "@/components/fixture-calendar";
+import { Dialog, FormDialog } from "@/components/form-dialog";
 import { MatchKitPicker } from "@/components/match-kit-picker";
+import { ScheduleImportForm } from "@/components/schedule-import-form";
 import { KitSwatch } from "@/components/team-colors";
-import { Card, EmptyState, Field, MatchStatusBadge, inputClass } from "@/components/ui";
+import {
+  Card,
+  EmptyState,
+  Field,
+  MatchStatusBadge,
+  inputClass,
+  outlineButtonClass,
+} from "@/components/ui";
 import { createMatchAction } from "@/app/admin/actions";
 import { formatDateTime, parseMonthValue, shiftMonth, toDateTimeInputValue } from "@/lib/dates";
-import { MATCH_STATUSES, MATCH_STATUS_LABELS } from "@/lib/enums";
+import {
+  MATCH_DISPLAY_LABELS,
+  MATCH_DISPLAY_STATUSES,
+  isMatchDisplayStatus,
+  matchDisplayWhere,
+} from "@/lib/match-status";
 import { prisma } from "@/lib/prisma";
-import { getActiveSeason, listMatches } from "@/lib/queries";
+import { getActiveSeason, listMatches, scoreText } from "@/lib/queries";
 import { zonedToUtc } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +61,11 @@ export default async function AdminMatchesPage({
   const when = params.when === "all" ? "all" : "upcoming";
 
   const where: Record<string, unknown> = { seasonId };
-  if (params.status) where.status = params.status;
+  // Filtering on what the badge says, not on the stored column: "waiting
+  // report" and "not started" are both SCHEDULED underneath, so the raw status
+  // would not tell them apart.
+  const status = params.status && isMatchDisplayStatus(params.status) ? params.status : undefined;
+  if (status) where.AND = [matchDisplayWhere(status)];
   if (params.division) where.divisionId = params.division;
   if (when === "upcoming") where.kickoffAt = { gte: new Date() };
   if (params.q) {
@@ -69,7 +87,15 @@ export default async function AdminMatchesPage({
         awayTeam: { select: { name: true, colorPrimary: true, colorAlternate: true } },
         division: { select: { name: true } },
         referee: { select: { name: true } },
-        report: { select: { homeScore: true, awayScore: true, status: true } },
+        report: {
+          select: {
+            homeScore: true,
+            awayScore: true,
+            homeForfeit: true,
+            awayForfeit: true,
+            status: true,
+          },
+        },
       },
     }),
   ]);
@@ -91,7 +117,7 @@ export default async function AdminMatchesPage({
   const carried = {
     season: params.season,
     division: params.division,
-    status: params.status,
+    status: status,
     q: params.q,
     month: params.month,
     when: params.when,
@@ -138,16 +164,11 @@ export default async function AdminMatchesPage({
               </select>
             </Field>
             <Field label="Status" htmlFor="status">
-              <select
-                id="status"
-                name="status"
-                defaultValue={params.status ?? ""}
-                className={inputClass}
-              >
+              <select id="status" name="status" defaultValue={status ?? ""} className={inputClass}>
                 <option value="">All</option>
-                {MATCH_STATUSES.map((s) => (
+                {MATCH_DISPLAY_STATUSES.map((s) => (
                   <option key={s} value={s}>
-                    {MATCH_STATUS_LABELS[s]}
+                    {MATCH_DISPLAY_LABELS[s]}
                   </option>
                 ))}
               </select>
@@ -181,6 +202,81 @@ export default async function AdminMatchesPage({
               : `Fixtures (${matches.length})`}
           </h2>
           <div className="flex flex-wrap items-center gap-2">
+            <FormDialog
+              trigger="Add fixture"
+              title="Add a fixture"
+              action={createMatchAction}
+              submitLabel="Create fixture"
+              fieldsClassName="grid gap-4 sm:grid-cols-2"
+            >
+              <input type="hidden" name="seasonId" value={seasonId} />
+              <Field label="Matchweek" htmlFor="new-mw">
+                <input
+                  id="new-mw"
+                  name="matchweek"
+                  type="text"
+                  maxLength={40}
+                  defaultValue="1"
+                  placeholder="7 or Final"
+                  className={inputClass}
+                  required
+                />
+                <FieldError name="matchweek" />
+              </Field>
+              <Field label="Counts for standings" htmlFor="new-counts">
+                <label className="flex items-center gap-2 py-2 text-sm">
+                  <input
+                    id="new-counts"
+                    name="countsForStandings"
+                    type="checkbox"
+                    defaultChecked
+                    className="h-4 w-4"
+                  />
+                  Include this result in the league table
+                </label>
+                <p className="text-muted text-xs">
+                  Clear it for a final, play-off or friendly. The fixture still appears everywhere
+                  else.
+                </p>
+                <FieldError name="countsForStandings" />
+              </Field>
+              <MatchKitPicker
+                divisions={divisions.map((d) => ({ id: d.id, name: d.name }))}
+                teams={teams.map((t) => ({
+                  id: t.id,
+                  name: t.name,
+                  divisionId: t.divisionId,
+                  colorPrimary: t.colorPrimary,
+                  colorAlternate: t.colorAlternate,
+                }))}
+              />
+              <Field label="Kick-off" htmlFor="new-kickoff">
+                <input
+                  id="new-kickoff"
+                  name="kickoffAt"
+                  type="datetime-local"
+                  defaultValue={toDateTimeInputValue(new Date())}
+                  className={inputClass}
+                  required
+                />
+                <FieldError name="kickoffAt" />
+              </Field>
+              <Field
+                label="Venue"
+                htmlFor="new-venue"
+                hint="Free text, shown exactly as typed. Blank shows as TBD."
+              >
+                <input
+                  id="new-venue"
+                  name="venueName"
+                  type="text"
+                  maxLength={200}
+                  placeholder="To be confirmed"
+                  className={inputClass}
+                />
+                <FieldError name="venueName" />
+              </Field>
+            </FormDialog>
             {/*
               Exactly the columns the importer reads back, so an organiser can
               export a season, edit it in Excel and re-upload it as a template.
@@ -188,10 +284,19 @@ export default async function AdminMatchesPage({
             <a
               href={`/admin/schedule.csv?season=${encodeURIComponent(seasonId)}`}
               download
-              className="border-subtle hover:bg-surface-muted rounded-lg border px-3 py-1.5 text-sm font-medium"
+              className={outlineButtonClass}
             >
               Download CSV
             </a>
+            <Dialog
+              trigger="Upload CSV"
+              triggerClassName={outlineButtonClass}
+              title="Import a schedule"
+              description="Paste or upload a CSV, dry run it to see exactly what would change, then import the valid rows."
+              widthClassName="w-[min(64rem,calc(100vw-2rem))]"
+            >
+              <ScheduleImportForm seasons={seasons.map((s) => ({ id: s.id, name: s.name }))} />
+            </Dialog>
             <CalendarViewToggle view={view} basePath="/admin/matches" query={carried} />
           </div>
         </div>
@@ -233,167 +338,88 @@ export default async function AdminMatchesPage({
                 </tr>
               </thead>
               <tbody className="divide-subtle divide-y">
-                {matches.map((match) => (
-                  <ClickableRow key={match.id} href={`/admin/matches/${match.id}`}>
-                    <td className="text-muted px-3 py-2">
-                      {match.matchweek}
-                      {match.countsForStandings ? null : (
-                        <span
-                          className="ml-1 rounded bg-amber-100 px-1 py-px text-[10px] font-semibold tracking-wide text-amber-900 dark:bg-amber-900/50 dark:text-amber-100"
-                          title="This fixture is excluded from the league table."
-                        >
-                          <span className="sr-only">Does not count towards the standings, </span>
-                          NL
-                        </span>
-                      )}
-                    </td>
-                    <td className="text-muted px-3 py-2 whitespace-nowrap">
-                      {formatDateTime(match.kickoffAt)}
-                    </td>
-                    <td className="px-3 py-2">
-                      {/*
+                {matches.map((match) => {
+                  const score = scoreText(match.report);
+                  return (
+                    <ClickableRow key={match.id} href={`/admin/matches/${match.id}`}>
+                      <td className="text-muted px-3 py-2">
+                        {match.matchweek}
+                        {match.countsForStandings ? null : (
+                          <span
+                            className="ml-1 rounded bg-amber-100 px-1 py-px text-[10px] font-semibold tracking-wide text-amber-900 dark:bg-amber-900/50 dark:text-amber-100"
+                            title="This fixture is excluded from the league table."
+                          >
+                            <span className="sr-only">Does not count towards the standings, </span>
+                            NL
+                          </span>
+                        )}
+                      </td>
+                      <td className="text-muted px-3 py-2 whitespace-nowrap">
+                        {formatDateTime(match.kickoffAt)}
+                      </td>
+                      <td className="px-3 py-2">
+                        {/*
                         The whole row is clickable, but this link is what
                         keyboard users tab to and what still works with
                         JavaScript disabled.
                       */}
-                      <Link
-                        href={`/admin/matches/${match.id}`}
-                        className="hover:text-brand inline-flex flex-wrap items-center gap-x-2 gap-y-1 font-medium hover:underline"
-                      >
-                        {/*
+                        <Link
+                          href={`/admin/matches/${match.id}`}
+                          className="hover:text-brand inline-flex flex-wrap items-center gap-x-2 gap-y-1 font-medium hover:underline"
+                        >
+                          {/*
                           "FT" leads the line so a scanned column of fixtures
                           separates played from scheduled at a glance, without
                           reading the status badge at the far right.
                         */}
-                        {match.report ? (
-                          <span className="rounded bg-emerald-100 px-1 py-px text-[10px] font-semibold tracking-wide text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
-                            <span className="sr-only">Full time, </span>FT
+                          {match.report ? (
+                            <span className="rounded bg-emerald-100 px-1 py-px text-[10px] font-semibold tracking-wide text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
+                              <span className="sr-only">Full time, </span>FT
+                            </span>
+                          ) : null}
+                          <span className="inline-flex items-center gap-1.5">
+                            <KitSwatch
+                              team={match.homeTeam}
+                              kit={match.homeKit}
+                              teamName={match.homeTeam.name}
+                            />
+                            {match.homeTeam.name}
                           </span>
-                        ) : null}
-                        <span className="inline-flex items-center gap-1.5">
-                          <KitSwatch
-                            team={match.homeTeam}
-                            kit={match.homeKit}
-                            teamName={match.homeTeam.name}
-                          />
-                          {match.homeTeam.name}
-                        </span>
-                        {/*
+                          {/*
                           The result reads inline with the fixture — "Home 2–1
                           Away" — so a separate score column is not needed and
                           the table stays narrow enough for a laptop.
                         */}
-                        {match.report ? (
-                          <span className="font-mono font-semibold tabular-nums">
-                            {`${match.report.homeScore}\u2013${match.report.awayScore}`}
+                          {score ? (
+                            <span className="font-mono font-semibold tabular-nums">{score}</span>
+                          ) : (
+                            <span className="text-muted text-xs font-normal">vs</span>
+                          )}
+                          <span className="inline-flex items-center gap-1.5">
+                            <KitSwatch
+                              team={match.awayTeam}
+                              kit={match.awayKit}
+                              teamName={match.awayTeam.name}
+                            />
+                            {match.awayTeam.name}
                           </span>
-                        ) : (
-                          <span className="text-muted text-xs font-normal">vs</span>
-                        )}
-                        <span className="inline-flex items-center gap-1.5">
-                          <KitSwatch
-                            team={match.awayTeam}
-                            kit={match.awayKit}
-                            teamName={match.awayTeam.name}
-                          />
-                          {match.awayTeam.name}
-                        </span>
-                      </Link>
-                      {match.venueName ? (
-                        <span className="text-muted block text-xs">{match.venueName}</span>
-                      ) : null}
-                    </td>
-                    <td className="text-muted px-3 py-2">{match.division.name}</td>
-                    <td className="text-muted px-3 py-2">{match.referee?.name ?? "\u2014"}</td>
-                    <td className="px-3 py-2">
-                      <MatchStatusBadge status={match.status} />
-                    </td>
-                  </ClickableRow>
-                ))}
+                        </Link>
+                        {match.venueName ? (
+                          <span className="text-muted block text-xs">{match.venueName}</span>
+                        ) : null}
+                      </td>
+                      <td className="text-muted px-3 py-2">{match.division.name}</td>
+                      <td className="text-muted px-3 py-2">{match.referee?.name ?? "\u2014"}</td>
+                      <td className="px-3 py-2">
+                        <MatchStatusBadge match={match} />
+                      </td>
+                    </ClickableRow>
+                  );
+                })}
               </tbody>
             </table>
           </Card>
         )}
-      </section>
-
-      <section aria-labelledby="new-fixture">
-        <h2 id="new-fixture" className="mb-3 text-lg font-semibold">
-          Add a fixture
-        </h2>
-        <Card className="p-5">
-          <ActionForm action={createMatchAction} className="grid gap-4 sm:grid-cols-2">
-            <input type="hidden" name="seasonId" value={seasonId} />
-            <Field label="Matchweek" htmlFor="new-mw">
-              <input
-                id="new-mw"
-                name="matchweek"
-                type="text"
-                maxLength={40}
-                defaultValue="1"
-                placeholder="7 or Final"
-                className={inputClass}
-                required
-              />
-              <FieldError name="matchweek" />
-            </Field>
-            <Field label="Counts for standings" htmlFor="new-counts">
-              <label className="flex items-center gap-2 py-2 text-sm">
-                <input
-                  id="new-counts"
-                  name="countsForStandings"
-                  type="checkbox"
-                  defaultChecked
-                  className="h-4 w-4"
-                />
-                Include this result in the league table
-              </label>
-              <p className="text-muted text-xs">
-                Clear it for a final, play-off or friendly. The fixture still appears everywhere
-                else.
-              </p>
-              <FieldError name="countsForStandings" />
-            </Field>
-            <MatchKitPicker
-              divisions={divisions.map((d) => ({ id: d.id, name: d.name }))}
-              teams={teams.map((t) => ({
-                id: t.id,
-                name: t.name,
-                divisionId: t.divisionId,
-                colorPrimary: t.colorPrimary,
-                colorAlternate: t.colorAlternate,
-              }))}
-            />
-            <Field label="Kick-off" htmlFor="new-kickoff">
-              <input
-                id="new-kickoff"
-                name="kickoffAt"
-                type="datetime-local"
-                defaultValue={toDateTimeInputValue(new Date())}
-                className={inputClass}
-                required
-              />
-              <FieldError name="kickoffAt" />
-            </Field>
-            <Field
-              label="Venue"
-              htmlFor="new-venue"
-              hint="Free text, shown exactly as typed. Blank shows as TBD."
-            >
-              <input
-                id="new-venue"
-                name="venueName"
-                type="text"
-                maxLength={200}
-                placeholder="To be confirmed"
-                className={inputClass}
-              />
-              <FieldError name="venueName" />
-            </Field>
-            <div className="sm:col-span-2">
-              <SubmitButton>Create fixture</SubmitButton>
-            </div>
-          </ActionForm>
-        </Card>
       </section>
     </div>
   );

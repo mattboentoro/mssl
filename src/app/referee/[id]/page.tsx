@@ -6,13 +6,15 @@ import { GameReportForm } from "@/components/game-report-form";
 import { ActionButton } from "@/components/match-actions";
 import { Alert, Badge, Card, MatchStatusBadge, PageHeader } from "@/components/ui";
 import { KitSwatch } from "@/components/team-colors";
-import { WarningBoard } from "@/components/warning-board";
+import { SuspensionBoard } from "@/components/suspension-board";
 import { AuthzError, requireReferee } from "@/lib/authz";
 import { formatDateTime } from "@/lib/dates";
 import { CARD_LABELS, type CardType } from "@/lib/enums";
 import { kitColorName, resolveKit } from "@/lib/kits";
+import { isForfeit } from "@/lib/match-status";
 import { prisma } from "@/lib/prisma";
-import { getWarningBoard } from "@/lib/queries";
+import { getSeasonSuspensions, getWarningBoard, scoreText } from "@/lib/queries";
+import { suspensionsForMatch } from "@/lib/suspensions";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Match" };
@@ -58,6 +60,11 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
   const warnings = canAct
     ? await getWarningBoard(prisma, match.seasonId, [match.homeTeamId, match.awayTeamId])
     : [];
+  // Which fixtures a ban covers is derived from the schedule, so ask for the
+  // season's bans and pick out the ones that land on this fixture.
+  const bans = canAct
+    ? suspensionsForMatch(await getSeasonSuspensions(match.seasonId), match.id)
+    : [];
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -94,7 +101,7 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
             </span>
           </>
         }
-        actions={<MatchStatusBadge status={match.status} />}
+        actions={<MatchStatusBadge match={match} />}
       />
 
       {!canAct ? (
@@ -170,18 +177,20 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
         </Card>
       ) : null}
 
-      {/* --------------------------- Warning board --------------------------- */}
+      {/* --------------------------- Suspensions ----------------------------- */}
       {canAct ? (
-        <section aria-labelledby="warning-board" className="mt-8">
-          <h2 id="warning-board" className="mb-1 text-lg font-semibold">
-            Warning board
+        <section aria-labelledby="suspended-players" className="mt-8">
+          <h2 id="suspended-players" className="mb-1 text-lg font-semibold">
+            Suspended for this fixture
           </h2>
           <p className="text-muted mb-3 text-sm">
-            Players from either side carrying a card this season, worst first. League sanctions
-            issued by the Game Administrator appear at the top.
+            These players are serving a ban and must not take the field. Report anyone who plays
+            anyway in your incident notes.
           </p>
-          <WarningBoard
-            entries={warnings}
+          <SuspensionBoard
+            bans={bans}
+            cards={warnings}
+            matchId={match.id}
             homeTeamName={match.homeTeam.name}
             awayTeamName={match.awayTeam.name}
           />
@@ -196,9 +205,18 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
           </h2>
           <Card className="p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-3xl font-bold tabular-nums">
-                {match.report.homeScore} &ndash; {match.report.awayScore}
-              </p>
+              <div>
+                <p className="text-3xl font-bold tabular-nums">{scoreText(match.report)}</p>
+                {/*
+                  A forfeit is filed against the played score, usually 0-0, so
+                  show both rather than let the awarded figures look invented.
+                */}
+                {isForfeit(match.report) ? (
+                  <p className="text-muted text-xs">
+                    {`Awarded on forfeit \u00b7 filed ${match.report.homeScore}\u2013${match.report.awayScore}`}
+                  </p>
+                ) : null}
+              </div>
               <div className="flex flex-wrap gap-2">
                 <Badge tone={match.report.status === "CONFIRMED" ? "success" : "brand"}>
                   {match.report.status}

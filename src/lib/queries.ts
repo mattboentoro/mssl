@@ -1,8 +1,12 @@
 import type { DbClient } from "@/lib/audit";
 import { config } from "@/lib/config";
+import type { SuspensionReason } from "@/lib/enums";
 import { prisma } from "@/lib/prisma";
+import { getSeasonDivisionMap } from "@/lib/season-teams";
+import { resolveSuspensions, type ResolvedSuspension, type TeamFixture } from "@/lib/suspensions";
 import {
   calculateStandingsByDivision,
+  forfeitScoreline,
   type PrimaryMetric,
   type StandingsMatchInput,
   type StandingsOptions,
@@ -20,6 +24,38 @@ export const standingsOptionsFromConfig = (): StandingsOptions => ({
   includeUnconfirmed: config.standings.includeUnconfirmed,
   forfeitScore: config.standings.forfeit,
 });
+
+/** The bits of a report that decide what scoreline a fixture shows. */
+type ScoredReport = {
+  homeScore: number;
+  awayScore: number;
+  homeForfeit: boolean;
+  awayForfeit: boolean;
+};
+
+/**
+ * The scoreline to print for a fixture: the awarded one when a side forfeited,
+ * otherwise the one the referee reported.
+ *
+ * A forfeit is a ruling rather than a result, and referees file it against a
+ * 0-0. Printing that 0-0 would contradict the standings, which count the
+ * awarded score — so every fixture list runs the report through here first.
+ */
+export function displayedScore(
+  report: ScoredReport | null | undefined,
+): { home: number; away: number } | null {
+  if (!report) return null;
+  const awarded = forfeitScoreline(report, config.standings.forfeit);
+  return awarded
+    ? { home: awarded.homeGoals, away: awarded.awayGoals }
+    : { home: report.homeScore, away: report.awayScore };
+}
+
+/** `displayedScore` written out, e.g. "3–0", or `null` when no report exists. */
+export function scoreText(report: ScoredReport | null | undefined): string | null {
+  const score = displayedScore(report);
+  return score ? `${score.home}\u2013${score.away}` : null;
+}
 
 /** Exactly the columns `calculateStandings` needs — nothing more. */
 const STANDINGS_MATCH_SELECT = {
@@ -159,7 +195,16 @@ export async function getStandingsForSeason(seasonId: string): Promise<DivisionS
     select: { teamId: true, points: true, reason: true },
   });
 
-  const teams: StandingsTeamInput[] = divisions.flatMap((division) => division.teams);
+  // A club is bucketed into the division it played in *that season*, not the
+  // one it sits in today -- otherwise promoting a side would retroactively move
+  // its old results up a tier. See src/lib/season-teams.ts.
+  const seasonDivisions = await getSeasonDivisionMap(seasonId);
+  const teams: StandingsTeamInput[] = divisions
+    .flatMap((division) => division.teams)
+    .map((team) => ({
+      ...team,
+      divisionId: seasonDivisions.get(team.id) ?? team.divisionId,
+    }));
   // The season owns its ranking rule, so every table for that season -- public,
   // admin, mini-snippet -- agrees without the caller having to remember.
   const season = await prisma.season.findUnique({
@@ -250,6 +295,9 @@ export interface DisciplinaryRow {
   divisionName: string;
   matchId: string | null;
   matchLabel: string | null;
+  /** Ban length in fixtures. Null means a red card nobody has reviewed yet. */
+  gamesSuspended: number | null;
+  suspensionReason: string | null;
 }
 
 /**
@@ -288,7 +336,100 @@ export async function getDisciplinaryRecords(seasonId: string): Promise<Discipli
     matchLabel: row.match
       ? `MW${row.match.matchweek} ${row.match.homeTeam.shortName} v ${row.match.awayTeam.shortName}`
       : null,
+    gamesSuspended: row.gamesSuspended,
+    suspensionReason: row.suspensionReason,
   }));
+}
+
+export interface SuspensionRow extends ResolvedSuspension {
+  teamName: string;
+  /** Fixtures the ban covers that have yet to be played, earliest first. */
+  upcoming: { id: string; label: string; kickoffAt: Date }[];
+}
+
+/**
+ * Every ban in a season, mapped onto the fixtures it covers.
+ *
+ * Bans are not stored against fixtures — they are worked out here from the card
+ * and the schedule, so moving a fixture moves the ban with it and a rescinded
+ * card takes its ban away without anything left to clean up.
+ */
+export async function getSeasonSuspensions(seasonId: string): Promise<SuspensionRow[]> {
+  const [records, matches] = await Promise.all([
+    prisma.disciplinaryAction.findMany({
+      where: { seasonId, gamesSuspended: { gt: 0 } },
+      include: {
+        team: { select: { id: true, name: true } },
+        match: { select: { kickoffAt: true } },
+      },
+    }),
+    prisma.match.findMany({
+      where: { seasonId },
+      select: {
+        id: true,
+        kickoffAt: true,
+        status: true,
+        matchweek: true,
+        homeTeamId: true,
+        awayTeamId: true,
+        homeTeam: { select: { shortName: true } },
+        awayTeam: { select: { shortName: true } },
+        report: { select: { id: true } },
+      },
+    }),
+  ]);
+
+  if (records.length === 0) return [];
+
+  const labels = new Map<string, { label: string; kickoffAt: Date }>();
+  const fixturesByTeam = new Map<string, TeamFixture[]>();
+  for (const match of matches) {
+    labels.set(match.id, {
+      label: `MW${match.matchweek} ${match.homeTeam.shortName} v ${match.awayTeam.shortName}`,
+      kickoffAt: match.kickoffAt,
+    });
+    const fixture: TeamFixture = {
+      id: match.id,
+      kickoffAt: match.kickoffAt,
+      // A fixture nobody played cannot be sat out, so a ban steps over it.
+      eligible: match.status !== "CANCELLED" && match.status !== "POSTPONED",
+      played: match.report !== null || match.status === "FORFEIT",
+    };
+    for (const teamId of [match.homeTeamId, match.awayTeamId]) {
+      const bucket = fixturesByTeam.get(teamId);
+      if (bucket) bucket.push(fixture);
+      else fixturesByTeam.set(teamId, [fixture]);
+    }
+  }
+
+  const teamNames = new Map(records.map((row) => [row.team.id, row.team.name]));
+  const resolved = resolveSuspensions(
+    records.map((row) => ({
+      id: row.id,
+      teamId: row.teamId,
+      playerName: row.playerName.trim(),
+      games: row.gamesSuspended ?? 0,
+      reason: (row.suspensionReason ?? "LEAGUE_SANCTION") as SuspensionReason,
+      originKickoffAt: row.match?.kickoffAt ?? null,
+      createdAt: row.createdAt,
+    })),
+    fixturesByTeam,
+  );
+
+  return resolved.map((suspension) => {
+    // Only the fixtures still to be sat out are worth naming; the rest are
+    // history the moment a result is filed against them.
+    const upcoming: { id: string; label: string; kickoffAt: Date }[] = [];
+    for (const id of suspension.matchIds.slice(suspension.served)) {
+      const fixture = labels.get(id);
+      if (fixture) upcoming.push({ id, label: fixture.label, kickoffAt: fixture.kickoffAt });
+    }
+    return {
+      ...suspension,
+      teamName: teamNames.get(suspension.teamId) ?? "Unknown",
+      upcoming,
+    };
+  });
 }
 
 /** Card counts per team, used by the public discipline summary. */
@@ -410,4 +551,25 @@ export async function getTeamDetail(slugOrId: string) {
 
 export async function getTeamMatches(teamId: string) {
   return listMatches({ OR: [{ homeTeamId: teamId }, { awayTeamId: teamId }] });
+}
+
+/**
+ * Split a club's fixture list into results and fixtures still to come.
+ *
+ * "Upcoming" means the kickoff is genuinely ahead of us: a past date with no
+ * report is a missing report, not something to look forward to. `now` is a
+ * parameter so the split stays pure — components must not read the clock
+ * themselves (the `react-hooks/purity` lint rule enforces this).
+ */
+export function splitTeamMatches<T extends { kickoffAt: Date; status: string; report: unknown }>(
+  matches: T[],
+  now: Date = new Date(),
+): { played: T[]; upcoming: T[] } {
+  const cutoff = now.getTime();
+  return {
+    played: matches.filter((m) => m.report),
+    upcoming: matches.filter(
+      (m) => !m.report && m.status !== "CANCELLED" && m.kickoffAt.getTime() >= cutoff,
+    ),
+  };
 }

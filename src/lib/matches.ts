@@ -3,6 +3,8 @@ import type { Prisma } from "@prisma/client";
 import type { AuditActor, DbClient } from "@/lib/audit";
 import { writeAudit } from "@/lib/audit";
 import { CLOSED_MATCH_STATUSES, type KitChoice, type MatchStatus } from "@/lib/enums";
+import type { SuspensionReason } from "@/lib/enums";
+import { planAccumulationBans, playerKey } from "@/lib/suspensions";
 
 /**
  * Match lifecycle service.
@@ -302,6 +304,21 @@ export async function submitGameReport(
     select: { id: true },
   });
 
+  // A yellow filed here may be the player's third of the season, which earns an
+  // automatic ban with nobody in the loop. Reds are left for an administrator
+  // to weigh up, so they stay pending.
+  const yellowPlayers = new Map<string, { teamId: string; playerName: string }>();
+  for (const card of cards) {
+    if (card.type !== "YELLOW") continue;
+    yellowPlayers.set(playerKey(card.teamId, card.playerName), {
+      teamId: card.teamId,
+      playerName: card.playerName,
+    });
+  }
+  for (const player of yellowPlayers.values()) {
+    await applyAccumulationRule(db, { seasonId: match.seasonId, ...player });
+  }
+
   const updated = await db.match.updateMany({
     where: { id: matchId, status: "ASSIGNED", version: match.version },
     data: {
@@ -497,7 +514,8 @@ export async function updateMatchSchedule(
   if (params.venueName !== undefined) {
     data.venueName = params.venueName?.trim() || null;
   }
-  if (params.status) data.status = params.status;
+  const nextStatus = params.status ?? match.status;
+  if (params.status) data.status = nextStatus;
   if (params.matchweek) data.matchweek = params.matchweek;
   if (params.countsForStandings !== undefined) {
     data.countsForStandings = params.countsForStandings;
@@ -558,7 +576,7 @@ export async function updateMatchSchedule(
       },
       after: {
         kickoffAt: params.kickoffAt ?? match.kickoffAt,
-        status: params.status ?? match.status,
+        status: nextStatus,
         venueName: params.venueName === undefined ? match.venueName : params.venueName,
         matchweek: params.matchweek ?? match.matchweek,
         countsForStandings: params.countsForStandings ?? match.countsForStandings,
@@ -613,6 +631,50 @@ export interface DisciplinaryInput {
   type: string;
   minute?: number | null;
   note?: string | null;
+  /** Ban length in fixtures. Null leaves a red card awaiting review. */
+  gamesSuspended?: number | null;
+}
+
+/**
+ * Re-apply the automatic yellow-accumulation ban for one player.
+ *
+ * Called after anything that changes a player's yellow count. It recomputes
+ * from scratch instead of incrementing, so rescinding a card moves the ban onto
+ * whichever yellow is now third rather than leaving a ban with nothing behind
+ * it. Bans an administrator decided on are never touched.
+ */
+export async function applyAccumulationRule(
+  db: DbClient,
+  params: { seasonId: string; teamId: string; playerName: string },
+): Promise<void> {
+  const { seasonId, teamId } = params;
+
+  // Free-text names, so pull the team's season and fold them in memory rather
+  // than trusting the database to match "J. Smith" against "j. smith".
+  const key = playerKey(teamId, params.playerName);
+  const yellows = await db.disciplinaryAction.findMany({
+    where: { seasonId, teamId, type: "YELLOW" },
+    select: {
+      id: true,
+      playerName: true,
+      gamesSuspended: true,
+      suspensionReason: true,
+      createdAt: true,
+    },
+  });
+
+  const mine = yellows.filter((card) => playerKey(teamId, card.playerName) === key);
+  const changes = planAccumulationBans(mine);
+
+  for (const change of changes) {
+    await db.disciplinaryAction.update({
+      where: { id: change.id },
+      data: {
+        gamesSuspended: change.gamesSuspended,
+        suspensionReason: change.suspensionReason,
+      },
+    });
+  }
 }
 
 /**
@@ -634,6 +696,7 @@ export async function addDisciplinaryAction(
   });
   if (!team) throw new MatchError("Team not found.", 404, "NOT_FOUND");
 
+  const games = input.gamesSuspended ?? null;
   const created = await db.disciplinaryAction.create({
     data: {
       seasonId: input.seasonId,
@@ -644,9 +707,23 @@ export async function addDisciplinaryAction(
       minute: input.minute ?? null,
       note: input.note ?? null,
       issuedBy: "ADMIN",
+      gamesSuspended: games,
+      // An administrator typing a length in is making the decision themselves,
+      // so the ban is theirs rather than the accumulation rule's. Leaving it
+      // unattributed would let the rule overwrite it on the next recount.
+      suspensionReason:
+        games === null ? null : input.type === "RED" ? "RED_CARD" : "LEAGUE_SANCTION",
     },
     select: { id: true },
   });
+
+  if (input.type === "YELLOW" && games === null) {
+    await applyAccumulationRule(db, {
+      seasonId: input.seasonId,
+      teamId: input.teamId,
+      playerName: input.playerName,
+    });
+  }
 
   await writeAudit(db, {
     actor,
@@ -657,6 +734,54 @@ export async function addDisciplinaryAction(
   });
 
   return created;
+}
+
+/**
+ * Set how long a player is banned for.
+ *
+ * This is the review step for a red card: the card arrives with no length and
+ * stays pending until someone decides. Zero is a real answer — it records that
+ * the card was looked at and warranted no ban, which is what stops it sitting
+ * in the review queue forever.
+ */
+export async function setSuspensionLength(
+  db: DbClient,
+  params: { id: string; games: number; note?: string | null; actor: ActorContext },
+): Promise<void> {
+  const { id, games, actor } = params;
+  if (!actor.isAdmin) throw new MatchError("Admin only.", 403, "NOT_YOUR_MATCH");
+  if (!Number.isInteger(games) || games < 0) {
+    throw new MatchError("Games suspended must be zero or more.", 400, "INVALID_STATE");
+  }
+
+  const existing = await db.disciplinaryAction.findUnique({ where: { id } });
+  if (!existing) throw new MatchError("Disciplinary record not found.", 404, "NOT_FOUND");
+
+  const reason: SuspensionReason | null =
+    games === 0 ? null : existing.type === "RED" ? "RED_CARD" : "LEAGUE_SANCTION";
+
+  await db.disciplinaryAction.update({
+    where: { id },
+    data: {
+      gamesSuspended: games,
+      suspensionReason: reason,
+      note: params.note === undefined ? existing.note : (params.note ?? null),
+    },
+  });
+
+  await writeAudit(db, {
+    actor,
+    action: "discipline.suspend",
+    entity: "DisciplinaryAction",
+    entityId: id,
+    metadata: {
+      teamId: existing.teamId,
+      playerName: existing.playerName,
+      type: existing.type,
+      games,
+      previousGames: existing.gamesSuspended,
+    },
+  });
 }
 
 /** Rescind a sanction. Referee-filed cards can be removed too, with an audit trail. */
@@ -671,6 +796,16 @@ export async function deleteDisciplinaryAction(
   if (!existing) throw new MatchError("Disciplinary record not found.", 404, "NOT_FOUND");
 
   await db.disciplinaryAction.delete({ where: { id } });
+
+  // Removing a yellow can shift which of the remaining ones is third, so the
+  // automatic ban has to be recounted.
+  if (existing.type === "YELLOW") {
+    await applyAccumulationRule(db, {
+      seasonId: existing.seasonId,
+      teamId: existing.teamId,
+      playerName: existing.playerName,
+    });
+  }
 
   await writeAudit(db, {
     actor,

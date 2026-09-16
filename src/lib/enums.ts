@@ -60,6 +60,25 @@ export const DISCIPLINARY_SOURCES = ["REFEREE", "ADMIN"] as const;
 export type DisciplinarySource = (typeof DISCIPLINARY_SOURCES)[number];
 export const disciplinarySourceSchema = z.enum(DISCIPLINARY_SOURCES);
 
+/**
+ * Why a player is banned.
+ *
+ * ACCUMULATED_YELLOWS is written by the league itself — every third yellow of a
+ * season earns an automatic one-match ban, and the rule re-arms, so the sixth
+ * and ninth do too. The other two are decisions a person makes: an
+ * administrator reviewing a red card, or issuing a sanction outside any
+ * fixture.
+ */
+export const SUSPENSION_REASONS = ["ACCUMULATED_YELLOWS", "RED_CARD", "LEAGUE_SANCTION"] as const;
+export type SuspensionReason = (typeof SUSPENSION_REASONS)[number];
+export const suspensionReasonSchema = z.enum(SUSPENSION_REASONS);
+
+export const SUSPENSION_REASON_LABELS: Record<SuspensionReason, string> = {
+  ACCUMULATED_YELLOWS: "Yellow card accumulation",
+  RED_CARD: "Red card",
+  LEAGUE_SANCTION: "League sanction",
+};
+
 export const DOCUMENT_CATEGORIES = ["RULES", "FORMS", "POLICY", "OTHER"] as const;
 export type DocumentCategory = (typeof DOCUMENT_CATEGORIES)[number];
 export const documentCategorySchema = z.enum(DOCUMENT_CATEGORIES);
@@ -83,6 +102,19 @@ export const MATCH_STATUS_LABELS: Record<MatchStatus, string> = {
   CANCELLED: "Cancelled",
   FORFEIT: "Forfeit",
 };
+
+/**
+ * The only statuses an admin picks by hand.
+ *
+ * The others say where a fixture has reached in the referee workflow, and each
+ * one is already written on the match: SCHEDULED/ASSIGNED is the referee field,
+ * REPORT_SUBMITTED is whether a report exists, FORFEIT is what that report
+ * says. `matchDisplayStatus` reads the badge off those facts rather than off
+ * this column, which is why only the two decisions nothing else can imply — a
+ * result signed off, a fixture called off — are worth offering.
+ */
+export const ADMIN_SETTABLE_MATCH_STATUSES = ["CONFIRMED", "CANCELLED"] as const;
+export type AdminSettableMatchStatus = (typeof ADMIN_SETTABLE_MATCH_STATUSES)[number];
 
 export const CARD_LABELS: Record<CardType, string> = {
   YELLOW: "Yellow card",

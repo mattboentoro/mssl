@@ -1,4 +1,5 @@
-import { listMatches, resolveSeason } from "@/lib/queries";
+import { isForfeit } from "@/lib/match-status";
+import { displayedScore, listMatches, resolveSeason } from "@/lib/queries";
 import { LEAGUE_TIME_ZONE } from "@/lib/timezone";
 
 export const runtime = "nodejs";
@@ -65,11 +66,12 @@ export async function GET(request: Request) {
     const start = new Date(match.kickoffAt);
     const end = new Date(start.getTime() + 105 * 60 * 1000);
     const title = `${match.homeTeam.name} vs ${match.awayTeam.name}`;
+    const score = displayedScore(match.report);
     const description = [
       `${match.division.name} · Matchweek ${match.matchweek}`,
       match.referee ? `Referee: ${match.referee.name}` : "Referee: not yet assigned",
-      match.report
-        ? `Result: ${match.report.homeScore}-${match.report.awayScore}`
+      score
+        ? `Result: ${score.home}-${score.away}${isForfeit(match.report) ? " (awarded on forfeit)" : ""}`
         : `Status: ${match.status}`,
     ].join("\n");
 

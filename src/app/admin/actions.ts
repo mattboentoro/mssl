@@ -7,8 +7,13 @@ import { actorFrom } from "@/lib/api";
 import { parseCsv } from "@/lib/csv";
 import { AuthzError, requireAdmin } from "@/lib/authz";
 import { pickKitsForFixture, pickKitsForNewTeam } from "@/lib/kits";
-import { addDisciplinaryAction, deleteDisciplinaryAction } from "@/lib/matches";
+import {
+  addDisciplinaryAction,
+  deleteDisciplinaryAction,
+  setSuspensionLength,
+} from "@/lib/matches";
 import { prisma } from "@/lib/prisma";
+import { pinSeasonDivisions, setSeasonDivision } from "@/lib/season-teams";
 import { parseLeagueDateTime } from "@/lib/timezone";
 import {
   announcementSchema,
@@ -26,9 +31,12 @@ import {
   matchCreateSchema,
   pointsAdjustmentSchema,
   seasonSchema,
+  suspensionLengthSchema,
   teamSchema,
   updateAnnouncementSchema,
   updateDocumentSchema,
+  updateDivisionSchema,
+  updateSeasonSchema,
   updateTeamSchema,
 } from "@/lib/validation";
 import { z } from "zod";
@@ -147,63 +155,78 @@ export async function createSeasonAction(_prev: ActionState, form: FormData): Pr
   );
 }
 
-export async function activateSeasonAction(
-  _prev: ActionState,
-  form: FormData,
-): Promise<ActionState> {
-  return run(
-    z.object({ seasonId: z.string().min(1) }),
-    { seasonId: str(form, "seasonId") },
-    async (data, actor) => {
-      await prisma.$transaction(async (tx) => {
-        await tx.season.updateMany({ data: { isActive: false } });
-        await tx.season.update({ where: { id: data.seasonId }, data: { isActive: true } });
-        await writeAudit(tx, {
-          actor: actorFrom(actor),
-          action: "season.activate",
-          entity: "Season",
-          entityId: data.seasonId,
-        });
-      });
-      refreshAdmin();
-      return "Active season updated.";
-    },
-  );
-}
-
 /**
- * Choose how a season's tables are ranked. Total points is the normal rule;
- * points per game is the fair one while teams have played unequal numbers of
- * fixtures. Stored on the season so every table for it agrees.
+ * Save every editable property of one season in a single write: its name, its
+ * dates, how its tables are ranked and whether it is the active season.
+ *
+ * Total points is the normal ranking rule; points per game is the fair one
+ * while teams have played unequal numbers of fixtures. It is stored on the
+ * season so every table for it agrees.
+ *
+ * Activating this season deactivates the rest. Clearing the toggle on the
+ * season that is already active is ignored rather than obeyed: the league is
+ * never in a state with no active season, and the way to move on is to
+ * activate a different one.
  */
-export async function setSeasonTiebreakerAction(
-  _prev: ActionState,
-  form: FormData,
-): Promise<ActionState> {
+export async function updateSeasonAction(_prev: ActionState, form: FormData): Promise<ActionState> {
   return run(
-    z.object({
-      seasonId: z.string().min(1),
-      tiebreakerMode: z.enum(["POINTS", "POINTS_PER_GAME"]),
-    }),
-    { seasonId: str(form, "seasonId"), tiebreakerMode: str(form, "tiebreakerMode") },
-    async (data, actor) => {
+    updateSeasonSchema,
+    {
+      seasonId: str(form, "seasonId"),
+      name: str(form, "name"),
+      slug: str(form, "slug"),
+      startsOn: str(form, "startsOn"),
+      endsOn: str(form, "endsOn"),
+      tiebreakerMode: str(form, "tiebreakerMode"),
+      isActive: bool(form, "isActive"),
+    },
+    async ({ seasonId, ...data }, actor) => {
+      const before = await prisma.season.findUnique({ where: { id: seasonId } });
+      if (!before) throw new Error("That season no longer exists.");
+
+      const startsOn = new Date(data.startsOn);
+      const endsOn = new Date(data.endsOn);
+      if (endsOn <= startsOn) throw new Error("The season has to end after it starts.");
+
+      const clash = await prisma.season.findFirst({
+        where: { name: data.name, id: { not: seasonId } },
+        select: { name: true },
+      });
+      if (clash) throw new Error(`There is already a season called “${clash.name}”.`);
+
+      const activating = data.isActive && !before.isActive;
+
       await prisma.$transaction(async (tx) => {
+        if (activating) await tx.season.updateMany({ data: { isActive: false } });
         await tx.season.update({
-          where: { id: data.seasonId },
-          data: { tiebreakerMode: data.tiebreakerMode },
+          where: { id: seasonId },
+          data: {
+            name: data.name,
+            slug: data.slug,
+            startsOn,
+            endsOn,
+            tiebreakerMode: data.tiebreakerMode,
+            isActive: before.isActive || data.isActive,
+          },
         });
         await writeAudit(tx, {
           actor: actorFrom(actor),
-          action: "season.tiebreaker",
+          action: "season.update",
           entity: "Season",
-          entityId: data.seasonId,
-          metadata: { tiebreakerMode: data.tiebreakerMode },
+          entityId: seasonId,
+          metadata: {
+            name: data.name,
+            startsOn: data.startsOn,
+            endsOn: data.endsOn,
+            tiebreakerMode: data.tiebreakerMode,
+            activated: activating,
+          },
         });
       });
       refreshAdmin();
-      return data.tiebreakerMode === "POINTS_PER_GAME"
-        ? "Tables for this season now rank on points per game."
-        : "Tables for this season now rank on total points.";
+      return activating
+        ? `Season “${data.name}” updated and made active.`
+        : `Season “${data.name}” updated.`;
     },
   );
 }
@@ -271,12 +294,15 @@ export async function createDivisionAction(
   form: FormData,
 ): Promise<ActionState> {
   const name = str(form, "name");
+  // Position is no longer asked for on the form: a new division simply lands at
+  // the bottom of the list, and the admin can reorder later if that ever ships.
+  const sortOrder = num(form, "sortOrder") ?? (await prisma.division.count());
   return run(
     divisionSchema,
     {
       name,
       slug: str(form, "slug") || slugify(name),
-      sortOrder: num(form, "sortOrder") ?? 0,
+      sortOrder,
     },
     async (data, actor) => {
       const division = await prisma.division.create({ data });
@@ -289,6 +315,55 @@ export async function createDivisionAction(
       });
       refreshAdmin();
       return `Division “${data.name}” created.`;
+    },
+  );
+}
+
+/**
+ * Rename a division or move it up and down the list.
+ *
+ * The slug is deliberately left alone: it is only ever derived once, at
+ * creation, and anything already pointing at the division keeps working after
+ * a rename.
+ */
+export async function updateDivisionAction(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  return run(
+    updateDivisionSchema,
+    {
+      divisionId: str(form, "divisionId"),
+      name: str(form, "name"),
+      slug: str(form, "slug"),
+      sortOrder: num(form, "sortOrder") ?? 0,
+    },
+    async ({ divisionId, ...data }, actor) => {
+      const before = await prisma.division.findUnique({ where: { id: divisionId } });
+      if (!before) throw new Error("That division no longer exists.");
+
+      const clash = await prisma.division.findFirst({
+        where: { name: data.name, id: { not: divisionId } },
+        select: { name: true },
+      });
+      if (clash) throw new Error(`There is already a division called “${clash.name}”.`);
+
+      const division = await prisma.division.update({ where: { id: divisionId }, data });
+      await writeAudit(prisma, {
+        actor: actorFrom(actor),
+        action: "division.update",
+        entity: "Division",
+        entityId: division.id,
+        metadata: {
+          changed: Object.fromEntries(
+            Object.entries(data).filter(
+              ([key, value]) => (before as Record<string, unknown>)[key] !== value,
+            ),
+          ),
+        },
+      });
+      refreshAdmin();
+      return `Division “${data.name}” updated.`;
     },
   );
 }
@@ -378,7 +453,21 @@ export async function createTeamAction(_prev: ActionState, form: FormData): Prom
         throw new Error(`“${clash.name}” already uses the web address “/teams/${data.slug}”.`);
       }
 
-      const team = await prisma.team.create({ data });
+      const team = await prisma.$transaction(async (tx) => {
+        const created = await tx.team.create({ data });
+        // Record the club against the running season straight away, so a later
+        // promotion has something concrete to move away from.
+        const active = await tx.season.findFirst({
+          where: { isActive: true },
+          select: { id: true },
+        });
+        if (active) {
+          await tx.seasonTeam.create({
+            data: { seasonId: active.id, teamId: created.id, divisionId: data.divisionId },
+          });
+        }
+        return created;
+      });
       await writeAudit(prisma, {
         actor: actorFrom(actor),
         action: "team.create",
@@ -430,7 +519,27 @@ export async function updateTeamAction(_prev: ActionState, form: FormData): Prom
         throw new Error(`“${clash.name}” already uses the web address “/teams/${data.slug}”.`);
       }
 
-      const team = await prisma.team.update({ where: { id: teamId }, data });
+      const team = await prisma.$transaction(async (tx) => {
+        // A division change is a promotion or a relegation, so it must not
+        // touch seasons that have already been played. Pinning first freezes
+        // every existing season at the club's current division; the move then
+        // applies to the active season alone.
+        if (data.divisionId !== before.divisionId) {
+          const active = await tx.season.findFirst({
+            where: { isActive: true },
+            select: { id: true },
+          });
+          await pinSeasonDivisions(tx, teamId);
+          if (active) {
+            await setSeasonDivision(tx, {
+              seasonId: active.id,
+              teamId,
+              divisionId: data.divisionId,
+            });
+          }
+        }
+        return tx.team.update({ where: { id: teamId }, data });
+      });
       await writeAudit(prisma, {
         actor: actorFrom(actor),
         action: "team.update",
@@ -638,11 +747,46 @@ export async function createDisciplinaryAction(
       type: str(form, "type"),
       minute: num(form, "minute") ?? null,
       note: optional(form, "note") ?? null,
+      gamesSuspended: num(form, "gamesSuspended") ?? null,
     },
     async (data, actor) => {
       await addDisciplinaryAction(prisma, { actor: actorFrom(actor), input: data });
       refreshAdmin();
-      return `${data.type === "RED" ? "Red" : "Yellow"} card recorded for ${data.playerName}.`;
+      const card = data.type === "RED" ? "Red" : "Yellow";
+      if (data.gamesSuspended && data.gamesSuspended > 0) {
+        return `${card} card recorded for ${data.playerName}, suspended ${data.gamesSuspended} game${data.gamesSuspended === 1 ? "" : "s"}.`;
+      }
+      return `${card} card recorded for ${data.playerName}.`;
+    },
+  );
+}
+
+/**
+ * The review step for a red card. Zero is a valid answer and clears the card
+ * out of the queue without a ban.
+ */
+export async function setSuspensionAction(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  return run(
+    suspensionLengthSchema,
+    {
+      id: str(form, "id"),
+      gamesSuspended: num(form, "gamesSuspended") ?? 0,
+      note: optional(form, "note") ?? null,
+    },
+    async (data, actor) => {
+      await setSuspensionLength(prisma, {
+        id: data.id,
+        games: data.gamesSuspended,
+        note: data.note,
+        actor: actorFrom(actor),
+      });
+      refreshAdmin();
+      return data.gamesSuspended === 0
+        ? "Reviewed. No suspension applied."
+        : `Suspended for ${data.gamesSuspended} game${data.gamesSuspended === 1 ? "" : "s"}.`;
     },
   );
 }

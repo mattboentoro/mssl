@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Badge, Card, EmptyState } from "@/components/ui";
 import { formatDateTime } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
-import { getActiveSeason } from "@/lib/queries";
+import { getActiveSeason, scoreText } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +20,15 @@ export default async function AdminOverviewPage() {
         awayTeam: { select: { name: true } },
         division: { select: { name: true } },
         referee: { select: { name: true } },
-        report: { select: { homeScore: true, awayScore: true, submittedAt: true } },
+        report: {
+          select: {
+            homeScore: true,
+            awayScore: true,
+            homeForfeit: true,
+            awayForfeit: true,
+            submittedAt: true,
+          },
+        },
       },
     }),
     Promise.all([
@@ -95,9 +103,7 @@ export default async function AdminOverviewPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="font-mono text-lg font-semibold">
-                    {match.report?.homeScore}&ndash;{match.report?.awayScore}
-                  </span>
+                  <span className="font-mono text-lg font-semibold">{scoreText(match.report)}</span>
                   <Badge tone="warning">Review</Badge>
                 </div>
               </Link>
