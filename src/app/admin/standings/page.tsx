@@ -1,9 +1,10 @@
 import Link from "next/link";
 
 import { ActionForm, FieldError, SubmitButton } from "@/components/admin-forms";
+import { CloseOnSuccess, Dialog, DialogCancel } from "@/components/form-dialog";
 import { StandingsTable } from "@/components/match-display";
 import { PointsTeamPicker } from "@/components/points-team-picker";
-import { Alert, Card, EmptyState, Field, inputClass } from "@/components/ui";
+import { Alert, Card, EmptyState, Field, inputClass, outlineButtonClass } from "@/components/ui";
 import { createPointsAdjustmentAction, deletePointsAdjustmentAction } from "@/app/admin/actions";
 import { formatDate } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
@@ -62,10 +63,6 @@ export default async function AdminStandingsPage({
     divisionId: team.divisionId,
   }));
 
-  const deducted = adjustments
-    .filter((a) => a.points < 0)
-    .reduce((total, a) => total + Math.abs(a.points), 0);
-
   return (
     <div className="space-y-8">
       {seasons.length > 1 ? (
@@ -87,84 +84,83 @@ export default async function AdminStandingsPage({
         </nav>
       ) : null}
 
-      <section aria-labelledby="adjust-add">
-        <h2 id="adjust-add" className="mb-1 text-lg font-semibold">
-          Adjust a team&rsquo;s points
-        </h2>
-        <p className="text-muted mb-3 text-sm">
-          Use a negative number to deduct points and a positive number to restore them. Results are
-          never edited here &mdash; the adjustment is stored separately and shown on the public
-          table, so the maths always adds up.
-        </p>
-        <Card className="p-5">
-          {pickerTeams.length === 0 ? (
-            <div className="space-y-2">
-              <p className="text-sm font-medium">No teams in this season yet.</p>
-              <p className="text-muted text-sm">
-                There is nothing to adjust here. Add teams in{" "}
-                <Link href="/admin/league" className="underline underline-offset-2">
-                  Seasons &amp; teams
-                </Link>
-                .
-              </p>
-            </div>
-          ) : (
-            <ActionForm action={createPointsAdjustmentAction} className="grid gap-3 sm:grid-cols-2">
-              <input type="hidden" name="seasonId" value={season.id} />
-              <PointsTeamPicker divisions={seasonDivisions} teams={pickerTeams} />
-
-              <Field
-                label="Points"
-                htmlFor="adj-points"
-                hint="Negative deducts, e.g. &minus;3. Zero is not allowed."
-              >
-                <input
-                  id="adj-points"
-                  name="points"
-                  type="number"
-                  min={-50}
-                  max={50}
-                  step={1}
-                  defaultValue={-3}
-                  className={inputClass}
-                  required
-                />
-                <FieldError name="points" />
-              </Field>
-
-              <div className="sm:col-span-2">
-                <Field
-                  label="Reason"
-                  htmlFor="adj-reason"
-                  hint="Shown to the public alongside the adjustment."
-                >
-                  <input
-                    id="adj-reason"
-                    name="reason"
-                    className={inputClass}
-                    placeholder="Fielding an ineligible player in matchweek 4"
-                    required
-                  />
-                  <FieldError name="reason" />
-                </Field>
-              </div>
-
-              <div className="sm:col-span-2">
-                <SubmitButton>Apply adjustment</SubmitButton>
-              </div>
-            </ActionForm>
-          )}
-        </Card>
-      </section>
-
       <section aria-labelledby="adjust-list">
-        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 id="adjust-list" className="text-lg font-semibold">
             Active adjustments
           </h2>
-          <p className="text-muted text-sm">
-            {adjustments.length} adjustment(s) &middot; {deducted} point(s) deducted
-          </p>
+          <Dialog
+            trigger="Add adjustment"
+            triggerClassName={outlineButtonClass}
+            title="Adjust a team's points"
+            description="Use a negative number to deduct points and a positive number to restore them. Results are never edited here — the adjustment is stored separately and shown on the public table, so the maths always adds up."
+          >
+            {pickerTeams.length === 0 ? (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">No teams in this season yet.</p>
+                <p className="text-muted text-sm">
+                  There is nothing to adjust here. Add teams in{" "}
+                  <Link href="/admin/league" className="underline underline-offset-2">
+                    Seasons &amp; teams
+                  </Link>
+                  .
+                </p>
+              </div>
+            ) : (
+              <ActionForm
+                action={createPointsAdjustmentAction}
+                className="space-y-4"
+                showSuccess={false}
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <input type="hidden" name="seasonId" value={season.id} />
+                  <PointsTeamPicker divisions={seasonDivisions} teams={pickerTeams} />
+
+                  <Field
+                    label="Points"
+                    htmlFor="adj-points"
+                    hint="Negative deducts, e.g. &minus;3. Zero is not allowed."
+                  >
+                    <input
+                      id="adj-points"
+                      name="points"
+                      type="number"
+                      min={-50}
+                      max={50}
+                      step={1}
+                      defaultValue={-3}
+                      className={inputClass}
+                      required
+                    />
+                    <FieldError name="points" />
+                  </Field>
+
+                  <div className="sm:col-span-2">
+                    <Field
+                      label="Reason"
+                      htmlFor="adj-reason"
+                      hint="Shown to the public alongside the adjustment."
+                    >
+                      <input
+                        id="adj-reason"
+                        name="reason"
+                        className={inputClass}
+                        placeholder="Fielding an ineligible player in matchweek 4"
+                        required
+                      />
+                      <FieldError name="reason" />
+                    </Field>
+                  </div>
+                </div>
+
+                <div className="border-subtle flex items-center justify-end gap-2 border-t pt-4">
+                  <DialogCancel />
+                  <SubmitButton>Apply adjustment</SubmitButton>
+                </div>
+                <CloseOnSuccess />
+              </ActionForm>
+            )}
+          </Dialog>
         </div>
 
         {adjustments.length === 0 ? (
