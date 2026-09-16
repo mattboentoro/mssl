@@ -105,12 +105,11 @@ model Team {
   colorPrimary   String   @default("#0f766e")
   /// Change/alternate kit colour, worn when the two sides would otherwise clash.
   colorAlternate String   @default("#ffffff")
-  captainName    String?
-  contactEmail   String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   division    Division             @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+  captains    TeamCaptain[]
   homeMatches Match[]              @relation("HomeTeam")
   awayMatches Match[]              @relation("AwayTeam")
   discipline  DisciplinaryAction[]
@@ -118,6 +117,21 @@ model Team {
   seasons     SeasonTeam[]
 
   @@index([divisionId])
+}
+
+model TeamCaptain {
+  id        String   @id @default(cuid())
+  teamId    String
+  name      String
+  email     String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, sortOrder])
+  @@index([teamId])
 }
 
 /// An administrative change to a team's points total, almost always a deduction

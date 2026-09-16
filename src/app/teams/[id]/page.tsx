@@ -93,7 +93,11 @@ export default async function TeamPage({
         description={
           <>
             {team.shortName ? `Also known as ${team.shortName}. ` : ""}
-            {team.captainName ? `Captain: ${team.captainName}.` : "No captain on record."}
+            {team.captains.length > 0
+              ? `${team.captains.length === 1 ? "Captain" : "Captains"}: ${team.captains
+                  .map((captain) => captain.name)
+                  .join(", ")}.`
+              : "No captains on record."}
           </>
         }
       />

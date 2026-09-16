@@ -178,6 +178,17 @@ export const divisionSchema = z.object({
 
 export const updateDivisionSchema = divisionSchema.extend({ divisionId: z.string().min(1) });
 
+export const teamCaptainSchema = z.object({
+  name: trimmed(120).min(1, "Enter the captain's name."),
+  email: z
+    .string()
+    .trim()
+    .email()
+    .optional()
+    .or(z.literal(""))
+    .transform((v) => v || undefined),
+});
+
 export const teamSchema = z.object({
   divisionId: z.string().min(1),
   name: trimmed(120).min(2),
@@ -189,13 +200,7 @@ export const teamSchema = z.object({
   shortName: trimmed(24).min(1),
   colorPrimary: hexColor("#0f766e"),
   colorAlternate: hexColor("#ffffff"),
-  captainName: optionalText(120).optional(),
-  contactEmail: z
-    .string()
-    .email()
-    .optional()
-    .or(z.literal(""))
-    .transform((v) => v || undefined),
+  captains: z.array(teamCaptainSchema).max(5, "A team can have at most 5 captains."),
 });
 
 export const updateTeamSchema = teamSchema.extend({ teamId: z.string().min(1) });

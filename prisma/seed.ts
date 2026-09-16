@@ -366,8 +366,12 @@ async function seedLeague(): Promise<League> {
           shortName: teamSpec.shortName,
           colorPrimary: teamSpec.colorPrimary,
           colorAlternate: teamSpec.colorAlternate,
-          captainName: `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`,
-          contactEmail: `${teamSpec.slug}@example.com`,
+          captains: {
+            create: {
+              name: `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`,
+              email: `${teamSpec.slug}@example.com`,
+            },
+          },
         },
       });
 
