@@ -96,17 +96,17 @@ export default async function TeamPage({
       {team.captains.length > 0 ? (
         <section
           aria-labelledby="team-captains"
-          className="border-brand/40 bg-brand/10 mb-6 rounded-xl border p-4"
+          className="border-subtle mb-6 rounded-xl border p-4"
         >
           <h2
             id="team-captains"
-            className="text-brand text-xs font-bold tracking-[0.16em] uppercase"
+            className="text-brand text-sm font-bold tracking-[0.16em] uppercase"
           >
             {team.captains.length === 1 ? "Team captain" : "Team captains"}
           </h2>
           <ul className="mt-2 space-y-1">
             {team.captains.map((captain) => (
-              <li key={captain.id} className="font-semibold">
+              <li key={captain.id} className="text-xs font-medium">
                 {captain.name}
               </li>
             ))}
