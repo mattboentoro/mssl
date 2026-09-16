@@ -273,6 +273,14 @@ export const documentSchema = z.object({
   sortOrder: z.number().int().min(0).max(999).default(0),
 });
 
+export const updateDocumentSchema = documentSchema.extend({
+  documentId: z.string().min(1),
+});
+
+export const deleteDocumentSchema = z.object({
+  documentId: z.string().min(1),
+});
+
 export const announcementSchema = z.object({
   title: trimmed(200).min(3),
   slug: trimmed(200)
@@ -282,6 +290,14 @@ export const announcementSchema = z.object({
   body: trimmed(20000).min(3),
   pinned: z.boolean().default(false),
   seasonId: z.string().nullable().optional(),
+});
+
+export const updateAnnouncementSchema = announcementSchema.extend({
+  announcementId: z.string().min(1),
+});
+
+export const deleteAnnouncementSchema = z.object({
+  announcementId: z.string().min(1),
 });
 
 /**

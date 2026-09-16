@@ -1,0 +1,99 @@
+﻿matchweek,kickoff,division,home,away,venue
+1,8/5/2026 17:30,Premier League,SOS,Chargers,East Field
+1,8/5/2026 19:00,Premier League,RCS United,SMURF,East Field
+1,8/5/2026 19:00,Premier League,Tequileros,FFC,West Field
+1,8/6/2026 17:30,First Division,Tap-In Merchants FC,The POT,East Field
+1,8/6/2026 18:00,Premier League,False 9-5,Seaturks,West Field
+1,8/6/2026 19:00,First Division,Free Foulin,DeJong United,East Field
+1,8/6/2026 19:30,First Division,Arsenal,Red Star,West Field
+2,8/12/2026 17:30,Premier League,SMURF,Chargers,East Field
+2,8/12/2026 19:00,Premier League,Seaturks,SOS,West Field
+2,8/12/2026 19:00,Premier League,Tequileros,RCS United,East Field
+2,8/13/2026 17:30,First Division,DeJong United,Tap-In Merchants FC,East Field
+2,8/13/2026 17:30,Premier League,FFC,False 9-5,West Field
+2,8/13/2026 19:00,First Division,Free Foulin,Arsenal,East Field
+2,8/13/2026 19:00,First Division,The POT,Atleticopilot,West Field
+3,8/19/2026 17:30,Premier League,SOS,SMURF,East Field
+3,8/19/2026 19:00,Premier League,Chargers,Tequileros,East Field
+3,8/19/2026 19:00,Premier League,Seaturks,FFC,West Field
+3,8/20/2026 17:30,First Division,Atleticopilot,Red Star,West Field
+3,8/20/2026 17:30,Premier League,False 9-5,RCS United,East Field
+3,8/20/2026 19:00,First Division,Tap-In Merchants FC,Arsenal,East Field
+3,8/20/2026 19:00,First Division,The POT,DeJong United,West Field
+4,8/26/2026 17:30,Premier League,Tequileros,SMURF,East Field
+4,8/26/2026 19:00,First Division,DeJong United,Atleticopilot,East Field
+4,8/26/2026 19:00,Premier League,FFC,SOS,West Field
+4,8/27/2026 17:30,Premier League,False 9-5,Chargers,East Field
+4,8/27/2026 17:30,Premier League,RCS United,Seaturks,West Field
+4,8/27/2026 19:00,First Division,Arsenal,The POT,West Field
+4,8/27/2026 19:00,First Division,Free Foulin,Red Star,East Field
+5,9/2/2026 17:30,Premier League,SOS,Tequileros,East Field
+5,9/2/2026 19:00,First Division,DeJong United,Arsenal,West Field
+5,9/2/2026 19:00,Premier League,SMURF,False 9-5,East Field
+5,9/3/2026 17:30,First Division,Atleticopilot,Free Foulin,East Field
+5,9/3/2026 17:30,Premier League,Seaturks,Chargers,West Field
+5,9/3/2026 19:00,First Division,Red Star,Tap-In Merchants FC,East Field
+5,9/3/2026 19:00,Premier League,FFC,RCS United,West Field
+6,9/9/2026 17:30,Premier League,False 9-5,Tequileros,East Field
+6,9/9/2026 17:30,Premier League,RCS United,SOS,West Field
+6,9/9/2026 19:00,Premier League,Chargers,FFC,West Field
+6,9/9/2026 19:00,Premier League,Seaturks,SMURF,East Field
+6,9/10/2026 17:30,First Division,Arsenal,Atleticopilot,West Field
+6,9/10/2026 17:30,First Division,Tap-In Merchants FC,Free Foulin,East Field
+6,9/10/2026 19:00,First Division,The POT,Red Star,West Field
+7,9/16/2026 17:30,Premier League,RCS United,Chargers,West Field
+7,9/16/2026 17:30,Premier League,SOS,False 9-5,East Field
+7,9/16/2026 19:00,First Division,DeJong United,Red Star,East Field
+7,9/16/2026 19:00,Premier League,FFC,SMURF,West Field
+7,9/17/2026 17:30,First Division,Atleticopilot,Tap-In Merchants FC,East Field
+7,9/17/2026 17:30,First Division,Free Foulin,The POT,West Field
+7,9/17/2026 19:00,Premier League,Tequileros,Seaturks,East Field
+8,9/23/2026 17:30,Premier League,Chargers,SOS,West Field
+8,9/23/2026 17:30,Premier League,FFC,Tequileros,East Field
+8,9/23/2026 19:00,First Division,Red Star,Arsenal,East Field
+8,9/23/2026 19:00,Premier League,SMURF,RCS United,West Field
+8,9/24/2026 17:30,First Division,The POT,Tap-In Merchants FC,West Field
+8,9/24/2026 17:30,Premier League,Seaturks,False 9-5,East Field
+8,9/24/2026 19:00,First Division,DeJong United,Free Foulin,West Field
+9,9/30/2026 17:30,First Division,Tap-In Merchants FC,DeJong United,West Field
+9,9/30/2026 17:30,Premier League,SOS,Seaturks,East Field
+9,9/30/2026 19:00,First Division,Atleticopilot,The POT,East Field
+9,9/30/2026 19:00,Premier League,RCS United,Tequileros,West Field
+9,10/1/2026 17:30,Premier League,Chargers,SMURF,West Field
+9,10/1/2026 17:30,Premier League,False 9-5,FFC,East Field
+9,10/1/2026 19:00,First Division,Arsenal,Free Foulin,East Field
+10,10/7/2026 17:30,Premier League,SMURF,SOS,West Field
+10,10/7/2026 18:00,Premier League,FFC,Seaturks,East Field
+10,10/7/2026 19:00,Premier League,Tequileros,Chargers,West Field
+10,10/8/2026 17:30,First Division,Red Star,Atleticopilot,West Field
+10,10/8/2026 18:00,First Division,DeJong United,The POT,East Field
+10,10/8/2026 19:00,First Division,Arsenal,Tap-In Merchants FC,West Field
+10,10/8/2026 19:30,Premier League,RCS United,False 9-5,East Field
+11,10/14/2026 17:30,Premier League,SMURF,Tequileros,West Field
+11,10/14/2026 18:00,Premier League,SOS,FFC,East Field
+11,10/14/2026 19:00,First Division,Red Star,Free Foulin,West Field
+11,10/14/2026 19:30,Premier League,Seaturks,RCS United,East Field
+11,10/15/2026 17:30,First Division,Atleticopilot,DeJong United,West Field
+11,10/15/2026 18:00,Premier League,Chargers,False 9-5,East Field
+11,10/15/2026 19:30,First Division,The POT,Arsenal,East Field
+12,10/28/2026 17:30,Premier League,RCS United,FFC,East Field
+12,10/28/2026 17:30,Premier League,Tequileros,SOS,West Field
+12,10/28/2026 19:00,First Division,Arsenal,DeJong United,West Field
+12,10/29/2026 17:30,First Division,Free Foulin,Atleticopilot,West Field
+12,10/29/2026 17:30,Premier League,Chargers,Seaturks,East Field
+12,10/29/2026 19:00,First Division,Tap-In Merchants FC,Red Star,West Field
+12,10/29/2026 19:00,Premier League,False 9-5,SMURF,West Field
+13,11/4/2026 17:30,Premier League,SOS,RCS United,East Field
+13,11/4/2026 19:00,Premier League,FFC,Chargers,East Field
+13,11/4/2026 19:30,Premier League,SMURF,Seaturks,West Field
+13,11/5/2026 17:30,First Division,Atleticopilot,Arsenal,East Field
+13,11/5/2026 17:30,First Division,Free Foulin,Tap-In Merchants FC,West Field
+13,11/5/2026 19:00,First Division,Red Star,The POT,East Field
+13,11/5/2026 19:00,Premier League,Tequileros,False 9-5,West Field
+14,11/11/2026 17:30,Premier League,Chargers,RCS United,East Field
+14,11/11/2026 19:00,Premier League,SMURF,FFC,East Field
+14,11/11/2026 19:30,Premier League,Seaturks,Tequileros,West Field
+14,11/12/2026 17:30,First Division,Tap-In Merchants FC,Atleticopilot,West Field
+14,11/12/2026 17:30,First Division,The POT,Free Foulin,East Field
+14,11/12/2026 19:00,First Division,Red Star,DeJong United,West Field
+14,11/12/2026 19:00,Premier League,False 9-5,SOS,East Field
