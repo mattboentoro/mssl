@@ -60,6 +60,25 @@ export const DISCIPLINARY_SOURCES = ["REFEREE", "ADMIN"] as const;
 export type DisciplinarySource = (typeof DISCIPLINARY_SOURCES)[number];
 export const disciplinarySourceSchema = z.enum(DISCIPLINARY_SOURCES);
 
+/**
+ * Why a player is banned.
+ *
+ * ACCUMULATED_YELLOWS is written by the league itself — every third yellow of a
+ * season earns an automatic one-match ban, and the rule re-arms, so the sixth
+ * and ninth do too. The other two are decisions a person makes: an
+ * administrator reviewing a red card, or issuing a sanction outside any
+ * fixture.
+ */
+export const SUSPENSION_REASONS = ["ACCUMULATED_YELLOWS", "RED_CARD", "LEAGUE_SANCTION"] as const;
+export type SuspensionReason = (typeof SUSPENSION_REASONS)[number];
+export const suspensionReasonSchema = z.enum(SUSPENSION_REASONS);
+
+export const SUSPENSION_REASON_LABELS: Record<SuspensionReason, string> = {
+  ACCUMULATED_YELLOWS: "Yellow card accumulation",
+  RED_CARD: "Red card",
+  LEAGUE_SANCTION: "League sanction",
+};
+
 export const DOCUMENT_CATEGORIES = ["RULES", "FORMS", "POLICY", "OTHER"] as const;
 export type DocumentCategory = (typeof DOCUMENT_CATEGORIES)[number];
 export const documentCategorySchema = z.enum(DOCUMENT_CATEGORIES);

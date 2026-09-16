@@ -265,22 +265,36 @@ model GameReport {
 ///
 /// `playerName` is free text. The league does not maintain squad lists, so
 /// there is no player record to point at.
+///
+/// A row may also carry a suspension. `gamesSuspended` is the ban length in
+/// fixtures and doubles as the review state for red cards:
+///   * null — no ban attached. Every yellow starts here, and a red card sits
+///     here until an administrator has reviewed it.
+///   * 0    — reviewed, no ban warranted.
+///   * > 0  — banned for that many of the team's next fixtures.
+/// Which fixtures a ban actually covers is derived at read time from the
+/// schedule (see `src/lib/suspensions.ts`) rather than stored, so that
+/// rescheduling a fixture cannot strand a ban.
 model DisciplinaryAction {
-  id           String   @id @default(cuid())
-  seasonId     String
-  teamId       String
-  gameReportId String?
-  matchId      String?
-  playerName   String
+  id               String   @id @default(cuid())
+  seasonId         String
+  teamId           String
+  gameReportId     String?
+  matchId          String?
+  playerName       String
   /// One of CardType: YELLOW | RED
-  type         String
+  type             String
   /// Minute of the match, when it came from a game report.
-  minute       Int?
-  note         String?
+  minute           Int?
+  note             String?
   /// One of DisciplinarySource: REFEREE | ADMIN
-  issuedBy     String   @default("REFEREE")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  issuedBy         String   @default("REFEREE")
+  /// Ban length in fixtures. Null means undecided; see the model comment.
+  gamesSuspended   Int?
+  /// One of SuspensionReason: ACCUMULATED_YELLOWS | RED_CARD | LEAGUE_SANCTION
+  suspensionReason String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   season     Season      @relation(fields: [seasonId], references: [id], onDelete: Cascade)
   team       Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)

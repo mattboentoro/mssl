@@ -7,7 +7,11 @@ import { actorFrom } from "@/lib/api";
 import { parseCsv } from "@/lib/csv";
 import { AuthzError, requireAdmin } from "@/lib/authz";
 import { pickKitsForFixture, pickKitsForNewTeam } from "@/lib/kits";
-import { addDisciplinaryAction, deleteDisciplinaryAction } from "@/lib/matches";
+import {
+  addDisciplinaryAction,
+  deleteDisciplinaryAction,
+  setSuspensionLength,
+} from "@/lib/matches";
 import { prisma } from "@/lib/prisma";
 import { pinSeasonDivisions, setSeasonDivision } from "@/lib/season-teams";
 import { parseLeagueDateTime } from "@/lib/timezone";
@@ -25,6 +29,7 @@ import {
   matchCreateSchema,
   pointsAdjustmentSchema,
   seasonSchema,
+  suspensionLengthSchema,
   teamSchema,
   updateDivisionSchema,
   updateSeasonSchema,
@@ -738,11 +743,46 @@ export async function createDisciplinaryAction(
       type: str(form, "type"),
       minute: num(form, "minute") ?? null,
       note: optional(form, "note") ?? null,
+      gamesSuspended: num(form, "gamesSuspended") ?? null,
     },
     async (data, actor) => {
       await addDisciplinaryAction(prisma, { actor: actorFrom(actor), input: data });
       refreshAdmin();
-      return `${data.type === "RED" ? "Red" : "Yellow"} card recorded for ${data.playerName}.`;
+      const card = data.type === "RED" ? "Red" : "Yellow";
+      if (data.gamesSuspended && data.gamesSuspended > 0) {
+        return `${card} card recorded for ${data.playerName}, suspended ${data.gamesSuspended} game${data.gamesSuspended === 1 ? "" : "s"}.`;
+      }
+      return `${card} card recorded for ${data.playerName}.`;
+    },
+  );
+}
+
+/**
+ * The review step for a red card. Zero is a valid answer and clears the card
+ * out of the queue without a ban.
+ */
+export async function setSuspensionAction(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  return run(
+    suspensionLengthSchema,
+    {
+      id: str(form, "id"),
+      gamesSuspended: num(form, "gamesSuspended") ?? 0,
+      note: optional(form, "note") ?? null,
+    },
+    async (data, actor) => {
+      await setSuspensionLength(prisma, {
+        id: data.id,
+        games: data.gamesSuspended,
+        note: data.note,
+        actor: actorFrom(actor),
+      });
+      refreshAdmin();
+      return data.gamesSuspended === 0
+        ? "Reviewed. No suspension applied."
+        : `Suspended for ${data.gamesSuspended} game${data.gamesSuspended === 1 ? "" : "s"}.`;
     },
   );
 }

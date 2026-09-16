@@ -85,6 +85,17 @@ export const disciplinaryActionSchema = z.object({
   type: z.enum(CARD_TYPES),
   minute: minuteSchema.nullable().optional(),
   note: optionalText(500).nullable().optional(),
+  /**
+   * Ban length in fixtures. Left blank a red card lands in the review queue,
+   * which is the whole point of the queue — an administrator has to decide.
+   */
+  gamesSuspended: z.number().int().min(0).max(50).nullable().optional(),
+});
+
+export const suspensionLengthSchema = z.object({
+  id: z.string().min(1),
+  gamesSuspended: z.number().int().min(0, "Enter zero or more games.").max(50),
+  note: optionalText(500).nullable().optional(),
 });
 
 export const assignSchema = z.object({

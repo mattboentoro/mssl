@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 
 import { kitsClash } from "../src/lib/kits";
+import { YELLOW_CARDS_PER_BAN, planAccumulationBans, playerKey } from "../src/lib/suspensions";
 
 /**
  * Deterministic seed data.
@@ -726,6 +727,109 @@ async function seedLeagueSanctions(seasonId: string) {
   return issued;
 }
 
+/**
+ * Apply the yellow-accumulation rule across everything seeded so far, and
+ * decide one red card so the sample league shows a ban actually being served.
+ *
+ * The rule normally runs inside `submitGameReport`, but the seed writes cards
+ * straight to the database, so it has to be swept afterwards.
+ */
+async function seedSuspensions(seasonId: string) {
+  // Cards are dealt at random across ~165 players, so a natural hat-trick of
+  // yellows is unlikely. Top the busiest offender up to three so the automatic
+  // ban is visible in the sample league.
+  const busiest = await prisma.disciplinaryAction.groupBy({
+    by: ["teamId", "playerName"],
+    where: { seasonId, type: "YELLOW" },
+    _count: { _all: true },
+    orderBy: [{ _count: { id: "desc" } }, { playerName: "asc" }],
+    take: 1,
+  });
+
+  if (busiest.length > 0) {
+    const target = busiest[0];
+    const shortfall = YELLOW_CARDS_PER_BAN - target._count._all;
+    const played = await prisma.match.findMany({
+      where: {
+        seasonId,
+        OR: [{ homeTeamId: target.teamId }, { awayTeamId: target.teamId }],
+        report: { isNot: null },
+      },
+      orderBy: { kickoffAt: "asc" },
+      select: { id: true, kickoffAt: true },
+    });
+
+    for (let index = 0; index < shortfall && index < played.length; index += 1) {
+      await prisma.disciplinaryAction.create({
+        data: {
+          seasonId,
+          teamId: target.teamId,
+          matchId: played[index].id,
+          playerName: target.playerName,
+          type: "YELLOW",
+          minute: 20 + index * 15,
+          issuedBy: "REFEREE",
+          createdAt: played[index].kickoffAt,
+        },
+      });
+    }
+  }
+
+  const yellows = await prisma.disciplinaryAction.findMany({
+    where: { seasonId, type: "YELLOW" },
+    select: {
+      id: true,
+      teamId: true,
+      playerName: true,
+      gamesSuspended: true,
+      suspensionReason: true,
+      createdAt: true,
+    },
+  });
+
+  const byPlayer = new Map<string, typeof yellows>();
+  for (const card of yellows) {
+    const key = playerKey(card.teamId, card.playerName);
+    const bucket = byPlayer.get(key);
+    if (bucket) bucket.push(card);
+    else byPlayer.set(key, [card]);
+  }
+
+  let automatic = 0;
+  for (const bucket of byPlayer.values()) {
+    for (const change of planAccumulationBans(bucket)) {
+      await prisma.disciplinaryAction.update({
+        where: { id: change.id },
+        data: {
+          gamesSuspended: change.gamesSuspended,
+          suspensionReason: change.suspensionReason,
+        },
+      });
+      if (change.gamesSuspended) automatic += 1;
+    }
+  }
+
+  // Leave every other red card undecided so the review queue on
+  // /admin/discipline has something in it.
+  const reviewed = await prisma.disciplinaryAction.findFirst({
+    where: { seasonId, type: "RED", gamesSuspended: null },
+    orderBy: { createdAt: "asc" },
+  });
+  if (reviewed) {
+    await prisma.disciplinaryAction.update({
+      where: { id: reviewed.id },
+      data: { gamesSuspended: 3, suspensionReason: "RED_CARD" },
+    });
+  }
+
+  return {
+    automatic,
+    pending: await prisma.disciplinaryAction.count({
+      where: { seasonId, type: "RED", gamesSuspended: null },
+    }),
+  };
+}
+
 async function seedContent(seasonId: string) {
   const announcements = [
     {
@@ -905,6 +1009,9 @@ async function main() {
   console.log("Seeding a sample points deduction...");
   await seedPointsAdjustment(active.id);
 
+  console.log("Applying suspensions...");
+  const suspensions = await seedSuspensions(active.id);
+
   const counts = {
     seasons: await prisma.season.count(),
     divisions: await prisma.division.count(),
@@ -916,6 +1023,8 @@ async function main() {
     cards: await prisma.disciplinaryAction.count(),
     sanctions: await prisma.disciplinaryAction.count({ where: { issuedBy: "ADMIN" } }),
     adjustments: await prisma.pointsAdjustment.count(),
+    autoBans: suspensions.automatic,
+    redsToReview: suspensions.pending,
   };
 
   console.log("\nSeed complete:");

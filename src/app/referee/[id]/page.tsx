@@ -9,11 +9,12 @@ import { KitSwatch } from "@/components/team-colors";
 import { WarningBoard } from "@/components/warning-board";
 import { AuthzError, requireReferee } from "@/lib/authz";
 import { formatDateTime } from "@/lib/dates";
-import { CARD_LABELS, type CardType } from "@/lib/enums";
+import { CARD_LABELS, SUSPENSION_REASON_LABELS, type CardType } from "@/lib/enums";
 import { kitColorName, resolveKit } from "@/lib/kits";
 import { isForfeit } from "@/lib/match-status";
 import { prisma } from "@/lib/prisma";
-import { getWarningBoard, scoreText } from "@/lib/queries";
+import { getSeasonSuspensions, getWarningBoard, scoreText } from "@/lib/queries";
+import { suspensionsForMatch } from "@/lib/suspensions";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Match" };
@@ -58,6 +59,11 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
   const canAct = isOwner || user.isAdmin;
   const warnings = canAct
     ? await getWarningBoard(prisma, match.seasonId, [match.homeTeamId, match.awayTeamId])
+    : [];
+  // Which fixtures a ban covers is derived from the schedule, so ask for the
+  // season's bans and pick out the ones that land on this fixture.
+  const bans = canAct
+    ? suspensionsForMatch(await getSeasonSuspensions(match.seasonId), match.id)
     : [];
 
   return (
@@ -169,6 +175,37 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
             </li>
           </ol>
         </Card>
+      ) : null}
+
+      {/* --------------------------- Suspensions ----------------------------- */}
+      {canAct && bans.length > 0 ? (
+        <section aria-labelledby="suspended-players" className="mt-8">
+          <h2 id="suspended-players" className="mb-1 text-lg font-semibold">
+            Suspended for this fixture
+          </h2>
+          <p className="text-muted mb-3 text-sm">
+            These players are serving a ban and must not take the field. Report anyone who plays
+            anyway in your incident notes.
+          </p>
+          <Card className="divide-subtle divide-y">
+            {bans.map((ban) => (
+              <div key={ban.id} className="flex flex-wrap items-center gap-3 p-3 text-sm">
+                <span aria-hidden className="bg-danger h-6 w-4 shrink-0 rounded-sm" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">
+                    {ban.playerName}
+                    <span className="text-muted font-normal"> &middot; {ban.teamName}</span>
+                  </p>
+                  <p className="text-muted text-xs">
+                    {SUSPENSION_REASON_LABELS[ban.reason] ?? ban.reason}
+                    {` \u00b7 game ${ban.matchIds.indexOf(match.id) + 1} of ${ban.games}`}
+                  </p>
+                </div>
+                <Badge tone="danger">Suspended</Badge>
+              </div>
+            ))}
+          </Card>
+        </section>
       ) : null}
 
       {/* --------------------------- Warning board --------------------------- */}
