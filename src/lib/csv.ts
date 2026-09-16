@@ -1,5 +1,9 @@
 /** Minimal RFC-4180-ish CSV parser: handles quoted fields, embedded commas and newlines. */
 export function parseCsv(text: string): string[][] {
+  if (text.charCodeAt(0) === 0xfeff) {
+    text = text.slice(1);
+  }
+
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";

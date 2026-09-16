@@ -1,4 +1,11 @@
-import { createAnnouncementAction, createDocumentAction } from "@/app/admin/actions";
+import {
+  createAnnouncementAction,
+  createDocumentAction,
+  deleteAnnouncementAction,
+  deleteDocumentAction,
+  updateAnnouncementAction,
+  updateDocumentAction,
+} from "@/app/admin/actions";
 import { ActionForm, FieldError, SubmitButton } from "@/components/admin-forms";
 import { Card, Field, inputClass } from "@/components/ui";
 import { DOCUMENT_CATEGORIES, DOCUMENT_CATEGORY_LABELS } from "@/lib/enums";
@@ -37,6 +44,104 @@ export default async function AdminContentPage() {
                     {item.publishedAt ? formatDate(item.publishedAt) : "Draft"}
                   </p>
                   <p className="text-muted mt-1 text-sm">{item.summary}</p>
+                  <details className="mt-3">
+                    <summary className="text-accent cursor-pointer text-xs font-semibold">
+                      Edit announcement
+                    </summary>
+                    <ActionForm
+                      action={updateAnnouncementAction}
+                      resetOnSuccess={false}
+                      className="mt-3 space-y-3"
+                    >
+                      <input type="hidden" name="announcementId" value={item.id} />
+                      <Field label="Title" htmlFor={`ann-${item.id}-title`}>
+                        <input
+                          id={`ann-${item.id}-title`}
+                          name="title"
+                          defaultValue={item.title}
+                          className={inputClass}
+                          required
+                        />
+                        <FieldError name="title" />
+                      </Field>
+                      <Field label="Slug" htmlFor={`ann-${item.id}-slug`}>
+                        <input
+                          id={`ann-${item.id}-slug`}
+                          name="slug"
+                          defaultValue={item.slug}
+                          className={inputClass}
+                          required
+                        />
+                        <FieldError name="slug" />
+                      </Field>
+                      <Field label="Summary" htmlFor={`ann-${item.id}-summary`}>
+                        <input
+                          id={`ann-${item.id}-summary`}
+                          name="summary"
+                          defaultValue={item.summary}
+                          className={inputClass}
+                          required
+                        />
+                        <FieldError name="summary" />
+                      </Field>
+                      <Field label="Body" htmlFor={`ann-${item.id}-body`}>
+                        <textarea
+                          id={`ann-${item.id}-body`}
+                          name="body"
+                          rows={5}
+                          defaultValue={item.body}
+                          className={inputClass}
+                          required
+                        />
+                        <FieldError name="body" />
+                      </Field>
+                      <Field label="Season" htmlFor={`ann-${item.id}-season`}>
+                        <select
+                          id={`ann-${item.id}-season`}
+                          name="seasonId"
+                          defaultValue={item.seasonId ?? ""}
+                          className={inputClass}
+                        >
+                          <option value="">League-wide</option>
+                          {seasons.map((season) => (
+                            <option key={season.id} value={season.id}>
+                              {season.name}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          name="pinned"
+                          defaultChecked={item.pinned}
+                          className="h-4 w-4"
+                        />
+                        Pin to the home page
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        <SubmitButton>Save changes</SubmitButton>
+                      </div>
+                    </ActionForm>
+                    <ActionForm
+                      action={deleteAnnouncementAction}
+                      resetOnSuccess={false}
+                      className="mt-2"
+                    >
+                      <input
+                        id={`delete-ann-${item.id}`}
+                        type="hidden"
+                        name="announcementId"
+                        value={item.id}
+                      />
+                      <SubmitButton
+                        variant="danger"
+                        confirm={`Delete “${item.title}”? This cannot be undone.`}
+                      >
+                        Delete announcement
+                      </SubmitButton>
+                    </ActionForm>
+                  </details>
                 </article>
               ))
             )}
@@ -104,6 +209,97 @@ export default async function AdminContentPage() {
                     {doc.fileType ? ` \u00B7 ${doc.fileType}` : ""}
                   </p>
                   {doc.description ? <p className="text-muted mt-1">{doc.description}</p> : null}
+                  <details className="mt-3">
+                    <summary className="text-accent cursor-pointer text-xs font-semibold">
+                      Edit document
+                    </summary>
+                    <ActionForm
+                      action={updateDocumentAction}
+                      resetOnSuccess={false}
+                      className="mt-3 grid gap-3"
+                    >
+                      <input type="hidden" name="documentId" value={doc.id} />
+                      <Field label="Title" htmlFor={`doc-${doc.id}-title`}>
+                        <input
+                          id={`doc-${doc.id}-title`}
+                          name="title"
+                          defaultValue={doc.title}
+                          className={inputClass}
+                          required
+                        />
+                        <FieldError name="title" />
+                      </Field>
+                      <Field label="Category" htmlFor={`doc-${doc.id}-category`}>
+                        <select
+                          id={`doc-${doc.id}-category`}
+                          name="category"
+                          defaultValue={doc.category}
+                          className={inputClass}
+                        >
+                          {DOCUMENT_CATEGORIES.map((category) => (
+                            <option key={category} value={category}>
+                              {DOCUMENT_CATEGORY_LABELS[category]}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label="URL" htmlFor={`doc-${doc.id}-url`}>
+                        <input
+                          id={`doc-${doc.id}-url`}
+                          name="url"
+                          defaultValue={doc.url}
+                          className={inputClass}
+                          required
+                        />
+                        <FieldError name="url" />
+                      </Field>
+                      <Field label="File type" htmlFor={`doc-${doc.id}-filetype`}>
+                        <input
+                          id={`doc-${doc.id}-filetype`}
+                          name="fileType"
+                          defaultValue={doc.fileType ?? ""}
+                          className={inputClass}
+                        />
+                      </Field>
+                      <Field label="Description" htmlFor={`doc-${doc.id}-description`}>
+                        <input
+                          id={`doc-${doc.id}-description`}
+                          name="description"
+                          defaultValue={doc.description ?? ""}
+                          className={inputClass}
+                        />
+                      </Field>
+                      <Field label="Sort order" htmlFor={`doc-${doc.id}-sort`}>
+                        <input
+                          id={`doc-${doc.id}-sort`}
+                          name="sortOrder"
+                          type="number"
+                          min={0}
+                          defaultValue={doc.sortOrder}
+                          className={inputClass}
+                        />
+                      </Field>
+                      <SubmitButton>Save changes</SubmitButton>
+                    </ActionForm>
+                    <ActionForm
+                      action={deleteDocumentAction}
+                      resetOnSuccess={false}
+                      className="mt-2"
+                    >
+                      <input
+                        id={`delete-doc-${doc.id}`}
+                        type="hidden"
+                        name="documentId"
+                        value={doc.id}
+                      />
+                      <SubmitButton
+                        variant="danger"
+                        confirm={`Delete “${doc.title}”? This cannot be undone.`}
+                      >
+                        Delete document
+                      </SubmitButton>
+                    </ActionForm>
+                  </details>
                 </div>
               ))
             )}

@@ -13,6 +13,8 @@ import { parseLeagueDateTime } from "@/lib/timezone";
 import {
   announcementSchema,
   csvMatchRowSchema,
+  deleteAnnouncementSchema,
+  deleteDocumentSchema,
   deleteSeasonSchema,
   deleteTeamSchema,
   deleteDivisionSchema,
@@ -25,6 +27,8 @@ import {
   pointsAdjustmentSchema,
   seasonSchema,
   teamSchema,
+  updateAnnouncementSchema,
+  updateDocumentSchema,
   updateTeamSchema,
 } from "@/lib/validation";
 import { z } from "zod";
@@ -773,6 +777,89 @@ export async function createAnnouncementAction(
   );
 }
 
+export async function updateAnnouncementAction(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  return run(
+    updateAnnouncementSchema,
+    {
+      announcementId: str(form, "announcementId"),
+      title: str(form, "title"),
+      slug: str(form, "slug"),
+      summary: str(form, "summary"),
+      body: str(form, "body"),
+      pinned: bool(form, "pinned"),
+      seasonId: optional(form, "seasonId") ?? null,
+    },
+    async (data, actor) => {
+      const existing = await prisma.announcement.findUnique({
+        where: { id: data.announcementId },
+      });
+      if (!existing) throw new Error("That announcement no longer exists.");
+
+      await prisma.$transaction(async (tx) => {
+        await tx.announcement.update({
+          where: { id: data.announcementId },
+          data: {
+            title: data.title,
+            slug: data.slug,
+            summary: data.summary,
+            body: data.body,
+            pinned: data.pinned,
+            seasonId: data.seasonId ?? null,
+          },
+        });
+        await writeAudit(tx, {
+          actor: actorFrom(actor),
+          action: "announcement.update",
+          entity: "Announcement",
+          entityId: data.announcementId,
+          metadata: {
+            previousTitle: existing.title,
+            title: data.title,
+            previousSlug: existing.slug,
+            slug: data.slug,
+          },
+        });
+      });
+
+      refreshAdmin();
+      return `Announcement “${data.title}” updated.`;
+    },
+  );
+}
+
+export async function deleteAnnouncementAction(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  return run(
+    deleteAnnouncementSchema,
+    { announcementId: str(form, "announcementId") },
+    async (data, actor) => {
+      const announcement = await prisma.announcement.findUnique({
+        where: { id: data.announcementId },
+      });
+      if (!announcement) throw new Error("That announcement no longer exists.");
+
+      await prisma.$transaction(async (tx) => {
+        await tx.announcement.delete({ where: { id: announcement.id } });
+        await writeAudit(tx, {
+          actor: actorFrom(actor),
+          action: "announcement.delete",
+          entity: "Announcement",
+          entityId: announcement.id,
+          metadata: { title: announcement.title, slug: announcement.slug },
+        });
+      });
+
+      refreshAdmin();
+      return `Announcement “${announcement.title}” deleted.`;
+    },
+  );
+}
+
 export async function createDocumentAction(
   _prev: ActionState,
   form: FormData,
@@ -800,6 +887,81 @@ export async function createDocumentAction(
       return "Document added.";
     },
   );
+}
+
+export async function updateDocumentAction(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  return run(
+    updateDocumentSchema,
+    {
+      documentId: str(form, "documentId"),
+      title: str(form, "title"),
+      description: optional(form, "description"),
+      category: str(form, "category") || "OTHER",
+      url: str(form, "url"),
+      fileType: optional(form, "fileType"),
+      sortOrder: num(form, "sortOrder") ?? 0,
+    },
+    async (data, actor) => {
+      const existing = await prisma.document.findUnique({ where: { id: data.documentId } });
+      if (!existing) throw new Error("That document no longer exists.");
+
+      await prisma.$transaction(async (tx) => {
+        await tx.document.update({
+          where: { id: data.documentId },
+          data: {
+            title: data.title,
+            description: data.description,
+            category: data.category,
+            url: data.url,
+            fileType: data.fileType,
+            sortOrder: data.sortOrder,
+          },
+        });
+        await writeAudit(tx, {
+          actor: actorFrom(actor),
+          action: "document.update",
+          entity: "Document",
+          entityId: data.documentId,
+          metadata: {
+            previousTitle: existing.title,
+            title: data.title,
+            previousUrl: existing.url,
+            url: data.url,
+          },
+        });
+      });
+
+      refreshAdmin();
+      return `Document “${data.title}” updated.`;
+    },
+  );
+}
+
+export async function deleteDocumentAction(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  return run(deleteDocumentSchema, { documentId: str(form, "documentId") }, async (data, actor) => {
+    const document = await prisma.document.findUnique({ where: { id: data.documentId } });
+    if (!document) throw new Error("That document no longer exists.");
+
+    await prisma.$transaction(async (tx) => {
+      await tx.document.delete({ where: { id: document.id } });
+      await writeAudit(tx, {
+        actor: actorFrom(actor),
+        action: "document.delete",
+        entity: "Document",
+        entityId: document.id,
+        metadata: { title: document.title, url: document.url },
+      });
+    });
+
+    refreshAdmin();
+    return `Document “${document.title}” deleted.`;
+  });
 }
 
 // ---------------------------------------------------------------------------
