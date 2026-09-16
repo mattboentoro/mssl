@@ -22,6 +22,11 @@ import { buttonClass, outlineButtonClass } from "@/components/ui";
 
 const DialogCloseContext = createContext<() => void>(() => {});
 
+/** Dismisses the surrounding dialog. A no-op outside one. */
+export function useDialogClose() {
+  return useContext(DialogCloseContext);
+}
+
 /** Dismisses the surrounding dialog once the server action reports success. */
 export function CloseOnSuccess() {
   const close = useContext(DialogCloseContext);

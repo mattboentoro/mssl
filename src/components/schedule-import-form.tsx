@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 import { importScheduleAction, type CsvImportState } from "@/app/admin/actions";
 import { SubmitButton } from "@/components/admin-forms";
+import { useDialogClose } from "@/components/form-dialog";
 import { Alert, Card, Field, inputClass } from "@/components/ui";
 import { formatDateTime } from "@/lib/dates";
 
@@ -16,6 +17,15 @@ export function ScheduleImportForm({ seasons }: { seasons: { id: string; name: s
   const [seasonId, setSeasonId] = useState(state.seasonId ?? seasons[0]?.id ?? "");
   const [fileName, setFileName] = useState("");
   const csvRef = useRef<HTMLTextAreaElement>(null);
+  const closeDialog = useDialogClose();
+
+  // A dry run has to stay on screen so the preview can be read, but a
+  // committed import is done — get out of the way and let the fixture list
+  // behind the dialog show the result.
+  const committed = state.committed === true;
+  useEffect(() => {
+    if (committed) closeDialog();
+  }, [committed, closeDialog]);
 
   // The file is read in the browser and dropped into the textarea, so the
   // server action keeps its single `csv` string input and the pasted and

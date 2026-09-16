@@ -5,7 +5,15 @@ import { forbidden, redirect } from "next/navigation";
 import { ActionButton } from "@/components/match-actions";
 import { CalendarViewToggle, FixtureCalendar, parseView } from "@/components/fixture-calendar";
 import { FixtureLine } from "@/components/match-display";
-import { Alert, Card, EmptyState, PageHeader, inputClass, labelClass } from "@/components/ui";
+import {
+  Alert,
+  Card,
+  EmptyState,
+  PageHeader,
+  buttonClass,
+  inputClass,
+  labelClass,
+} from "@/components/ui";
 import { MatchStatusBadge } from "@/components/ui";
 import { AuthzError, requireReferee } from "@/lib/authz";
 import { formatDateTime, parseMonthValue, shiftMonth } from "@/lib/dates";
@@ -235,10 +243,7 @@ export default async function RefereePage({
                         confirm="Release this match so another referee can claim it?"
                       />
                     ) : null}
-                    <Link
-                      href={`/referee/${match.id}`}
-                      className="bg-brand text-brand-contrast rounded-lg px-4 py-2 text-sm font-semibold"
-                    >
+                    <Link href={`/referee/${match.id}`} className={buttonClass("outline")}>
                       {match.report ? "Open" : "File report"}
                     </Link>
                   </div>
@@ -410,6 +415,7 @@ export default async function RefereePage({
                     url={`/api/matches/${match.id}/assign`}
                     body={{ expectedVersion: match.version }}
                     label="Assign me"
+                    variant="outline"
                     pendingLabel={"Claiming\u2026"}
                   />
                 </div>

@@ -145,11 +145,12 @@ export function MatchStatusBadge({ match }: { match: MatchDisplayInput }) {
 /* Buttons                                                                    */
 /* -------------------------------------------------------------------------- */
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+export type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "danger";
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   primary: "bg-brand text-brand-contrast hover:opacity-90",
   secondary: "bg-surface border-subtle border hover:bg-surface-muted",
+  outline: "border-subtle border-2 hover:bg-surface-muted",
   ghost: "hover:bg-surface-muted",
   danger: "bg-danger text-white hover:opacity-90",
 };

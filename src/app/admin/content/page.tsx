@@ -1,6 +1,7 @@
 import { createAnnouncementAction, createDocumentAction } from "@/app/admin/actions";
 import { ActionForm, FieldError, SubmitButton } from "@/components/admin-forms";
-import { Card, Field, inputClass } from "@/components/ui";
+import { CloseOnSuccess, Dialog, DialogCancel } from "@/components/form-dialog";
+import { Card, Field, inputClass, outlineButtonClass } from "@/components/ui";
 import { DOCUMENT_CATEGORIES, DOCUMENT_CATEGORY_LABELS } from "@/lib/enums";
 import { formatDate } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
@@ -19,32 +20,17 @@ export default async function AdminContentPage() {
   return (
     <div className="space-y-10">
       <section aria-labelledby="announcements">
-        <h2 id="announcements" className="mb-3 text-lg font-semibold">
-          Announcements
-        </h2>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card className="divide-subtle max-h-[28rem] divide-y overflow-y-auto">
-            {announcements.length === 0 ? (
-              <p className="text-muted p-4 text-sm">Nothing published yet.</p>
-            ) : (
-              announcements.map((item) => (
-                <article key={item.id} className="p-4">
-                  <p className="text-sm font-semibold">
-                    {item.pinned ? <span className="text-accent mr-1">📌</span> : null}
-                    {item.title}
-                  </p>
-                  <p className="text-muted text-xs">
-                    {item.publishedAt ? formatDate(item.publishedAt) : "Draft"}
-                  </p>
-                  <p className="text-muted mt-1 text-sm">{item.summary}</p>
-                </article>
-              ))
-            )}
-          </Card>
-
-          <Card className="p-5">
-            <h3 className="mb-3 font-semibold">Publish an announcement</h3>
-            <ActionForm action={createAnnouncementAction} className="space-y-3">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 id="announcements" className="text-lg font-semibold">
+            Announcements
+          </h2>
+          <Dialog
+            trigger="Publish announcement"
+            triggerClassName={outlineButtonClass}
+            title="Publish an announcement"
+            description="Announcements appear on the home page and the news feed. Pinned items stay at the top."
+          >
+            <ActionForm action={createAnnouncementAction} showSuccess={false} className="space-y-3">
               <Field label="Title" htmlFor="ann-title">
                 <input id="ann-title" name="title" className={inputClass} required />
                 <FieldError name="title" />
@@ -79,39 +65,50 @@ export default async function AdminContentPage() {
                 <input type="checkbox" name="pinned" className="h-4 w-4" />
                 Pin to the home page
               </label>
-              <SubmitButton>Publish</SubmitButton>
+              <div className="border-subtle flex justify-end gap-2 border-t pt-3">
+                <DialogCancel />
+                <SubmitButton>Publish</SubmitButton>
+              </div>
+              <CloseOnSuccess />
             </ActionForm>
-          </Card>
+          </Dialog>
         </div>
+        <Card className="divide-subtle divide-y">
+          {announcements.length === 0 ? (
+            <p className="text-muted p-4 text-sm">Nothing published yet.</p>
+          ) : (
+            announcements.map((item) => (
+              <article key={item.id} className="p-4">
+                <p className="text-sm font-semibold">
+                  {item.pinned ? <span className="text-accent mr-1">📌</span> : null}
+                  {item.title}
+                </p>
+                <p className="text-muted text-xs">
+                  {item.publishedAt ? formatDate(item.publishedAt) : "Draft"}
+                </p>
+                <p className="text-muted mt-1 text-sm">{item.summary}</p>
+              </article>
+            ))
+          )}
+        </Card>
       </section>
 
       <section aria-labelledby="documents">
-        <h2 id="documents" className="mb-3 text-lg font-semibold">
-          Documents &amp; downloads
-        </h2>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card className="divide-subtle max-h-[28rem] divide-y overflow-y-auto">
-            {documents.length === 0 ? (
-              <p className="text-muted p-4 text-sm">No documents yet.</p>
-            ) : (
-              documents.map((doc) => (
-                <div key={doc.id} className="p-4 text-sm">
-                  <p className="font-medium">{doc.title}</p>
-                  <p className="text-muted text-xs">
-                    {DOCUMENT_CATEGORY_LABELS[
-                      doc.category as keyof typeof DOCUMENT_CATEGORY_LABELS
-                    ] ?? doc.category}
-                    {doc.fileType ? ` \u00B7 ${doc.fileType}` : ""}
-                  </p>
-                  {doc.description ? <p className="text-muted mt-1">{doc.description}</p> : null}
-                </div>
-              ))
-            )}
-          </Card>
-
-          <Card className="p-5">
-            <h3 className="mb-3 font-semibold">Add a document</h3>
-            <ActionForm action={createDocumentAction} className="grid gap-3 sm:grid-cols-2">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 id="documents" className="text-lg font-semibold">
+            Documents &amp; downloads
+          </h2>
+          <Dialog
+            trigger="Add document"
+            triggerClassName={outlineButtonClass}
+            title="Add a document"
+            description="Link a file that already lives somewhere the league can reach — SharePoint, OneDrive, or any public URL."
+          >
+            <ActionForm
+              action={createDocumentAction}
+              showSuccess={false}
+              className="grid gap-3 sm:grid-cols-2"
+            >
               <Field label="Title" htmlFor="doc-title">
                 <input id="doc-title" name="title" className={inputClass} required />
                 <FieldError name="title" />
@@ -145,12 +142,32 @@ export default async function AdminContentPage() {
                   className={inputClass}
                 />
               </Field>
-              <div className="sm:col-span-2">
+              <div className="border-subtle flex justify-end gap-2 border-t pt-3 sm:col-span-2">
+                <DialogCancel />
                 <SubmitButton>Add document</SubmitButton>
               </div>
+              <CloseOnSuccess />
             </ActionForm>
-          </Card>
+          </Dialog>
         </div>
+        <Card className="divide-subtle divide-y">
+          {documents.length === 0 ? (
+            <p className="text-muted p-4 text-sm">No documents yet.</p>
+          ) : (
+            documents.map((doc) => (
+              <div key={doc.id} className="p-4 text-sm">
+                <p className="font-medium">{doc.title}</p>
+                <p className="text-muted text-xs">
+                  {DOCUMENT_CATEGORY_LABELS[
+                    doc.category as keyof typeof DOCUMENT_CATEGORY_LABELS
+                  ] ?? doc.category}
+                  {doc.fileType ? ` \u00B7 ${doc.fileType}` : ""}
+                </p>
+                {doc.description ? <p className="text-muted mt-1">{doc.description}</p> : null}
+              </div>
+            ))
+          )}
+        </Card>
       </section>
     </div>
   );

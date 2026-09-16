@@ -212,7 +212,7 @@ export default async function AdminStandingsPage({
 
       <section aria-labelledby="adjust-tables">
         <h2 id="adjust-tables" className="mb-3 text-lg font-semibold">
-          {season.name} tables as they stand
+          Standings (as they stands)
         </h2>
         <Alert tone="info" title="These are the live public tables">
           Adjustments are already applied below, exactly as visitors see them at{" "}
