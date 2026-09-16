@@ -27,6 +27,18 @@ export const YELLOW_CARDS_PER_BAN = 3;
 export const ACCUMULATION_BAN_GAMES = 1;
 
 /**
+ * Is this player one caution away from an automatic ban?
+ *
+ * Worth surfacing to the referee holding the fixture, because they are the one
+ * who decides whether the caution lands. The count re-arms with the rule, so a
+ * player on five yellows is on the brink just as one on two is.
+ */
+export function isOneCautionFromBan(yellowCards: number): boolean {
+  if (yellowCards <= 0) return false;
+  return yellowCards % YELLOW_CARDS_PER_BAN === YELLOW_CARDS_PER_BAN - 1;
+}
+
+/**
  * Fold a free-text player name into a stable grouping key.
  *
  * The league keeps no squad lists, so a player is only ever a name a referee

@@ -215,13 +215,15 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
             Warning board
           </h2>
           <p className="text-muted mb-3 text-sm">
-            Players from either side carrying a card this season, worst first. League sanctions
-            issued by the Game Administrator appear at the top.
+            Players from either side carrying a card this season. Anyone serving a suspension is
+            listed first and may not take the field. League sanctions issued by the Game
+            Administrator appear at the top.
           </p>
           <WarningBoard
             entries={warnings}
             homeTeamName={match.homeTeam.name}
             awayTeamName={match.awayTeam.name}
+            bans={bans}
           />
         </section>
       ) : null}
