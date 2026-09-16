@@ -29,7 +29,7 @@ export function MatchRow({ match }: { match: MatchListItem }) {
         <Badge tone="neutral">{match.division.name}</Badge>
         <Badge tone="neutral">MW {match.matchweek}</Badge>
         {ASSIGNMENT_ONLY_STATUSES.includes(match.status) ? null : (
-          <MatchStatusBadge status={match.status} />
+          <MatchStatusBadge match={{ ...match, hasResult: Boolean(match.report) }} />
         )}
         {match.report?.status === "DISPUTED" ? <Badge tone="danger">Disputed</Badge> : null}
       </div>

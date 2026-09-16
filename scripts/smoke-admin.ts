@@ -16,6 +16,7 @@
 import { prisma } from "../src/lib/prisma";
 import { toDateTimeInputValue } from "../src/lib/dates";
 import { MATCH_STATUSES } from "../src/lib/enums";
+import { MATCH_DISPLAY_STATUSES } from "../src/lib/match-status";
 import { kitsClash, resolveKit } from "../src/lib/kits";
 import { getStandingsForSeason } from "../src/lib/queries";
 
@@ -895,7 +896,7 @@ async function main(): Promise<void> {
     });
     const untouched = await prisma.match.findUnique({ where: { id: importedMatch.id } });
     check(
-      "saving another field leaves the status alone",
+      "an edit that names no status leaves the status alone",
       untouched?.status === beforeCancel,
       `status ${untouched?.status}, expected ${beforeCancel}`,
     );
@@ -922,6 +923,35 @@ async function main(): Promise<void> {
       "admin can sign a result off",
       signedOff?.status === "CONFIRMED",
       `status ${signedOff?.status}`,
+    );
+
+    /*
+      The status filter narrows by what the badge says, not by the stored
+      column. "Needs a referee" and "Not started" are both SCHEDULED in the
+      database, so a filter on the raw column could not separate them.
+    */
+    const listHtml = await (await req("/admin/matches?status=NEEDS_REFEREE&when=upcoming")).text();
+    const filterOffers = MATCH_DISPLAY_STATUSES.filter((s) =>
+      listHtml.includes(`value="${s}"`),
+    ).sort();
+    check(
+      "the status filter offers the badge's own labels",
+      filterOffers.join(",") === MATCH_DISPLAY_STATUSES.slice().sort().join(","),
+      `offers ${filterOffers.join(",") || "nothing"}`,
+    );
+
+    const listedIds = [...listHtml.matchAll(/\/admin\/matches\/([a-z0-9]{20,})/g)].map((m) => m[1]);
+    const listed = await prisma.match.findMany({
+      where: { id: { in: [...new Set(listedIds)] } },
+      include: { report: true },
+    });
+    const strays = listed.filter(
+      (m) => m.refereeId !== null || m.report !== null || m.kickoffAt <= new Date(),
+    );
+    check(
+      "filtering by Need a referee returns only unclaimed future fixtures",
+      listed.length > 0 && strays.length === 0,
+      `${listed.length} listed, ${strays.length} that should not be`,
     );
   }
 

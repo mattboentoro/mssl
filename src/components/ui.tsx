@@ -1,8 +1,13 @@
 import Link from "next/link";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 
-import { MATCH_STATUS_LABELS, type MatchStatus } from "@/lib/enums";
 import { cn } from "@/lib/cn";
+import {
+  MATCH_DISPLAY_LABELS,
+  matchDisplayStatus,
+  type MatchDisplayInput,
+  type MatchDisplayStatus,
+} from "@/lib/match-status";
 
 /* -------------------------------------------------------------------------- */
 /* Layout primitives                                                          */
@@ -121,19 +126,18 @@ export function Badge({
   );
 }
 
-const STATUS_TONES: Record<MatchStatus, BadgeTone> = {
-  SCHEDULED: "neutral",
-  ASSIGNED: "accent",
-  REPORT_SUBMITTED: "brand",
-  CONFIRMED: "success",
+const DISPLAY_TONES: Record<MatchDisplayStatus, BadgeTone> = {
+  COMPLETED: "success",
+  WAITING_REPORT: "warning",
+  NOT_STARTED: "warning",
+  NEEDS_REFEREE: "neutral",
   POSTPONED: "warning",
   CANCELLED: "danger",
-  FORFEIT: "danger",
 };
 
-export function MatchStatusBadge({ status }: { status: string }) {
-  const key = (MATCH_STATUS_LABELS[status as MatchStatus] ? status : "SCHEDULED") as MatchStatus;
-  return <Badge tone={STATUS_TONES[key]}>{MATCH_STATUS_LABELS[key]}</Badge>;
+export function MatchStatusBadge({ match }: { match: MatchDisplayInput }) {
+  const key = matchDisplayStatus(match);
+  return <Badge tone={DISPLAY_TONES[key]}>{MATCH_DISPLAY_LABELS[key]}</Badge>;
 }
 
 /* -------------------------------------------------------------------------- */

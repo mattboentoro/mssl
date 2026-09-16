@@ -86,7 +86,7 @@ export default async function AdminMatchDetailPage({
               {` \u00b7 v${match.version}`}
             </p>
           </div>
-          <MatchStatusBadge status={match.status} />
+          <MatchStatusBadge match={{ ...match, hasResult: Boolean(match.report) }} />
         </div>
       </Card>
 

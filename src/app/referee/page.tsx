@@ -217,7 +217,7 @@ export default async function RefereePage({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <MatchStatusBadge status={match.status} />
+                      <MatchStatusBadge match={{ ...match, hasResult: Boolean(match.report) }} />
                       <span className="text-muted text-xs">{match.division.name}</span>
                     </div>
                     <FixtureLine className="mt-1" match={match} href={`/referee/${match.id}`} />

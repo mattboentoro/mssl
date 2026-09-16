@@ -94,7 +94,7 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
             </span>
           </>
         }
-        actions={<MatchStatusBadge status={match.status} />}
+        actions={<MatchStatusBadge match={{ ...match, hasResult: Boolean(match.report) }} />}
       />
 
       {!canAct ? (

@@ -8,7 +8,12 @@ import { KitSwatch } from "@/components/team-colors";
 import { Card, EmptyState, Field, MatchStatusBadge, inputClass } from "@/components/ui";
 import { createMatchAction } from "@/app/admin/actions";
 import { formatDateTime, parseMonthValue, shiftMonth, toDateTimeInputValue } from "@/lib/dates";
-import { MATCH_STATUSES, MATCH_STATUS_LABELS } from "@/lib/enums";
+import {
+  MATCH_DISPLAY_LABELS,
+  MATCH_DISPLAY_STATUSES,
+  isMatchDisplayStatus,
+  matchDisplayWhere,
+} from "@/lib/match-status";
 import { prisma } from "@/lib/prisma";
 import { getActiveSeason, listMatches } from "@/lib/queries";
 import { zonedToUtc } from "@/lib/timezone";
@@ -47,7 +52,11 @@ export default async function AdminMatchesPage({
   const when = params.when === "all" ? "all" : "upcoming";
 
   const where: Record<string, unknown> = { seasonId };
-  if (params.status) where.status = params.status;
+  // Filtering on what the badge says, not on the stored column: "waiting
+  // report" and "not started" are both SCHEDULED underneath, so the raw status
+  // would not tell them apart.
+  const status = params.status && isMatchDisplayStatus(params.status) ? params.status : undefined;
+  if (status) where.AND = [matchDisplayWhere(status)];
   if (params.division) where.divisionId = params.division;
   if (when === "upcoming") where.kickoffAt = { gte: new Date() };
   if (params.q) {
@@ -91,7 +100,7 @@ export default async function AdminMatchesPage({
   const carried = {
     season: params.season,
     division: params.division,
-    status: params.status,
+    status: status,
     q: params.q,
     month: params.month,
     when: params.when,
@@ -138,16 +147,11 @@ export default async function AdminMatchesPage({
               </select>
             </Field>
             <Field label="Status" htmlFor="status">
-              <select
-                id="status"
-                name="status"
-                defaultValue={params.status ?? ""}
-                className={inputClass}
-              >
+              <select id="status" name="status" defaultValue={status ?? ""} className={inputClass}>
                 <option value="">All</option>
-                {MATCH_STATUSES.map((s) => (
+                {MATCH_DISPLAY_STATUSES.map((s) => (
                   <option key={s} value={s}>
-                    {MATCH_STATUS_LABELS[s]}
+                    {MATCH_DISPLAY_LABELS[s]}
                   </option>
                 ))}
               </select>
@@ -306,7 +310,7 @@ export default async function AdminMatchesPage({
                     <td className="text-muted px-3 py-2">{match.division.name}</td>
                     <td className="text-muted px-3 py-2">{match.referee?.name ?? "\u2014"}</td>
                     <td className="px-3 py-2">
-                      <MatchStatusBadge status={match.status} />
+                      <MatchStatusBadge match={{ ...match, hasResult: Boolean(match.report) }} />
                     </td>
                   </ClickableRow>
                 ))}
