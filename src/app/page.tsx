@@ -1,7 +1,15 @@
 import Link from "next/link";
 
+import { Dialog } from "@/components/form-dialog";
 import { MatchList, StandingsTable } from "@/components/match-display";
-import { Badge, ButtonLink, Card, EmptyState, SectionHeading } from "@/components/ui";
+import {
+  Badge,
+  ButtonLink,
+  Card,
+  EmptyState,
+  SectionHeading,
+  outlineButtonClass,
+} from "@/components/ui";
 import { formatLongDate } from "@/lib/dates";
 import {
   getActiveSeason,
@@ -41,6 +49,31 @@ const QUICK_LINKS = [
     hint: "Claim matches & file reports",
   },
 ];
+
+function AnnouncementBody({
+  title,
+  summary,
+  body,
+}: {
+  title: string;
+  summary: string;
+  body: string;
+}) {
+  return (
+    <div className="mt-4">
+      <Dialog
+        trigger="Read full announcement"
+        triggerClassName={outlineButtonClass}
+        title={title}
+        description={summary}
+      >
+        <div className="max-h-[calc(100vh-12rem)] overflow-y-auto pr-1">
+          <p className="text-muted text-sm whitespace-pre-line">{body}</p>
+        </div>
+      </Dialog>
+    </div>
+  );
+}
 
 export default async function HomePage() {
   const season = await getActiveSeason();
@@ -110,6 +143,7 @@ export default async function HomePage() {
                 </div>
                 <h3 className="mt-2 font-semibold">{item.title}</h3>
                 <p className="text-muted mt-1 text-sm">{item.summary}</p>
+                <AnnouncementBody title={item.title} summary={item.summary} body={item.body} />
               </Card>
             ))}
             {rest.map((item) => (
@@ -117,6 +151,7 @@ export default async function HomePage() {
                 <span className="text-muted text-xs">{formatLongDate(item.publishedAt)}</span>
                 <h3 className="mt-2 font-semibold">{item.title}</h3>
                 <p className="text-muted mt-1 text-sm">{item.summary}</p>
+                <AnnouncementBody title={item.title} summary={item.summary} body={item.body} />
               </Card>
             ))}
           </div>
