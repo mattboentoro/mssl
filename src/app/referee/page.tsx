@@ -280,7 +280,7 @@ export default async function RefereePage({
         {view === "calendar" ? (
           <p className="text-muted mb-3 text-sm">
             Open fixtures, plus your own assignments marked{" "}
-            <span className="font-semibold text-emerald-600">
+            <span className="dark:text-success font-semibold text-emerald-600">
               <Check aria-hidden="true" size={14} className="inline-block align-text-bottom" />
             </span>{" "}
             so you can spot a clash before claiming.

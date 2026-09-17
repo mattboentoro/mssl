@@ -8,6 +8,7 @@ import { ColorPalettePicker } from "@/components/color-palette-picker";
 import { MatchList, MatchRow, StandingsTable } from "@/components/match-display";
 import { SiteHeader } from "@/components/site-header";
 import { TeamColorBar } from "@/components/team-colors";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { DEFAULT_ALTERNATE, DEFAULT_PRIMARY } from "@/lib/kits";
 import type { MatchListItem } from "@/lib/queries";
 import { calculateStandings } from "@/lib/standings";
@@ -187,7 +188,7 @@ describe("TeamColorBar", () => {
 });
 
 describe("Matchday identity", () => {
-  it("has no leftover dark-theme utilities or custom variants in application source", () => {
+  it("never selects a theme from operating-system settings", () => {
     function checkDirectory(directory: string) {
       for (const entry of readdirSync(directory, { withFileTypes: true })) {
         const file = path.join(directory, entry.name);
@@ -195,7 +196,7 @@ describe("Matchday identity", () => {
           checkDirectory(file);
         } else if (/\.(tsx?|css)$/.test(entry.name)) {
           expect(readFileSync(file, "utf8"), file).not.toMatch(
-            /\bdark:|@custom-variant\s+dark\b|prefers-color-scheme:\s*dark/,
+            /prefers-color-scheme|matchMedia\s*\(/,
           );
         }
       }
@@ -223,7 +224,7 @@ describe("Matchday identity", () => {
     expect(home).not.toContain("The matchweek starts here");
   });
 
-  it("uses Touchline's light-only palette and the shared compact type scale", () => {
+  it("preserves the light palette and adds explicitly selected dark tokens", () => {
     const css = readFileSync(path.join(process.cwd(), "src/app/globals.css"), "utf8");
     const layout = readFileSync(path.join(process.cwd(), "src/app/layout.tsx"), "utf8");
     expect(css).toContain("--brand: #204cda");
@@ -231,13 +232,18 @@ describe("Matchday identity", () => {
     expect(css).toContain("--surface-muted: #f1f4f8");
     expect(css).toContain("--text-base: 0.875rem");
     expect(css).toContain("color-scheme: light");
-    expect(css).not.toContain("color-scheme: dark");
-    expect(css).not.toContain(".dark {");
+    expect(css).toContain('html[data-theme="dark"]');
+    expect(css).toContain("color-scheme: dark");
+    expect(css).toContain(
+      '@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *))',
+    );
     expect(layout).toContain("Archivo_Narrow");
-    expect(layout).not.toContain("themeInitScript");
+    expect(layout).toContain("themeInitScript");
+    expect(layout).toContain('data-theme="light"');
+    expect(layout.indexOf("__html: themeInitScript")).toBeLessThan(layout.indexOf("<body"));
   });
 
-  it("retains accessible mobile navigation and hides theme switching", () => {
+  it("retains accessible mobile navigation and exposes the theme toggle", () => {
     const html = renderToStaticMarkup(createElement(SiteHeader, { user: null }));
     expect(html).toContain('aria-label="Toggle navigation"');
     expect(html).toContain('aria-controls="mobile-nav"');
@@ -246,10 +252,30 @@ describe("Matchday identity", () => {
     expect(html).toContain("lucide-menu");
     expect(html).toContain("<svg");
     expect(html).toContain('aria-hidden="true"');
-    expect(html).not.toContain("Switch to dark");
+    expect(html).toContain('aria-label="Dark mode"');
+    expect(html).toContain('aria-pressed="false"');
     expect(html).not.toContain('href="/admin/matches"');
     expect(html).not.toContain('href="/referee"');
     expect(html).not.toMatch(new RegExp("\\p{Extended_Pictographic}", "u"));
+  });
+
+  it("renders the toggle in light mode during SSR without reading browser storage", () => {
+    const html = renderToStaticMarkup(createElement(ThemeToggle));
+    expect(html).toContain('aria-label="Dark mode"');
+    expect(html).toContain('aria-pressed="false"');
+    expect(html).toContain('title="Switch to dark mode"');
+    expect(html).toContain("lucide-moon");
+    expect(html).toContain('aria-hidden="true"');
+  });
+
+  it("keeps the theme toggle subtle and sized to the sign-in control", () => {
+    const html = renderToStaticMarkup(createElement(ThemeToggle));
+    expect(html).toContain("text-muted hover:text-foreground");
+    expect(html).toContain("cursor-pointer");
+    expect(html).toContain("rounded-sm p-2");
+    expect(html).toContain('height="18"');
+    expect(html).not.toContain("bg-surface-muted");
+    expect(html).not.toContain("h-10 w-10");
   });
 
   it("keeps referee and admin navigation role-gated", () => {

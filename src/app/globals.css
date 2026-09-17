@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
-/* Matchday typography, Touchline palette. The league identity is light-only. */
+/* Matchday typography, Touchline palette. Dark mode is explicitly selected. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
   --background: #ffffff;
@@ -17,6 +18,25 @@
   --danger: #b91c1c;
   --warning: #b45309;
   --success: #15803d;
+  --status-contrast: #ffffff;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0c1420;
+  --surface: #111d2b;
+  --surface-muted: #1b2b3c;
+  --foreground: #edf2f8;
+  --muted: #a5b3c4;
+  --border: #44556b;
+  --brand: #93b0ff;
+  --brand-strong: #adc2ff;
+  --brand-contrast: #102038;
+  --accent: #a4bdff;
+  --danger: #ff9999;
+  --warning: #f5c274;
+  --success: #82d8a5;
+  --status-contrast: #102038;
 }
 
 @theme inline {
@@ -33,6 +53,7 @@
   --color-danger: var(--danger);
   --color-warning: var(--warning);
   --color-success: var(--success);
+  --color-status-contrast: var(--status-contrast);
   --font-sans: var(--font-archivo), system-ui, sans-serif;
   --font-display: var(--font-archivo-narrow), "Arial Narrow", sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
