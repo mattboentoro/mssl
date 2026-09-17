@@ -32,14 +32,14 @@ export function ThemeToggle() {
         aria-label="Dark mode"
         aria-pressed={isDark}
         title={isDark ? "Switch to light mode" : "Switch to dark mode"}
-        className="text-muted hover:text-foreground inline-flex cursor-pointer items-center justify-center rounded-sm p-2"
+        className="text-muted hover:text-foreground squircle inline-flex cursor-pointer items-center justify-center rounded-lg p-2"
       >
         {isDark ? <Sun aria-hidden="true" size={18} /> : <Moon aria-hidden="true" size={18} />}
       </button>
       {storageError ? (
         <p
           role="status"
-          className="bg-surface border-subtle absolute top-full right-0 z-50 mt-2 w-60 rounded-sm border p-3 text-xs"
+          className="bg-surface border-subtle squircle absolute top-full right-0 z-50 mt-2 w-60 rounded-xl border p-3 text-xs"
         >
           Theme changed for this page, but your browser could not save the preference.
         </p>

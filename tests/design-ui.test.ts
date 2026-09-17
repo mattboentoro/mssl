@@ -1,14 +1,17 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { createElement } from "react";
+import { createElement, type ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { ColorPalettePicker } from "@/components/color-palette-picker";
+import { CalendarViewToggle, FixtureCalendar } from "@/components/fixture-calendar";
+import { Dialog } from "@/components/form-dialog";
 import { MatchList, MatchRow, StandingsTable } from "@/components/match-display";
 import { SiteHeader } from "@/components/site-header";
 import { TeamColorBar } from "@/components/team-colors";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Badge, Button, Card, EmptyState, inputClass, outlineButtonClass } from "@/components/ui";
 import { DEFAULT_ALTERNATE, DEFAULT_PRIMARY } from "@/lib/kits";
 import type { MatchListItem } from "@/lib/queries";
 import { calculateStandings } from "@/lib/standings";
@@ -272,7 +275,8 @@ describe("Matchday identity", () => {
     const html = renderToStaticMarkup(createElement(ThemeToggle));
     expect(html).toContain("text-muted hover:text-foreground");
     expect(html).toContain("cursor-pointer");
-    expect(html).toContain("rounded-sm p-2");
+    expect(html).toContain("rounded-lg p-2");
+    expect(html).toContain("squircle");
     expect(html).toContain('height="18"');
     expect(html).not.toContain("bg-surface-muted");
     expect(html).not.toContain("h-10 w-10");
@@ -304,13 +308,40 @@ describe("Matchday identity", () => {
     expect(source).not.toContain("hover:bg");
   });
 
-  it("uses shared 2px gray row borders instead of table fills", () => {
+  it("keeps table rows connected with shared dividers and only outer corners rounded", () => {
     const css = readFileSync(path.join(process.cwd(), "src/app/globals.css"), "utf8");
     expect(css).toContain("--table-row-border: var(--surface-muted)");
     expect(css).toContain(".data-table > :is(tbody, tfoot) > tr");
     expect(css).not.toContain(".data-table > :is(thead, tbody, tfoot) > tr");
-    expect(css).toContain("border: 2px solid var(--table-row-border)");
-    expect(css).toContain("border-collapse: collapse");
+    expect(css).toContain("border-bottom: 2px solid var(--table-row-border)");
+    expect(css).toContain("border-top: 2px solid var(--table-row-border)");
+    expect(css).not.toContain("border-block: 2px solid var(--table-row-border)");
+    expect(css).toContain("border-left: 2px solid var(--table-row-border)");
+    expect(css).toContain("border-right: 2px solid var(--table-row-border)");
+    expect(css).toContain("border-collapse: separate");
+    expect(css).toContain("border-spacing: 0;");
+    expect(css).toMatch(/\.data-table\s*\{[^}]*background: transparent/);
+    expect(css).toMatch(/\.data-table\s*\{[^}]*position: relative/);
+    expect(css).toContain("border-top-left-radius: var(--radius-lg)");
+    expect(css).toContain("border-bottom-left-radius: var(--radius-lg)");
+    expect(css).toContain("border-top-right-radius: var(--radius-lg)");
+    expect(css).toContain("border-bottom-right-radius: var(--radius-lg)");
+    expect(css).toMatch(
+      /tbody:first-of-type > tr:first-child > :first-child\s*\{\s*border-top-left-radius:/,
+    );
+    expect(css).toMatch(
+      /tbody:first-of-type > tr:first-child > :last-child\s*\{\s*border-top-right-radius:/,
+    );
+    expect(css).toMatch(
+      /:is\(tbody, tfoot\):last-child > tr:last-child > :first-child\s*\{\s*border-bottom-left-radius:/,
+    );
+    expect(css).toMatch(
+      /:is\(tbody, tfoot\):last-child > tr:last-child > :last-child\s*\{\s*border-bottom-right-radius:/,
+    );
+    expect(css).not.toMatch(
+      /\.data-table > :is\(tbody, tfoot\) > tr > :is\((?:th, td)\)\s*\{[^}]*border-top:/,
+    );
+    expect(css).not.toMatch(/\.data-table[^{}]*tr[^{}]*\{[^}]*background/);
     expect(css).not.toContain("nth-child(even)");
   });
 
@@ -344,6 +375,101 @@ describe("Matchday identity", () => {
     expect(html).toContain("PPG");
     expect(html).toContain("point adjustment applied by the league administrator");
     expect(html).not.toContain("hover:bg");
+  });
+});
+
+describe("Rounded shape system", () => {
+  it("shares a graduated radius scale with progressive squircle support", () => {
+    const css = readFileSync(path.join(process.cwd(), "src/app/globals.css"), "utf8");
+    const radii = ["xs", "sm", "md", "lg", "xl", "2xl", "3xl"].map((size) => {
+      const value = css.match(new RegExp(`--radius-${size}: ([\\d.]+)rem;`));
+      expect(value).not.toBeNull();
+      return Number(value![1]);
+    });
+    expect(radii).toEqual([...radii].sort((a, b) => a - b));
+    expect(new Set(radii).size).toBe(radii.length);
+    expect(radii[4]).toBeGreaterThanOrEqual(2);
+    expect(css).toContain("@utility squircle");
+    expect(css).toContain("@supports (corner-shape: squircle)");
+    expect(css).toContain("corner-shape: squircle");
+  });
+
+  it("uses squircle cards and empty states without changing their semantics", () => {
+    const cardProps: ComponentProps<typeof Card> = {
+      as: "article",
+      className: "p-5",
+      children: "Announcement",
+    };
+    const card = renderToStaticMarkup(createElement(Card, cardProps));
+    const empty = renderToStaticMarkup(createElement(EmptyState, { title: "No fixtures" }));
+    expect(card).toMatch(/^<article /);
+    expect(card).toContain("squircle rounded-2xl");
+    expect(card).toContain("p-5");
+    expect(empty).toContain("squircle rounded-2xl");
+  });
+
+  it("uses pills for actions and badges, and squircles for form controls", () => {
+    const button = renderToStaticMarkup(createElement(Button, { disabled: true }, "Save"));
+    const badgeProps: ComponentProps<typeof Badge> = { children: "Premier League" };
+    const badge = renderToStaticMarkup(createElement(Badge, badgeProps));
+    expect(button).toContain("rounded-full");
+    expect(button).toContain('disabled=""');
+    expect(badge).toContain("rounded-full");
+    expect(outlineButtonClass).toContain("rounded-full");
+    expect(inputClass).toContain("squircle");
+    expect(inputClass).toContain("rounded-lg");
+  });
+
+  it("preserves native dialog semantics on rounded panels", () => {
+    const dialogProps: ComponentProps<typeof Dialog> = {
+      trigger: "Read announcement",
+      title: "League update",
+      children: "Announcement body",
+    };
+    const html = renderToStaticMarkup(createElement(Dialog, dialogProps));
+    expect(html).toMatch(/<dialog[^>]*aria-labelledby=/);
+    expect(html).toMatch(/<dialog[^>]*squircle[^>]*rounded-3xl/);
+    expect(html).toContain('aria-label="Close League update"');
+  });
+
+  it("does not replace the focused element's own corner geometry", () => {
+    const css = readFileSync(path.join(process.cwd(), "src/app/globals.css"), "utf8");
+    const focus = css.match(/:where\(a, button,[^{}]+:focus-visible\s*\{([^}]+)\}/);
+    expect(focus).not.toBeNull();
+    expect(focus![1]).toContain("outline: 2px solid var(--accent)");
+    expect(focus![1]).not.toContain("border-radius");
+    expect(focus![1]).not.toContain("corner-shape");
+  });
+
+  it("keeps calendar semantics and query parameters in rounded views", () => {
+    const calendar = renderToStaticMarkup(
+      createElement(FixtureCalendar, {
+        matches: [fixture],
+        year: 2026,
+        month: 9,
+        basePath: "/schedule",
+        query: { division: "premier" },
+      }),
+    );
+    expect(calendar).toContain("<table");
+    expect(calendar).toMatch(/<table class="relative /);
+    expect(calendar).toContain("border-separate border-spacing-1");
+    expect(calendar).toContain("squircle h-24 rounded-lg");
+    expect(calendar.match(/scope="col"/g)).toHaveLength(7);
+    expect(calendar).toContain("division=premier&amp;month=2026-10");
+    expect(calendar).toContain("SOS v CHA");
+
+    const toggle = renderToStaticMarkup(
+      createElement(CalendarViewToggle, {
+        view: "calendar",
+        basePath: "/schedule",
+        query: { division: "premier" },
+      }),
+    );
+    expect(toggle).toContain('role="group"');
+    expect(toggle.match(/rounded-full/g)).toHaveLength(3);
+    expect(toggle).toContain('aria-current="true"');
+    expect(toggle).toContain("division=premier&amp;view=list");
   });
 });
 

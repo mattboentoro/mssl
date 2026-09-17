@@ -55,7 +55,7 @@ export function SuspensionBoard({
 
         return (
           <div key={ban.id} className="bg-danger/10 flex flex-wrap items-center gap-3 p-3 text-sm">
-            <span aria-hidden className="bg-danger h-6 w-4 shrink-0 rounded-sm" />
+            <span aria-hidden className="bg-danger h-6 w-4 shrink-0 rounded-xs" />
             <div className="min-w-0 flex-1">
               <p className="font-medium">
                 {ban.playerName}
@@ -68,13 +68,13 @@ export function SuspensionBoard({
             </div>
             {tally && tally.yellow > 0 ? (
               <span className="text-muted flex shrink-0 items-center gap-1.5 text-xs">
-                <span aria-hidden className="h-5 w-3.5 rounded-sm bg-yellow-400" />
+                <span aria-hidden className="h-5 w-3.5 rounded-xs bg-yellow-400" />
                 {tally.yellow === 1 ? "1 yellow card" : `${tally.yellow} yellow cards`}
               </span>
             ) : null}
             {tally && tally.red > 0 ? (
               <span className="text-muted flex shrink-0 items-center gap-1.5 text-xs">
-                <span aria-hidden className="bg-danger h-5 w-3.5 rounded-sm" />
+                <span aria-hidden className="bg-danger h-5 w-3.5 rounded-xs" />
                 {tally.red === 1 ? "1 red card" : `${tally.red} red cards`}
               </span>
             ) : null}

@@ -51,7 +51,7 @@ export function Card({
   className?: string;
   as?: "div" | "section" | "article" | "li";
 }) {
-  return <As className={cn("bg-surface-muted rounded-sm", className)}>{children}</As>;
+  return <As className={cn("bg-surface-muted squircle rounded-2xl", className)}>{children}</As>;
 }
 
 export function SectionHeading({
@@ -83,7 +83,7 @@ export function SectionHeading({
 
 export function EmptyState({ title, hint }: { title: string; hint?: ReactNode }) {
   return (
-    <div className="bg-surface-muted text-muted rounded-sm p-6 text-sm">
+    <div className="bg-surface-muted text-muted squircle rounded-2xl p-6 text-sm">
       <p className="font-medium">{title}</p>
       {hint ? <p className="mt-1">{hint}</p> : null}
     </div>
@@ -117,7 +117,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-xs font-medium whitespace-nowrap",
+        "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap",
         BADGE_TONES[tone],
         className,
       )}
@@ -157,7 +157,7 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
 };
 
 const BUTTON_BASE =
-  "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50";
 
 /**
  * The bare-outline control used for page-level secondary actions: no fill, just
@@ -165,7 +165,7 @@ const BUTTON_BASE =
  * dialog triggers stay identical.
  */
 export const outlineButtonClass =
-  "border-subtle hover:bg-surface-muted inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition";
+  "border-subtle hover:bg-surface-muted inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition";
 
 export function buttonClass(variant: ButtonVariant = "primary", className?: string) {
   return cn(BUTTON_BASE, BUTTON_VARIANTS[variant], className);
@@ -197,7 +197,8 @@ export function ButtonLink({
 /* Form primitives                                                            */
 /* -------------------------------------------------------------------------- */
 
-export const inputClass = "bg-surface border-subtle w-full rounded-sm border px-3 py-2 text-sm";
+export const inputClass =
+  "bg-surface border-subtle squircle w-full rounded-lg border px-3 py-2 text-sm";
 
 export const labelClass = "text-muted mb-1 block text-xs font-semibold uppercase tracking-wide";
 
@@ -246,7 +247,10 @@ export function Alert({
   const role = tone === "danger" || tone === "warning" ? "alert" : undefined;
 
   return (
-    <div className={cn("rounded-lg border px-4 py-3 text-sm", tones[tone], className)} role={role}>
+    <div
+      className={cn("squircle rounded-xl border px-4 py-3 text-sm", tones[tone], className)}
+      role={role}
+    >
       {title ? <p className="font-semibold">{title}</p> : null}
       <div className={title ? "mt-1" : undefined}>{children}</div>
     </div>
@@ -272,7 +276,7 @@ export function FormGuide({ form }: { form: ("W" | "D" | "L")[] }) {
         <span
           key={index}
           className={cn(
-            "inline-flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold",
+            "squircle inline-flex h-5 w-5 items-center justify-center rounded-sm text-[10px] font-bold",
             tone[result],
           )}
           title={{ W: "Win", D: "Draw", L: "Loss" }[result]}

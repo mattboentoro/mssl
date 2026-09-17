@@ -57,11 +57,14 @@ html[data-theme="dark"] {
   --font-sans: var(--font-archivo), system-ui, sans-serif;
   --font-display: var(--font-archivo-narrow), "Arial Narrow", sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
-  --radius-sm: 0.125rem;
-  --radius-md: 0.125rem;
-  --radius-lg: 0.125rem;
-  --radius-xl: 0.125rem;
-  --radius-2xl: 0.125rem;
+  --radius: 0.5rem;
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.75rem;
+  --radius-md: 1rem;
+  --radius-lg: 1.25rem;
+  --radius-xl: 2rem;
+  --radius-2xl: 2.5rem;
+  --radius-3xl: 3rem;
   /* Reduce type sizes without scaling down rem-based spacing or controls. */
   --text-xs: 0.75rem;
   --text-xs--line-height: calc(1rem / 0.75rem);
@@ -81,6 +84,13 @@ html[data-theme="dark"] {
   --text-4xl--line-height: calc(2.125rem / 1.75rem);
   --text-5xl: 2rem;
   --text-5xl--line-height: 1.1875;
+}
+
+/* Unsupported browsers retain the same border-radius as a rounded fallback. */
+@utility squircle {
+  @supports (corner-shape: squircle) {
+    corner-shape: squircle;
+  }
 }
 
 html {
@@ -117,12 +127,50 @@ body {
 }
 
 .data-table {
-  border-collapse: collapse;
-  background: var(--surface);
+  /* Keep absolutely positioned accessibility text inside the table's scroller. */
+  position: relative;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: transparent;
 }
 
-.data-table > :is(tbody, tfoot) > tr {
-  border: 2px solid var(--table-row-border);
+/* Flush rows share dividers; only the outside corners of the data are rounded. */
+.data-table > :is(tbody, tfoot) > tr > :is(th, td) {
+  border-bottom: 2px solid var(--table-row-border);
+}
+
+.data-table > :is(tbody, tfoot) > tr > :first-child {
+  border-left: 2px solid var(--table-row-border);
+}
+
+.data-table > :is(tbody, tfoot) > tr > :last-child {
+  border-right: 2px solid var(--table-row-border);
+}
+
+.data-table > tbody:first-of-type > tr:first-child > :is(th, td) {
+  border-top: 2px solid var(--table-row-border);
+}
+
+.data-table > tbody:first-of-type > tr:first-child > :first-child {
+  border-top-left-radius: var(--radius-lg);
+}
+
+.data-table > tbody:first-of-type > tr:first-child > :last-child {
+  border-top-right-radius: var(--radius-lg);
+}
+
+.data-table > :is(tbody, tfoot):last-child > tr:last-child > :first-child {
+  border-bottom-left-radius: var(--radius-lg);
+}
+
+.data-table > :is(tbody, tfoot):last-child > tr:last-child > :last-child {
+  border-bottom-right-radius: var(--radius-lg);
+}
+
+@supports (corner-shape: squircle) {
+  .data-table > :is(tbody, tfoot) > tr > :is(:first-child, :last-child) {
+    corner-shape: squircle;
+  }
 }
 
 .standings-table-compact :is(th, td) {
@@ -130,18 +178,17 @@ body {
 }
 
 .standings-table-compact :is(th, td):first-child {
-  padding-left: 0.5rem;
+  padding-left: 0.75rem;
 }
 
 .standings-table-compact :is(th, td):last-child {
-  padding-right: 0.5rem;
+  padding-right: 0.75rem;
 }
 
 /* Visible focus for keyboard users on every interactive element. */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 0.125rem;
 }
 
 @media (prefers-reduced-motion: reduce) {

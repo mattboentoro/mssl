@@ -38,8 +38,8 @@ export function AdminTabs({ tabs }: { tabs: AdminTab[] }) {
             aria-current={current ? "page" : undefined}
             className={
               current
-                ? "bg-brand text-brand-contrast rounded-lg px-3 py-1.5 text-sm font-semibold"
-                : "border-subtle hover:bg-surface-muted rounded-lg border px-3 py-1.5 text-sm font-medium"
+                ? "bg-brand text-brand-contrast rounded-full px-3 py-1.5 text-sm font-semibold"
+                : "border-subtle hover:bg-surface-muted rounded-full border px-3 py-1.5 text-sm font-medium"
             }
           >
             {tab.label}
