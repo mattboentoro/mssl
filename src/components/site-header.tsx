@@ -79,10 +79,10 @@ export function SiteHeader({ user }: { user: HeaderUser | null }) {
               href={link.href}
               aria-current={isActive(link.href) ? "page" : undefined}
               className={cn(
-                "px-2 py-2 text-sm font-medium transition-colors xl:px-3",
+                "rounded-full px-2 py-2 text-sm font-medium transition-colors xl:px-3",
                 isActive(link.href)
-                  ? "text-brand underline decoration-2 underline-offset-8"
-                  : "text-muted hover:text-foreground underline-offset-8 hover:underline",
+                  ? "bg-brand/10 text-brand"
+                  : "text-muted hover:bg-surface-muted hover:text-foreground",
               )}
             >
               {link.label}
@@ -95,7 +95,7 @@ export function SiteHeader({ user }: { user: HeaderUser | null }) {
           <AccountChip user={user} />
           <button
             type="button"
-            className="bg-surface-muted hover:text-brand inline-flex h-10 w-10 items-center justify-center rounded-sm lg:hidden"
+            className="bg-surface-muted hover:text-brand squircle inline-flex h-10 w-10 items-center justify-center rounded-lg lg:hidden"
             aria-expanded={open}
             aria-controls="mobile-nav"
             aria-label="Toggle navigation"
@@ -107,15 +107,15 @@ export function SiteHeader({ user }: { user: HeaderUser | null }) {
       </div>
 
       {open ? (
-        <nav id="mobile-nav" aria-label="Primary mobile" className="bg-surface-muted lg:hidden">
-          <ul className="site-width grid gap-1 py-3">
+        <nav id="mobile-nav" aria-label="Primary mobile" className="site-width pb-3 lg:hidden">
+          <ul className="bg-surface-muted squircle grid gap-1 rounded-2xl p-3">
             {links.map((link) => (
               <li key={link.href}>
                 <Link
                   href={link.href}
                   aria-current={isActive(link.href) ? "page" : undefined}
                   className={cn(
-                    "block px-3 py-3 text-sm font-medium",
+                    "block rounded-full px-3 py-3 text-sm font-medium",
                     isActive(link.href) ? "bg-surface text-brand" : "hover:text-brand",
                   )}
                 >
@@ -135,7 +135,7 @@ function AccountChip({ user }: { user: HeaderUser | null }) {
     return (
       <Link
         href="/signin"
-        className="text-brand bg-surface-muted rounded-sm px-3 py-2 text-sm font-semibold hover:underline"
+        className="text-brand bg-surface-muted rounded-full px-3 py-2 text-sm font-semibold hover:underline"
       >
         Sign in
       </Link>
@@ -154,12 +154,12 @@ function AccountChip({ user }: { user: HeaderUser | null }) {
   return (
     <Link
       href="/account"
-      className="border-subtle hover:bg-surface-muted flex items-center gap-2 rounded-lg border py-1 pr-3 pl-1"
+      className="border-subtle hover:bg-surface-muted flex items-center gap-2 rounded-full border py-1 pr-3 pl-1"
       title={`${user.name ?? user.email ?? "Account"} — ${role}`}
     >
       <span
         aria-hidden
-        className="bg-brand text-brand-contrast flex h-7 w-7 items-center justify-center rounded-md text-xs font-bold"
+        className="bg-brand text-brand-contrast squircle flex h-7 w-7 items-center justify-center rounded-md text-xs font-bold"
       >
         {initials || "?"}
       </span>

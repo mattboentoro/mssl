@@ -104,7 +104,7 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-14">
-      <section className="bg-surface-muted rounded-sm p-6 sm:p-10">
+      <section className="bg-surface-muted squircle rounded-3xl p-6 sm:p-10">
         <Badge tone="brand">{season.name}</Badge>
         <h1 className="font-display mt-4 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
           Microsoft Soccer League
@@ -188,7 +188,7 @@ export default async function HomePage() {
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {QUICK_LINKS.map((link) => (
             <Card as="li" key={link.href}>
-              <Link href={link.href} className="group block p-4">
+              <Link href={link.href} className="squircle group block rounded-2xl p-4">
                 <p className="group-hover:text-brand text-sm font-semibold group-hover:underline">
                   {link.label}
                 </p>

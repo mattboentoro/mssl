@@ -95,7 +95,7 @@ export function Dialog({
         ref={ref}
         onClose={() => setGeneration((n) => n + 1)}
         aria-labelledby={titleId}
-        className={`bg-surface text-foreground border-subtle m-auto max-h-[calc(100vh-4rem)] ${widthClassName} rounded-xl border p-0 text-left shadow-xl backdrop:bg-black/60`}
+        className={`bg-surface text-foreground border-subtle squircle m-auto max-h-[calc(100vh-4rem)] ${widthClassName} rounded-3xl border p-0 text-left shadow-xl backdrop:bg-black/60`}
       >
         <DialogCloseContext.Provider value={closeValue}>
           <div className="border-subtle flex items-start justify-between gap-4 border-b p-5">
@@ -109,7 +109,7 @@ export function Dialog({
               type="button"
               onClick={close}
               aria-label={`Close ${title}`}
-              className="text-muted hover:text-foreground text-lg leading-none"
+              className="text-muted hover:text-foreground hover:bg-surface-muted squircle shrink-0 rounded-lg p-2 text-lg leading-none"
             >
               <X aria-hidden="true" size={18} />
             </button>

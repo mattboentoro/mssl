@@ -221,8 +221,8 @@ export default async function TeamPage({
                     aria-hidden
                     className={
                       card.type === "RED"
-                        ? "bg-danger h-5 w-3.5 shrink-0 rounded-sm"
-                        : "h-5 w-3.5 shrink-0 rounded-sm bg-yellow-400"
+                        ? "bg-danger h-5 w-3.5 shrink-0 rounded-xs"
+                        : "h-5 w-3.5 shrink-0 rounded-xs bg-yellow-400"
                     }
                   />
                   <div className="min-w-0 flex-1">

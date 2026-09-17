@@ -77,7 +77,7 @@ export function FixtureCalendar({
   const next = shiftMonth(year, month, 1);
   const label = monthLabel(year, month);
   const navClass =
-    "border-subtle hover:bg-surface-muted rounded-lg border px-3 py-1.5 text-sm font-medium";
+    "border-subtle hover:bg-surface-muted rounded-full border px-3 py-1.5 text-sm font-medium";
 
   return (
     <Card className="p-4">
@@ -105,7 +105,7 @@ export function FixtureCalendar({
         user to infer the column.
       */}
       <div className="-mx-4 overflow-x-auto px-4">
-        <table className="w-full min-w-[42rem] table-fixed border-collapse text-sm">
+        <table className="relative w-full min-w-[42rem] table-fixed border-separate border-spacing-1 text-sm">
           <caption className="sr-only">Fixtures for {label}, shown in Redmond time</caption>
           <thead>
             <tr>
@@ -129,7 +129,7 @@ export function FixtureCalendar({
                     <td
                       key={cell.key}
                       className={[
-                        "border-subtle h-24 border p-1 align-top",
+                        "border-subtle squircle h-24 rounded-lg border p-2 align-top",
                         cell.inMonth ? "" : "bg-surface-muted/40",
                         cell.isToday ? "outline-brand outline-2 -outline-offset-2" : "",
                       ]
@@ -282,7 +282,7 @@ export function CalendarViewToggle({
   ];
 
   return (
-    <div className="border-subtle inline-flex rounded-lg border p-0.5" role="group">
+    <div className="border-subtle inline-flex rounded-full border p-0.5" role="group">
       {options.map((option) => {
         const current = option.value === view;
         return (
@@ -290,7 +290,7 @@ export function CalendarViewToggle({
             key={option.value}
             href={linkTo(option.value)}
             aria-current={current ? "true" : undefined}
-            className={`rounded-md px-3 py-1 text-sm font-medium ${
+            className={`rounded-full px-3 py-1 text-sm font-medium ${
               current ? "bg-brand text-brand-contrast" : "text-muted hover:bg-surface-muted"
             }`}
           >
