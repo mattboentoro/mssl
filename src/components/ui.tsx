@@ -153,7 +153,7 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   secondary: "bg-surface border-subtle border hover:bg-surface-muted",
   outline: "border-subtle border hover:bg-surface-muted",
   ghost: "hover:bg-surface-muted",
-  danger: "bg-danger text-white hover:opacity-90",
+  danger: "bg-danger text-status-contrast hover:opacity-90",
 };
 
 const BUTTON_BASE =
@@ -262,9 +262,9 @@ export function FormGuide({ form }: { form: ("W" | "D" | "L")[] }) {
     return <span className="text-muted text-xs">&mdash;</span>;
   }
   const tone = {
-    W: "bg-success text-white",
+    W: "bg-success text-status-contrast",
     D: "bg-muted/40 text-foreground",
-    L: "bg-danger text-white",
+    L: "bg-danger text-status-contrast",
   };
   return (
     <span className="inline-flex gap-1">

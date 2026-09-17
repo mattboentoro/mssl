@@ -312,7 +312,7 @@ function StepMarker({ done, n }: { done: boolean; n: number }) {
       aria-hidden
       className={
         done
-          ? "bg-success inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+          ? "bg-success text-status-contrast inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold"
           : "bg-surface-muted text-muted inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold"
       }
     >

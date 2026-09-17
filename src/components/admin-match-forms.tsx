@@ -548,7 +548,7 @@ function KitField({
       <div className="flex items-center gap-2">
         <span
           aria-hidden
-          className="inline-block h-8 w-8 shrink-0 rounded-lg ring-1 ring-black/20"
+          className="dark:ring-foreground/30 inline-block h-8 w-8 shrink-0 rounded-lg ring-1 ring-black/20"
           style={{ backgroundColor: color }}
         />
         <select

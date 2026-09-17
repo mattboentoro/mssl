@@ -4,6 +4,7 @@ import { Archivo, Archivo_Narrow, Geist_Mono } from "next/font/google";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { getCurrentUser } from "@/lib/authz";
+import { themeInitScript } from "@/lib/theme";
 
 import "./globals.css";
 
@@ -24,7 +25,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const user = await getCurrentUser();
 
   return (
-    <html lang="en">
+    <html lang="en" data-theme="light" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body
         className={`${archivo.variable} ${archivoNarrow.variable} ${geistMono.variable} flex min-h-screen flex-col`}
       >

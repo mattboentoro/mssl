@@ -22,7 +22,7 @@ export function TeamColorBar({
   return (
     <span
       aria-hidden
-      className={`inline-flex shrink-0 flex-col overflow-hidden ring-1 ring-black/10 ${dimension}`}
+      className={`dark:ring-foreground/30 inline-flex shrink-0 flex-col overflow-hidden ring-1 ring-black/10 ${dimension}`}
     >
       <span className="w-full flex-1" style={{ backgroundColor: primary }} />
       <span className="w-full flex-1" style={{ backgroundColor: alternate }} />
@@ -47,7 +47,7 @@ export function KitSwatch({
   const colorName = kitColorName(color);
   return (
     <span
-      className="inline-block h-3 w-1.5 shrink-0 ring-1 ring-black/20"
+      className="dark:ring-foreground/30 inline-block h-3 w-1.5 shrink-0 ring-1 ring-black/20"
       style={{ backgroundColor: color }}
       title={`${teamName} wear ${colorName.toLowerCase()}`}
     >

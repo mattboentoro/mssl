@@ -346,7 +346,7 @@ export default async function AdminMatchesPage({
                         {match.matchweek}
                         {match.countsForStandings ? null : (
                           <span
-                            className="ml-1 rounded bg-amber-100 px-1 py-px text-[10px] font-semibold tracking-wide text-amber-900"
+                            className="dark:bg-warning/10 dark:text-warning ml-1 rounded bg-amber-100 px-1 py-px text-[10px] font-semibold tracking-wide text-amber-900"
                             title="This fixture is excluded from the league table."
                           >
                             <span className="sr-only">Does not count towards the standings, </span>
@@ -373,7 +373,7 @@ export default async function AdminMatchesPage({
                           reading the status badge at the far right.
                         */}
                           {match.report ? (
-                            <span className="rounded bg-emerald-100 px-1 py-px text-[10px] font-semibold tracking-wide text-emerald-800">
+                            <span className="dark:bg-success/10 dark:text-success rounded bg-emerald-100 px-1 py-px text-[10px] font-semibold tracking-wide text-emerald-800">
                               <span className="sr-only">Full time, </span>FT
                             </span>
                           ) : null}

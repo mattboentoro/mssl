@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
+import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/cn";
 
 export interface NavLink {
@@ -90,6 +91,7 @@ export function SiteHeader({ user }: { user: HeaderUser | null }) {
         </nav>
 
         <div className="ml-auto flex items-center gap-2 lg:ml-2">
+          <ThemeToggle />
           <AccountChip user={user} />
           <button
             type="button"
