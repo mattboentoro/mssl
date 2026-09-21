@@ -1,6 +1,5 @@
 "use client";
 
-import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -22,7 +21,6 @@ export interface HeaderUser {
 }
 
 const PUBLIC_LINKS: NavLink[] = [
-  { href: "/", label: "Overview" },
   { href: "/schedule", label: "Schedule" },
   { href: "/standings", label: "Standings" },
   { href: "/teams", label: "Teams" },
@@ -49,26 +47,23 @@ export function SiteHeader({ user }: { user: HeaderUser | null }) {
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <header className="bg-surface relative z-40">
+    <header className="bg-surface/90 border-subtle sticky top-0 z-40 border-b backdrop-blur">
       <a
         href="#main"
         className="bg-brand text-brand-contrast sr-only rounded px-3 py-2 focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50"
       >
         Skip to content
       </a>
-      <div className="bg-brand text-brand-contrast">
-        <div className="site-width flex flex-wrap justify-between gap-x-6 gap-y-1 py-2 text-xs">
-          <span>Microsoft Soccer League</span>
-          <span>Employee-run. Community-led.</span>
-        </div>
-      </div>
-      <div className="site-width flex items-center gap-4 py-5 sm:py-6">
-        <Link href="/" className="flex shrink-0 items-center gap-4">
-          <span className="font-display text-5xl leading-none font-bold tracking-tight">MSSL</span>
-          <span className="text-muted hidden text-[10px] leading-relaxed tracking-wider uppercase xl:block">
-            Microsoft
-            <br />
-            Soccer League
+      <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
+        <Link href="/" className="flex items-center gap-2 font-bold tracking-tight">
+          <span aria-hidden className="text-xl">
+            &#9917;
+          </span>
+          <span>
+            MSSL
+            <span className="text-muted ml-2 hidden text-xs font-medium sm:inline">
+              Microsoft Soccer League
+            </span>
           </span>
         </Link>
 
@@ -79,7 +74,7 @@ export function SiteHeader({ user }: { user: HeaderUser | null }) {
               href={link.href}
               aria-current={isActive(link.href) ? "page" : undefined}
               className={cn(
-                "rounded-full px-2 py-2 text-sm font-medium transition-colors xl:px-3",
+                "rounded-lg px-3 py-2 text-sm font-medium transition",
                 isActive(link.href)
                   ? "bg-brand/10 text-brand"
                   : "text-muted hover:bg-surface-muted hover:text-foreground",
@@ -95,28 +90,32 @@ export function SiteHeader({ user }: { user: HeaderUser | null }) {
           <AccountChip user={user} />
           <button
             type="button"
-            className="bg-surface-muted hover:text-brand squircle inline-flex h-10 w-10 items-center justify-center rounded-lg lg:hidden"
+            className="border-subtle hover:bg-surface-muted inline-flex h-9 w-9 items-center justify-center rounded-lg border lg:hidden"
             aria-expanded={open}
             aria-controls="mobile-nav"
             aria-label="Toggle navigation"
             onClick={() => setOpen((v) => !v)}
           >
-            {open ? <X aria-hidden="true" size={18} /> : <Menu aria-hidden="true" size={18} />}
+            <span aria-hidden>{open ? "\u2715" : "\u2630"}</span>
           </button>
         </div>
       </div>
 
       {open ? (
-        <nav id="mobile-nav" aria-label="Primary mobile" className="site-width pb-3 lg:hidden">
-          <ul className="bg-surface-muted squircle grid gap-1 rounded-2xl p-3">
+        <nav
+          id="mobile-nav"
+          aria-label="Primary mobile"
+          className="border-subtle border-t lg:hidden"
+        >
+          <ul className="mx-auto grid max-w-6xl gap-1 px-4 py-3">
             {links.map((link) => (
               <li key={link.href}>
                 <Link
                   href={link.href}
                   aria-current={isActive(link.href) ? "page" : undefined}
                   className={cn(
-                    "block rounded-full px-3 py-3 text-sm font-medium",
-                    isActive(link.href) ? "bg-surface text-brand" : "hover:text-brand",
+                    "block rounded-lg px-3 py-2 text-sm font-medium",
+                    isActive(link.href) ? "bg-brand/10 text-brand" : "hover:bg-surface-muted",
                   )}
                 >
                   {link.label}
@@ -135,7 +134,7 @@ function AccountChip({ user }: { user: HeaderUser | null }) {
     return (
       <Link
         href="/signin"
-        className="text-brand bg-surface-muted rounded-full px-3 py-2 text-sm font-semibold hover:underline"
+        className="bg-brand text-brand-contrast rounded-lg px-3 py-2 text-sm font-semibold"
       >
         Sign in
       </Link>
@@ -154,12 +153,12 @@ function AccountChip({ user }: { user: HeaderUser | null }) {
   return (
     <Link
       href="/account"
-      className="border-subtle hover:bg-surface-muted flex items-center gap-2 rounded-full border py-1 pr-3 pl-1"
+      className="border-subtle hover:bg-surface-muted flex items-center gap-2 rounded-lg border py-1 pr-3 pl-1"
       title={`${user.name ?? user.email ?? "Account"} — ${role}`}
     >
       <span
         aria-hidden
-        className="bg-brand text-brand-contrast squircle flex h-7 w-7 items-center justify-center rounded-md text-xs font-bold"
+        className="bg-brand text-brand-contrast flex h-7 w-7 items-center justify-center rounded-md text-xs font-bold"
       >
         {initials || "?"}
       </span>

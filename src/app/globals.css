@@ -1,42 +1,45 @@
 @import "tailwindcss";
 
-/* Matchday typography, Touchline palette. Dark mode is explicitly selected. */
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+/*
+ * MSSL theme.
+ *
+ * Dark mode is class-driven (`<html class="dark">`) rather than
+ * prefers-color-scheme only, so the header toggle can override the OS setting.
+ * A tiny inline script in the root layout applies the stored preference before
+ * first paint to avoid a flash.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #ffffff;
+  --background: #f8fafc;
   --surface: #ffffff;
-  --surface-muted: #f1f4f8;
-  --foreground: #142739;
-  --muted: #5d6c79;
-  --border: #cbd4df;
-  --table-row-border: var(--surface-muted);
-  --brand: #204cda;
-  --brand-strong: #173bb0;
+  --surface-muted: #f1f5f9;
+  --foreground: #0f172a;
+  --muted: #475569;
+  --border: #e2e8f0;
+  --brand: #047857;
+  --brand-strong: #065f46;
   --brand-contrast: #ffffff;
-  --accent: #204cda;
+  --accent: #0369a1;
   --danger: #b91c1c;
   --warning: #b45309;
   --success: #15803d;
-  --status-contrast: #ffffff;
 }
 
-html[data-theme="dark"] {
-  color-scheme: dark;
-  --background: #0c1420;
-  --surface: #111d2b;
-  --surface-muted: #1b2b3c;
-  --foreground: #edf2f8;
-  --muted: #a5b3c4;
-  --border: #44556b;
-  --brand: #93b0ff;
-  --brand-strong: #adc2ff;
-  --brand-contrast: #102038;
-  --accent: #a4bdff;
-  --danger: #ff9999;
-  --warning: #f5c274;
-  --success: #82d8a5;
-  --status-contrast: #102038;
+.dark {
+  --background: #020617;
+  --surface: #0f172a;
+  --surface-muted: #1e293b;
+  --foreground: #e2e8f0;
+  --muted: #94a3b8;
+  --border: #1e293b;
+  --brand: #10b981;
+  --brand-strong: #34d399;
+  --brand-contrast: #022c22;
+  --accent: #38bdf8;
+  --danger: #f87171;
+  --warning: #fbbf24;
+  --success: #4ade80;
 }
 
 @theme inline {
@@ -53,142 +56,35 @@ html[data-theme="dark"] {
   --color-danger: var(--danger);
   --color-warning: var(--warning);
   --color-success: var(--success);
-  --color-status-contrast: var(--status-contrast);
-  --font-sans: var(--font-archivo), system-ui, sans-serif;
-  --font-display: var(--font-archivo-narrow), "Arial Narrow", sans-serif;
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
-  --radius: 0.5rem;
-  --radius-xs: 0.25rem;
-  --radius-sm: 0.75rem;
-  --radius-md: 1rem;
-  --radius-lg: 1.25rem;
-  --radius-xl: 2rem;
-  --radius-2xl: 2.5rem;
-  --radius-3xl: 3rem;
-  /* Reduce type sizes without scaling down rem-based spacing or controls. */
-  --text-xs: 0.75rem;
-  --text-xs--line-height: calc(1rem / 0.75rem);
-  --text-sm: 0.8125rem;
-  --text-sm--line-height: calc(1.125rem / 0.8125rem);
-  --text-base: 0.875rem;
-  --text-base--line-height: calc(1.25rem / 0.875rem);
-  --text-lg: 1rem;
-  --text-lg--line-height: 1.5;
-  --text-xl: 1.125rem;
-  --text-xl--line-height: calc(1.625rem / 1.125rem);
-  --text-2xl: 1.25rem;
-  --text-2xl--line-height: 1.4;
-  --text-3xl: 1.5rem;
-  --text-3xl--line-height: 1.25;
-  --text-4xl: 1.75rem;
-  --text-4xl--line-height: calc(2.125rem / 1.75rem);
-  --text-5xl: 2rem;
-  --text-5xl--line-height: 1.1875;
-}
-
-/* Unsupported browsers retain the same border-radius as a rounded fallback. */
-@utility squircle {
-  @supports (corner-shape: squircle) {
-    corner-shape: squircle;
-  }
 }
 
 html {
   color-scheme: light;
 }
 
+html.dark {
+  color-scheme: dark;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family:
-    var(--font-archivo),
+    var(--font-geist-sans),
     system-ui,
     -apple-system,
     "Segoe UI",
     sans-serif;
-  font-size: var(--text-base);
-  line-height: var(--text-base--line-height);
   -webkit-font-smoothing: antialiased;
-}
-
-@layer base {
-  h1,
-  h2 {
-    font-family: var(--font-display);
-    text-transform: uppercase;
-  }
-}
-
-.site-width {
-  width: 100%;
-  max-width: 72rem;
-  margin-inline: auto;
-  padding-inline: 1rem;
-}
-
-.data-table {
-  /* Keep absolutely positioned accessibility text inside the table's scroller. */
-  position: relative;
-  border-collapse: separate;
-  border-spacing: 0;
-  background: transparent;
-}
-
-/* Flush rows share dividers; only the outside corners of the data are rounded. */
-.data-table > :is(tbody, tfoot) > tr > :is(th, td) {
-  border-bottom: 2px solid var(--table-row-border);
-}
-
-.data-table > :is(tbody, tfoot) > tr > :first-child {
-  border-left: 2px solid var(--table-row-border);
-}
-
-.data-table > :is(tbody, tfoot) > tr > :last-child {
-  border-right: 2px solid var(--table-row-border);
-}
-
-.data-table > tbody:first-of-type > tr:first-child > :is(th, td) {
-  border-top: 2px solid var(--table-row-border);
-}
-
-.data-table > tbody:first-of-type > tr:first-child > :first-child {
-  border-top-left-radius: var(--radius-lg);
-}
-
-.data-table > tbody:first-of-type > tr:first-child > :last-child {
-  border-top-right-radius: var(--radius-lg);
-}
-
-.data-table > :is(tbody, tfoot):last-child > tr:last-child > :first-child {
-  border-bottom-left-radius: var(--radius-lg);
-}
-
-.data-table > :is(tbody, tfoot):last-child > tr:last-child > :last-child {
-  border-bottom-right-radius: var(--radius-lg);
-}
-
-@supports (corner-shape: squircle) {
-  .data-table > :is(tbody, tfoot) > tr > :is(:first-child, :last-child) {
-    corner-shape: squircle;
-  }
-}
-
-.standings-table-compact :is(th, td) {
-  padding-inline: 0.375rem;
-}
-
-.standings-table-compact :is(th, td):first-child {
-  padding-left: 0.75rem;
-}
-
-.standings-table-compact :is(th, td):last-child {
-  padding-right: 0.75rem;
 }
 
 /* Visible focus for keyboard users on every interactive element. */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+  border-radius: 0.25rem;
 }
 
 @media (prefers-reduced-motion: reduce) {

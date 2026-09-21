@@ -308,6 +308,7 @@ export default async function AdminMatchesPage({
             basePath="/admin/matches"
             query={{ ...carried, month: undefined, view: "calendar" }}
             hrefForMatch={(match) => `/admin/matches/${match.id}`}
+            showFixtureDetails
             emptyHint="No fixtures are scheduled this month for the current filters."
           />
         ) : matches.length === 0 ? (
@@ -323,11 +324,11 @@ export default async function AdminMatchesPage({
           </Card>
         ) : (
           <Card className="overflow-x-auto">
-            <table className="data-table w-full min-w-[46rem] text-sm">
+            <table className="w-full min-w-[46rem] text-sm">
               <caption className="sr-only">
                 Fixtures for the selected filters. Selecting a row opens its management page.
               </caption>
-              <thead className="text-muted text-xs uppercase">
+              <thead className="bg-surface-muted text-muted text-xs uppercase">
                 <tr>
                   <th className="px-3 py-2 text-left">MW</th>
                   <th className="px-3 py-2 text-left">Kick-off</th>
@@ -337,7 +338,7 @@ export default async function AdminMatchesPage({
                   <th className="px-3 py-2 text-left">Status</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-subtle divide-y">
                 {matches.map((match) => {
                   const score = scoreText(match.report);
                   return (
@@ -346,7 +347,7 @@ export default async function AdminMatchesPage({
                         {match.matchweek}
                         {match.countsForStandings ? null : (
                           <span
-                            className="dark:bg-warning/10 dark:text-warning ml-1 rounded bg-amber-100 px-1 py-px text-[10px] font-semibold tracking-wide text-amber-900"
+                            className="ml-1 rounded bg-amber-100 px-1 py-px text-[10px] font-semibold tracking-wide text-amber-900 dark:bg-amber-900/50 dark:text-amber-100"
                             title="This fixture is excluded from the league table."
                           >
                             <span className="sr-only">Does not count towards the standings, </span>
@@ -373,7 +374,7 @@ export default async function AdminMatchesPage({
                           reading the status badge at the far right.
                         */}
                           {match.report ? (
-                            <span className="dark:bg-success/10 dark:text-success rounded bg-emerald-100 px-1 py-px text-[10px] font-semibold tracking-wide text-emerald-800">
+                            <span className="rounded bg-emerald-100 px-1 py-px text-[10px] font-semibold tracking-wide text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
                               <span className="sr-only">Full time, </span>FT
                             </span>
                           ) : null}

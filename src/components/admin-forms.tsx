@@ -1,6 +1,13 @@
 "use client";
 
-import { createContext, useActionState, useContext, type ReactNode } from "react";
+import {
+  createContext,
+  useActionState,
+  useContext,
+  useId,
+  useRef,
+  type ReactNode,
+} from "react";
 import { useFormStatus } from "react-dom";
 
 import { Alert, buttonClass, type ButtonVariant } from "@/components/ui";
@@ -33,6 +40,63 @@ export function SubmitButton({
   className?: string;
 }) {
   const { pending } = useFormStatus();
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+
+  if (confirm) {
+    return (
+      <>
+        <button
+          type="button"
+          disabled={pending}
+          className={buttonClass(variant, className)}
+          onClick={() => dialogRef.current?.showModal()}
+        >
+          {pending ? "Working\u2026" : children}
+        </button>
+        <dialog
+          ref={dialogRef}
+          aria-labelledby={titleId}
+          onClick={(event) => {
+            if (event.target === event.currentTarget && !pending) dialogRef.current?.close();
+          }}
+          className="bg-surface text-foreground border-subtle m-auto w-[min(30rem,calc(100vw-2rem))] rounded-xl border p-0 text-left shadow-xl backdrop:bg-black/60"
+        >
+          <div className="p-5">
+            <div className="bg-danger/10 border-danger/30 rounded-lg border p-4">
+              <p className="text-danger text-xs font-semibold tracking-wide uppercase">
+                Confirmation required
+              </p>
+              <h3 id={titleId} className="mt-1 text-lg font-semibold">
+                Are you sure?
+              </h3>
+              <p className="text-muted mt-2 text-sm">{confirm}</p>
+            </div>
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => dialogRef.current?.close()}
+                disabled={pending}
+                className={buttonClass("success")}
+              >
+                Keep
+              </button>
+              <button
+                type="submit"
+                name={name}
+                value={value}
+                disabled={pending}
+                className={buttonClass(variant === "danger" ? "danger" : "primary")}
+              >
+                {pending ? "Working\u2026" : children}
+              </button>
+            </div>
+          </div>
+        </dialog>
+      </>
+    );
+  }
+
   return (
     <button
       type="submit"
@@ -40,13 +104,6 @@ export function SubmitButton({
       value={value}
       disabled={pending}
       className={buttonClass(variant, className)}
-      onClick={
-        confirm
-          ? (event) => {
-              if (!window.confirm(confirm)) event.preventDefault();
-            }
-          : undefined
-      }
     >
       {pending ? "Working\u2026" : children}
     </button>

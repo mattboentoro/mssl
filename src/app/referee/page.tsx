@@ -1,8 +1,8 @@
-import { Check } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { forbidden, redirect } from "next/navigation";
 
+import { ClaimMatchCard } from "@/components/claim-match-card";
 import { ActionButton } from "@/components/match-actions";
 import { CalendarViewToggle, FixtureCalendar, parseView } from "@/components/fixture-calendar";
 import { FixtureLine } from "@/components/match-display";
@@ -240,8 +240,11 @@ export default async function RefereePage({
                       <ActionButton
                         url={`/api/matches/${match.id}/unassign`}
                         label="Release"
-                        variant="ghost"
+                        variant="danger"
                         confirm="Release this match so another referee can claim it?"
+                        confirmTitle="Drop this match?"
+                        confirmActionLabel="Drop match"
+                        confirmCancelLabel="Keep match"
                       />
                     ) : null}
                     <Link href={`/referee/${match.id}`} className={buttonClass("outline")}>
@@ -280,8 +283,8 @@ export default async function RefereePage({
         {view === "calendar" ? (
           <p className="text-muted mb-3 text-sm">
             Open fixtures, plus your own assignments marked{" "}
-            <span className="dark:text-success font-semibold text-emerald-600">
-              <Check aria-hidden="true" size={14} className="inline-block align-text-bottom" />
+            <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+              <span aria-hidden="true">&#10003;</span>
             </span>{" "}
             so you can spot a clash before claiming.
           </p>
@@ -400,27 +403,7 @@ export default async function RefereePage({
         ) : (
           <ul className="space-y-3">
             {available.map((match) => (
-              <Card key={match.id} as="li" className="p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-muted text-xs">
-                      {match.division.name} &middot; MW {match.matchweek}
-                    </p>
-                    <FixtureLine className="mt-0.5" match={match} href={`/referee/${match.id}`} />
-                    <p className="text-muted text-sm">
-                      {formatDateTime(match.kickoffAt)}
-                      {match.venueName ? ` \u00b7 ${match.venueName}` : ""}
-                    </p>
-                  </div>
-                  <ActionButton
-                    url={`/api/matches/${match.id}/assign`}
-                    body={{ expectedVersion: match.version }}
-                    label="Assign me"
-                    variant="outline"
-                    pendingLabel={"Claiming\u2026"}
-                  />
-                </div>
-              </Card>
+              <ClaimMatchCard key={match.id} match={match} />
             ))}
           </ul>
         )}

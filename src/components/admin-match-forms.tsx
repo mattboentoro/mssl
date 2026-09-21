@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { postJson, type ApiResult } from "@/components/match-actions";
 import { Alert, Card, Field, buttonClass, inputClass } from "@/components/ui";
@@ -20,7 +20,7 @@ interface Option {
   name: string;
 }
 
-interface FixtureTeam extends Option {
+interface FixtureTeam extends Option, TeamColors {
   divisionId: string;
 }
 
@@ -38,10 +38,6 @@ export function AdminMatchForms({
   awayTeamId,
   divisions,
   teams,
-  homeTeamName,
-  awayTeamName,
-  homeTeam,
-  awayTeam,
   homeKit,
   awayKit,
   currentHomeScore,
@@ -63,10 +59,6 @@ export function AdminMatchForms({
   awayTeamId: string;
   divisions: Option[];
   teams: FixtureTeam[];
-  homeTeamName: string;
-  awayTeamName: string;
-  homeTeam: TeamColors;
-  awayTeam: TeamColors;
   homeKit: KitChoice;
   awayKit: KitChoice;
   currentHomeScore: number;
@@ -81,23 +73,73 @@ export function AdminMatchForms({
   referees: Option[];
 }) {
   const router = useRouter();
+  const fixtureFormRef = useRef<HTMLFormElement>(null);
   const [result, setResult] = useState<(ApiResult & { form?: string }) | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [fixtureDirty, setFixtureDirty] = useState(false);
   const [home, setHome] = useState<KitChoice>(homeKit);
   const [away, setAway] = useState<KitChoice>(awayKit);
   const [division, setDivision] = useState(divisionId);
+  const [fixtureHome, setFixtureHome] = useState(homeTeamId);
+  const [fixtureAway, setFixtureAway] = useState(awayTeamId);
 
   const eligible = teams.filter((team) => team.divisionId === division);
-  const pick = (preferred: string, exclude?: string): string => {
-    if (preferred !== exclude && eligible.some((team) => team.id === preferred)) return preferred;
-    return eligible.find((team) => team.id !== exclude)?.id ?? "";
-  };
-  const fixtureHome = pick(homeTeamId);
-  const fixtureAway = pick(awayTeamId, fixtureHome);
-
-  const homeColor = resolveKit(homeTeam, home);
-  const awayColor = resolveKit(awayTeam, away);
+  const selectedHome = teams.find((team) => team.id === fixtureHome);
+  const selectedAway = teams.find((team) => team.id === fixtureAway);
+  const homeTeamLabel = selectedHome?.name ?? "Home team";
+  const awayTeamLabel = selectedAway?.name ?? "Away team";
+  const homeColor = selectedHome ? resolveKit(selectedHome, home) : "#000000";
+  const awayColor = selectedAway ? resolveKit(selectedAway, away) : "#000000";
   const clash = kitsClash(homeColor, awayColor);
+  const initialKickoff = toDateTimeInputValue(kickoffAt);
+  const initialStatus = (ADMIN_SETTABLE_MATCH_STATUSES as readonly string[]).includes(status)
+    ? status
+    : "CONFIRMED";
+
+  function fixtureHasChanges(data: FormData) {
+    return (
+      String(data.get("kickoffAt") ?? "") !== initialKickoff ||
+      String(data.get("venueName") ?? "") !== (venueName ?? "") ||
+      String(data.get("matchweek") ?? "") !== matchweek ||
+      String(data.get("status") ?? "") !== initialStatus ||
+      (data.get("countsForStandings") === "on") !== countsForStandings ||
+      String(data.get("homeKit") ?? "") !== homeKit ||
+      String(data.get("awayKit") ?? "") !== awayKit ||
+      String(data.get("refereeId") ?? "") !== (refereeId ?? "") ||
+      (!hasReport &&
+        (String(data.get("divisionId") ?? "") !== divisionId ||
+          String(data.get("homeTeamId") ?? "") !== homeTeamId ||
+          String(data.get("awayTeamId") ?? "") !== awayTeamId))
+    );
+  }
+
+  function refreshFixtureDirty() {
+    window.requestAnimationFrame(() => {
+      if (fixtureFormRef.current) {
+        setFixtureDirty(fixtureHasChanges(new FormData(fixtureFormRef.current)));
+      }
+    });
+  }
+
+  function changeDivision(nextDivision: string) {
+    const nextEligible = teams.filter((team) => team.divisionId === nextDivision);
+    const nextHome =
+      nextEligible.find((team) => team.id === fixtureHome)?.id ?? nextEligible[0]?.id ?? "";
+    const nextAway =
+      nextEligible.find((team) => team.id === fixtureAway && team.id !== nextHome)?.id ??
+      nextEligible.find((team) => team.id !== nextHome)?.id ??
+      "";
+    setDivision(nextDivision);
+    setFixtureHome(nextHome);
+    setFixtureAway(nextAway);
+  }
+
+  function swapTeams() {
+    setFixtureHome(fixtureAway);
+    setFixtureAway(fixtureHome);
+    setHome(away);
+    setAway(home);
+  }
 
   async function send(form: string, url: string, body: unknown) {
     setBusy(form);
@@ -161,13 +203,17 @@ export function AdminMatchForms({
             },
       );
       setBusy(null);
+      if (officials.ok) setFixtureDirty(false);
       router.refresh();
       return;
     }
 
     setResult({ ...scheduled, form: "fixture" });
     setBusy(null);
-    if (scheduled.ok) router.refresh();
+    if (scheduled.ok) {
+      setFixtureDirty(false);
+      router.refresh();
+    }
   }
 
   function feedback(form: string) {
@@ -191,7 +237,9 @@ export function AdminMatchForms({
           referee is audited with your reason.
         </p>
         <form
+          ref={fixtureFormRef}
           className="mt-4 space-y-4"
+          onChange={refreshFixtureDirty}
           onSubmit={(event) => {
             event.preventDefault();
             void saveFixture(new FormData(event.currentTarget));
@@ -208,7 +256,7 @@ export function AdminMatchForms({
                   id="kickoffAt"
                   name="kickoffAt"
                   type="datetime-local"
-                  defaultValue={toDateTimeInputValue(kickoffAt)}
+                  defaultValue={initialKickoff}
                   className={inputClass}
                 />
               </Field>
@@ -251,11 +299,7 @@ export function AdminMatchForms({
                 <select
                   id="status"
                   name="status"
-                  defaultValue={
-                    (ADMIN_SETTABLE_MATCH_STATUSES as readonly string[]).includes(status)
-                      ? status
-                      : "CONFIRMED"
-                  }
+                  defaultValue={initialStatus}
                   className={inputClass}
                 >
                   {ADMIN_SETTABLE_MATCH_STATUSES.map((s) => (
@@ -292,14 +336,14 @@ export function AdminMatchForms({
                 <legend className="text-muted px-1 text-xs font-semibold uppercase">Kits</legend>
                 <KitField
                   id="homeKit"
-                  label={`${homeTeamName} wears`}
+                  label={`${homeTeamLabel} wears`}
                   value={home}
                   onChange={setHome}
                   color={homeColor}
                 />
                 <KitField
                   id="awayKit"
-                  label={`${awayTeamName} wears`}
+                  label={`${awayTeamLabel} wears`}
                   value={away}
                   onChange={setAway}
                   color={awayColor}
@@ -335,7 +379,7 @@ export function AdminMatchForms({
                         id="fixture-division"
                         name="divisionId"
                         value={division}
-                        onChange={(event) => setDivision(event.target.value)}
+                        onChange={(event) => changeDivision(event.target.value)}
                         className={inputClass}
                       >
                         {divisions.map((d) => (
@@ -351,13 +395,13 @@ export function AdminMatchForms({
                         yet.
                       </Alert>
                     ) : (
-                      <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-end">
                         <Field label="Home team" htmlFor="fixture-home">
                           <select
                             id="fixture-home"
                             name="homeTeamId"
-                            defaultValue={fixtureHome}
-                            key={`home-${division}`}
+                            value={fixtureHome}
+                            onChange={(event) => setFixtureHome(event.target.value)}
                             className={inputClass}
                           >
                             {eligible.map((team) => (
@@ -367,12 +411,24 @@ export function AdminMatchForms({
                             ))}
                           </select>
                         </Field>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            swapTeams();
+                            refreshFixtureDirty();
+                          }}
+                          className={buttonClass("outline", "h-9 w-9 p-0")}
+                          aria-label="Swap home and away teams"
+                          title="Swap home and away teams"
+                        >
+                          <span aria-hidden="true">&#8644;</span>
+                        </button>
                         <Field label="Away team" htmlFor="fixture-away">
                           <select
                             id="fixture-away"
                             name="awayTeamId"
-                            defaultValue={fixtureAway}
-                            key={`away-${division}`}
+                            value={fixtureAway}
+                            onChange={(event) => setFixtureAway(event.target.value)}
                             className={inputClass}
                           >
                             {eligible.map((team) => (
@@ -427,7 +483,9 @@ export function AdminMatchForms({
 
           <button
             type="submit"
-            disabled={busy === "fixture" || (!hasReport && eligible.length < 2)}
+            disabled={
+              busy === "fixture" || !fixtureDirty || (!hasReport && eligible.length < 2)
+            }
             className={buttonClass("primary")}
           >
             {busy === "fixture" ? "Saving\u2026" : "Save fixture"}
@@ -460,7 +518,7 @@ export function AdminMatchForms({
             });
           }}
         >
-          <Field label={`${homeTeamName} score`} htmlFor="homeScore">
+          <Field label={`${homeTeamLabel} score`} htmlFor="homeScore">
             <input
               id="homeScore"
               name="homeScore"
@@ -472,7 +530,7 @@ export function AdminMatchForms({
               required
             />
           </Field>
-          <Field label={`${awayTeamName} score`} htmlFor="awayScore">
+          <Field label={`${awayTeamLabel} score`} htmlFor="awayScore">
             <input
               id="awayScore"
               name="awayScore"
@@ -492,7 +550,7 @@ export function AdminMatchForms({
                 defaultChecked={currentHomeForfeit}
                 className="h-4 w-4"
               />
-              {homeTeamName} forfeit
+              {homeTeamLabel} forfeit
             </label>
             <label className="flex items-center gap-2">
               <input
@@ -501,7 +559,7 @@ export function AdminMatchForms({
                 defaultChecked={currentAwayForfeit}
                 className="h-4 w-4"
               />
-              {awayTeamName} forfeit
+              {awayTeamLabel} forfeit
             </label>
           </div>
           <Field label="Reason (required)" htmlFor="override-reason">
@@ -548,7 +606,7 @@ function KitField({
       <div className="flex items-center gap-2">
         <span
           aria-hidden
-          className="dark:ring-foreground/30 inline-block h-8 w-8 shrink-0 rounded-lg ring-1 ring-black/20"
+          className="inline-block h-8 w-8 shrink-0 rounded-lg ring-1 ring-black/20 dark:ring-white/25"
           style={{ backgroundColor: color }}
         />
         <select

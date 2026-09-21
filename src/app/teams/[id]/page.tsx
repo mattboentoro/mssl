@@ -121,7 +121,7 @@ export default async function TeamPage({
           <div className="flex items-center gap-2">
             <span
               aria-hidden
-              className="dark:ring-foreground/30 inline-block h-5 w-5 rounded ring-1 ring-black/20"
+              className="inline-block h-5 w-5 rounded ring-1 ring-black/20 dark:ring-white/25"
               style={{ backgroundColor: resolveKit(team, "PRIMARY") }}
             />
             <div>
@@ -134,7 +134,7 @@ export default async function TeamPage({
           <div className="flex items-center gap-2">
             <span
               aria-hidden
-              className="dark:ring-foreground/30 inline-block h-5 w-5 rounded ring-1 ring-black/20"
+              className="inline-block h-5 w-5 rounded ring-1 ring-black/20 dark:ring-white/25"
               style={{ backgroundColor: resolveKit(team, "ALTERNATE") }}
             />
             <div>
@@ -187,6 +187,7 @@ export default async function TeamPage({
                 month={monthValue.month}
                 basePath={`/teams/${id}`}
                 query={{ view: "calendar" }}
+                showFixtureDetails
                 emptyHint={`${team.name} have nothing scheduled this month.`}
               />
             ) : upcoming.length === 0 ? (
@@ -221,8 +222,8 @@ export default async function TeamPage({
                     aria-hidden
                     className={
                       card.type === "RED"
-                        ? "bg-danger h-5 w-3.5 shrink-0 rounded-xs"
-                        : "h-5 w-3.5 shrink-0 rounded-xs bg-yellow-400"
+                        ? "bg-danger h-5 w-3.5 shrink-0 rounded-sm"
+                        : "h-5 w-3.5 shrink-0 rounded-sm bg-yellow-400"
                     }
                   />
                   <div className="min-w-0 flex-1">

@@ -113,7 +113,7 @@ export default async function AdminDisciplinePage({
           <Card className="divide-subtle divide-y">
             {pending.map((record) => (
               <div key={record.id} className="flex flex-wrap items-center gap-3 p-3 text-sm">
-                <span aria-hidden className="bg-danger h-6 w-4 shrink-0 rounded-xs" />
+                <span aria-hidden className="bg-danger h-6 w-4 shrink-0 rounded-sm" />
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">
                     {record.playerName}
@@ -306,8 +306,8 @@ export default async function AdminDisciplinePage({
                     aria-hidden
                     className={
                       record.type === "RED"
-                        ? "bg-danger h-6 w-4 shrink-0 rounded-xs"
-                        : "h-6 w-4 shrink-0 rounded-xs bg-yellow-400"
+                        ? "bg-danger h-6 w-4 shrink-0 rounded-sm"
+                        : "h-6 w-4 shrink-0 rounded-sm bg-yellow-400"
                     }
                   />
                   <div className="min-w-0 flex-1">

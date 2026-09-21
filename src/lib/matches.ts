@@ -415,6 +415,64 @@ export async function disputeGameReport(
 }
 
 /**
+ * Remove a filed report so its assigned referee can submit a corrected one.
+ *
+ * The route calls this inside a transaction: deleting the report also
+ * cascades its referee-issued disciplinary rows, while the audit snapshot
+ * preserves what was removed and why.
+ */
+export async function reopenGameReport(
+  db: DbClient,
+  params: { matchId: string; actor: ActorContext; reason: string },
+): Promise<void> {
+  const { matchId, actor, reason } = params;
+  if (!actor.isAdmin) throw new MatchError("Admin only.", 403, "NOT_YOUR_MATCH");
+
+  const match = await db.match.findUnique({
+    where: { id: matchId },
+    select: { id: true, refereeId: true, status: true },
+  });
+  if (!match) throw new MatchError("Match not found.", 404, "NOT_FOUND");
+
+  const report = await db.gameReport.findUnique({
+    where: { matchId },
+    include: { _count: { select: { discipline: true } } },
+  });
+  if (!report) throw new MatchError("No report to reopen.", 404, "REPORT_MISSING");
+
+  await db.gameReport.delete({ where: { id: report.id } });
+  await db.match.update({
+    where: { id: matchId },
+    data: {
+      status: match.refereeId ? "ASSIGNED" : "SCHEDULED",
+      assignedAt: match.refereeId ? undefined : null,
+      version: { increment: 1 },
+    },
+  });
+
+  await writeAudit(db, {
+    actor,
+    action: "report.reopen",
+    entity: "Match",
+    entityId: matchId,
+    metadata: {
+      reason,
+      reportId: report.id,
+      refereeId: match.refereeId,
+      previousMatchStatus: match.status,
+      removedReport: {
+        status: report.status,
+        homeScore: report.homeScore,
+        awayScore: report.awayScore,
+        homeForfeit: report.homeForfeit,
+        awayForfeit: report.awayForfeit,
+        disciplineCount: report._count.discipline,
+      },
+    },
+  });
+}
+
+/**
  * Admin override of a result. A reason is mandatory and audited.
  *
  * The fixture need not have a report: a referee may never file one, and the

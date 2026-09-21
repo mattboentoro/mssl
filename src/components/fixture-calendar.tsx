@@ -1,4 +1,3 @@
-import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 import { KitSwatch } from "@/components/team-colors";
@@ -34,6 +33,7 @@ export function FixtureCalendar({
   query,
   hrefForMatch,
   markFor,
+  showFixtureDetails = false,
   monthParam = "month",
   emptyHint,
 }: {
@@ -51,6 +51,8 @@ export function FixtureCalendar({
    * ticked; it is read out to screen readers and shown as a tooltip.
    */
   markFor?: (match: MatchListItem) => string | undefined;
+  /** Show the admin-oriented kit, team, and venue layout on each fixture. */
+  showFixtureDetails?: boolean;
   monthParam?: string;
   emptyHint?: string;
 }) {
@@ -77,7 +79,7 @@ export function FixtureCalendar({
   const next = shiftMonth(year, month, 1);
   const label = monthLabel(year, month);
   const navClass =
-    "border-subtle hover:bg-surface-muted rounded-full border px-3 py-1.5 text-sm font-medium";
+    "border-subtle hover:bg-surface-muted rounded-lg border px-3 py-1.5 text-sm font-medium";
 
   return (
     <Card className="p-4">
@@ -87,13 +89,13 @@ export function FixtureCalendar({
         </h3>
         <div className="flex items-center gap-2">
           <Link href={linkTo(previous.value)} className={navClass} rel="prev">
-            <ChevronLeft aria-hidden="true" size={16} />
+            <span aria-hidden="true">&larr;</span>
             <span className="sr-only">
               Previous month, {monthLabel(previous.year, previous.month)}
             </span>
           </Link>
           <Link href={linkTo(next.value)} className={navClass} rel="next">
-            <ChevronRight aria-hidden="true" size={16} />
+            <span aria-hidden="true">&rarr;</span>
             <span className="sr-only">Next month, {monthLabel(next.year, next.month)}</span>
           </Link>
         </div>
@@ -105,7 +107,7 @@ export function FixtureCalendar({
         user to infer the column.
       */}
       <div className="-mx-4 overflow-x-auto px-4">
-        <table className="relative w-full min-w-[42rem] table-fixed border-separate border-spacing-1 text-sm">
+        <table className="w-full min-w-[42rem] table-fixed border-collapse text-sm">
           <caption className="sr-only">Fixtures for {label}, shown in Redmond time</caption>
           <thead>
             <tr>
@@ -129,7 +131,7 @@ export function FixtureCalendar({
                     <td
                       key={cell.key}
                       className={[
-                        "border-subtle squircle h-24 rounded-lg border p-2 align-top",
+                        "border-subtle h-24 border p-1 align-top",
                         cell.inMonth ? "" : "bg-surface-muted/40",
                         cell.isToday ? "outline-brand outline-2 -outline-offset-2" : "",
                       ]
@@ -157,6 +159,7 @@ export function FixtureCalendar({
                                 match={match}
                                 href={hrefForMatch?.(match)}
                                 mark={markFor?.(match)}
+                                showFixtureDetails={showFixtureDetails}
                               />
                             </li>
                           ))}
@@ -186,21 +189,44 @@ function FixtureChip({
   match,
   href,
   mark,
+  showFixtureDetails,
 }: {
   match: MatchListItem;
   href?: string;
   mark?: string;
+  showFixtureDetails: boolean;
 }) {
   const label = `${match.homeTeam.shortName} v ${match.awayTeam.shortName}`;
+  const venue = match.venueName ?? "Venue TBD";
   // The swatches are tiny, so the tooltip spells the kits out in words. It is
   // the only place a referee can check the strip without opening the fixture.
   const detail =
     `${formatTime(match.kickoffAt)} ${label} \u2014 ` +
     `${match.homeTeam.name} in ${kitColorName(resolveKit(match.homeTeam, match.homeKit))}, ` +
-    `${match.awayTeam.name} in ${kitColorName(resolveKit(match.awayTeam, match.awayKit))}` +
+    `${match.awayTeam.name} in ${kitColorName(resolveKit(match.awayTeam, match.awayKit))}, ` +
+    `at ${venue}` +
     (mark ? ` \u2014 ${mark}` : "");
 
-  const body = (
+  const body = showFixtureDetails ? (
+    <>
+      <span className="flex min-w-0 items-center gap-1">
+        <span className="shrink-0 tabular-nums">{formatTime(match.kickoffAt)}</span>
+        <KitSwatch team={match.homeTeam} kit={match.homeKit} teamName={match.homeTeam.name} />
+        <span className="truncate">{match.homeTeam.shortName}:</span>
+        <span className="truncate">{match.awayTeam.shortName}</span>
+        <KitSwatch team={match.awayTeam} kit={match.awayKit} teamName={match.awayTeam.name} />
+        {mark ? (
+          <span className="ml-auto shrink-0 font-semibold text-emerald-600 dark:text-emerald-400">
+            <span className="sr-only">{mark}</span>
+            <span aria-hidden="true">&#10003;</span>
+          </span>
+        ) : null}
+      </span>
+      <span className="text-muted mt-0.5 block truncate" title={venue}>
+        {venue}
+      </span>
+    </>
+  ) : (
     <>
       <span className="tabular-nums">{formatTime(match.kickoffAt)}</span>
       <KitSwatch team={match.homeTeam} kit={match.homeKit} teamName={match.homeTeam.name} />
@@ -211,9 +237,9 @@ function FixtureChip({
         aligned down the week. `ml-auto` pins it to the right edge of the chip.
       */}
       {mark ? (
-        <span className="dark:text-success ml-auto shrink-0 font-semibold text-emerald-600">
+        <span className="ml-auto shrink-0 font-semibold text-emerald-600 dark:text-emerald-400">
           <span className="sr-only">{mark}</span>
-          <Check aria-hidden="true" size={12} />
+          <span aria-hidden="true">&#10003;</span>
         </span>
       ) : null}
     </>
@@ -221,17 +247,20 @@ function FixtureChip({
 
   // A marked fixture is tinted green as well as ticked, so the distinction
   // survives for anyone who cannot pick the glyph out at 11px.
-  const markedTone = "bg-emerald-50 dark:bg-success/10";
   const tone = mark
-    ? `${markedTone} hover:bg-emerald-100 dark:hover:bg-success/20`
+    ? "bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/40"
     : "bg-surface-muted hover:bg-brand/10";
 
-  const shared =
-    "flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-[11px] leading-tight";
+  const shared = showFixtureDetails
+    ? "block w-full rounded px-1 py-0.5 text-left text-[11px] leading-tight"
+    : "flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-[11px] leading-tight";
 
   if (!href) {
     return (
-      <span className={`${shared} ${mark ? markedTone : "bg-surface-muted"}`} title={detail}>
+      <span
+        className={`${shared} ${mark ? "bg-emerald-50 dark:bg-emerald-950/40" : "bg-surface-muted"}`}
+        title={detail}
+      >
         {body}
       </span>
     );
@@ -282,7 +311,7 @@ export function CalendarViewToggle({
   ];
 
   return (
-    <div className="border-subtle inline-flex rounded-full border p-0.5" role="group">
+    <div className="border-subtle inline-flex rounded-lg border p-0.5" role="group">
       {options.map((option) => {
         const current = option.value === view;
         return (
@@ -290,7 +319,7 @@ export function CalendarViewToggle({
             key={option.value}
             href={linkTo(option.value)}
             aria-current={current ? "true" : undefined}
-            className={`rounded-full px-3 py-1 text-sm font-medium ${
+            className={`rounded-md px-3 py-1 text-sm font-medium ${
               current ? "bg-brand text-brand-contrast" : "text-muted hover:bg-surface-muted"
             }`}
           >

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { postJson } from "@/components/match-actions";
+import { UnsavedChangesGuard } from "@/components/unsaved-changes-guard";
 import { Alert, Button, Field, inputClass, labelClass } from "@/components/ui";
 import { CARD_LABELS, type CardType } from "@/lib/enums";
 
@@ -49,6 +50,7 @@ export function GameReportForm({
   const [misconduct, setMisconduct] = useState("");
   const [cards, setCards] = useState<CardDraft[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -56,6 +58,15 @@ export function GameReportForm({
   const doubleForfeitMismatch =
     homeForfeit && awayForfeit && (Number(homeScore) !== 0 || Number(awayScore) !== 0);
   const incompleteCard = cards.some((card) => card.playerName.trim().length < 2);
+  const hasUnsavedChanges =
+    homeScore !== "0" ||
+    awayScore !== "0" ||
+    homeForfeit ||
+    awayForfeit ||
+    notes !== "" ||
+    incidentReport !== "" ||
+    misconduct !== "" ||
+    cards.length > 0;
 
   function addCard(type: CardType) {
     setCards((current) => [
@@ -103,11 +114,13 @@ export function GameReportForm({
       return;
     }
 
-    router.refresh();
+    setSubmitted(true);
+    window.setTimeout(() => router.refresh(), 0);
   }
 
   return (
     <form onSubmit={submit} className="space-y-6">
+      <UnsavedChangesGuard enabled={hasUnsavedChanges && !submitted} />
       {error ? (
         <Alert title="The report was not accepted">
           <p>{error}</p>

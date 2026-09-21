@@ -178,7 +178,7 @@ export default async function AdminStandingsPage({
                   className={
                     adjustment.points < 0
                       ? "text-danger w-12 shrink-0 text-right font-bold tabular-nums"
-                      : "dark:text-success w-12 shrink-0 text-right font-bold text-emerald-600 tabular-nums"
+                      : "w-12 shrink-0 text-right font-bold text-emerald-600 tabular-nums"
                   }
                 >
                   {adjustment.points > 0 ? "+" : "\u2212"}

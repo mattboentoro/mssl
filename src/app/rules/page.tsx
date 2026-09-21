@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { ArrowRight } from "lucide-react";
 import type { Metadata } from "next";
 
 import { Card, PageHeader } from "@/components/ui";
@@ -40,7 +39,7 @@ export default function RulesPage() {
             className="border-subtle hover:bg-surface-muted inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors"
           >
             Open the PDF
-            <ArrowRight aria-hidden="true" size={16} />
+            <span aria-hidden>&rarr;</span>
           </a>
         }
       />

@@ -1,4 +1,3 @@
-import { Check } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { forbidden, notFound, redirect } from "next/navigation";
@@ -126,6 +125,8 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
                   body={{ expectedVersion: match.version }}
                   label="Claim this match"
                   pendingLabel={"Claiming\u2026"}
+                  successLabel="Claimed"
+                  successDelayMs={2000}
                 />
               </span>
             </>
@@ -154,8 +155,11 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
                     <ActionButton
                       url={`/api/matches/${match.id}/unassign`}
                       label="Release match"
-                      variant="ghost"
+                      variant="danger"
                       confirm="Release this match so another referee can claim it?"
+                      confirmTitle="Drop this match?"
+                      confirmActionLabel="Drop match"
+                      confirmCancelLabel="Keep match"
                     />
                   </div>
                 ) : null}
@@ -312,11 +316,11 @@ function StepMarker({ done, n }: { done: boolean; n: number }) {
       aria-hidden
       className={
         done
-          ? "bg-success text-status-contrast inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+          ? "bg-success inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
           : "bg-surface-muted text-muted inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold"
       }
     >
-      {done ? <Check aria-hidden="true" size={14} /> : n}
+      {done ? "\u2713" : n}
     </span>
   );
 }

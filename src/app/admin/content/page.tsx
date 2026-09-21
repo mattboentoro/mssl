@@ -8,7 +8,7 @@ import {
 } from "@/app/admin/actions";
 import { ActionForm, FieldError, SubmitButton } from "@/components/admin-forms";
 import { CloseOnSuccess, Dialog, DialogCancel } from "@/components/form-dialog";
-import { Badge, Card, Field, inputClass, outlineButtonClass } from "@/components/ui";
+import { Card, Field, inputClass, outlineButtonClass } from "@/components/ui";
 import { DOCUMENT_CATEGORIES, DOCUMENT_CATEGORY_LABELS } from "@/lib/enums";
 import { formatDate } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
@@ -91,11 +91,7 @@ export default async function AdminContentPage() {
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold">
-                    {item.pinned ? (
-                      <Badge tone="accent" className="mr-2">
-                        Pinned
-                      </Badge>
-                    ) : null}
+                    {item.pinned ? <span className="text-accent mr-1">📌</span> : null}
                     {item.title}
                   </p>
                   <p className="text-muted text-xs">

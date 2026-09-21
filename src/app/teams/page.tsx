@@ -46,14 +46,12 @@ export default async function TeamsPage() {
               </h2>
               <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {divisionTeams.map((team) => (
-                  <Card key={team.id} as="li">
-                    <Link href={`/teams/${team.slug}`} className="group block p-5">
+                  <Card key={team.id} as="li" className="hover:border-brand transition-colors">
+                    <Link href={`/teams/${team.slug}`} className="block p-4">
                       <div className="flex items-center gap-3">
                         <TeamColorBar team={team} size="lg" />
                         <div className="min-w-0">
-                          <p className="group-hover:text-brand font-semibold group-hover:underline">
-                            {team.name}
-                          </p>
+                          <p className="truncate font-semibold">{team.name}</p>
                           <p className="text-muted truncate text-xs">
                             {team.captains.length > 0
                               ? `${team.captains.length === 1 ? "Captain" : "Captains"}: ${team.captains

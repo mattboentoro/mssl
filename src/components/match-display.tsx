@@ -2,7 +2,6 @@ import Link from "next/link";
 
 import { KitSwatch, TeamColorBar } from "@/components/team-colors";
 import { Badge, Card, FormGuide, MatchStatusBadge } from "@/components/ui";
-import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/dates";
 import { kitColorName, resolveKit } from "@/lib/kits";
 import { scoreText, type MatchListItem } from "@/lib/queries";
@@ -20,9 +19,7 @@ export function MatchRow({ match }: { match: MatchListItem }) {
   return (
     <Card as="li" className="p-4">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-        <time className="text-muted" dateTime={match.kickoffAt.toISOString()}>
-          {formatDateTime(match.kickoffAt)}
-        </time>
+        <span className="text-muted">{formatDateTime(match.kickoffAt)}</span>
         <Badge tone="neutral">{match.division.name}</Badge>
         <Badge tone="neutral">MW {match.matchweek}</Badge>
         {ASSIGNMENT_ONLY_STATUSES.includes(match.status) ? null : (
@@ -38,7 +35,7 @@ export function MatchRow({ match }: { match: MatchListItem }) {
           forfeited={Boolean(match.report?.homeForfeit)}
         />
         {score ? (
-          <span className="text-xl leading-5 font-bold tabular-nums">{score}</span>
+          <span className="text-xl font-bold tabular-nums">{score}</span>
         ) : (
           <span className="text-muted text-sm font-semibold">vs</span>
         )}
@@ -50,7 +47,7 @@ export function MatchRow({ match }: { match: MatchListItem }) {
       </div>
 
       <div className="text-muted mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-        <span>Venue: {match.venueName || "TBD"}</span>
+        {match.venueName ? <span>&#128205; {match.venueName}</span> : <span>&#128205; TBD</span>}
       </div>
     </Card>
   );
@@ -74,7 +71,7 @@ function TeamCell({
         className="flex min-w-0 items-center gap-1.5 text-left font-semibold hover:underline"
       >
         <KitSwatch team={team} kit={kit} teamName={team.name} />
-        <span className="break-words">{team.name}</span>
+        <span className="truncate">{team.name}</span>
       </Link>
       {/*
         The awarded scoreline is nobody's actual result, so the side that gave
@@ -88,15 +85,9 @@ function TeamCell({
   );
 }
 
-export function MatchList({
-  matches,
-  className,
-}: {
-  matches: MatchListItem[];
-  className?: string;
-}) {
+export function MatchList({ matches }: { matches: MatchListItem[] }) {
   return (
-    <ul className={cn("grid gap-3", className)}>
+    <ul className="grid gap-3">
       {matches.map((match) => (
         <MatchRow key={match.id} match={match} />
       ))}
@@ -184,15 +175,10 @@ export function StandingsTable({
   // the points column and finding it out of sequence.
   const showPpg = primaryMetric === "pointsPerGame";
   return (
-    <div className="overflow-x-auto">
-      <table
-        className={cn(
-          "data-table w-full text-sm",
-          compact ? "standings-table-compact min-w-[20rem]" : "min-w-[36rem]",
-        )}
-      >
+    <div className="border-subtle overflow-x-auto rounded-xl border">
+      <table className="w-full min-w-[36rem] text-sm">
         <caption className="sr-only">{caption}</caption>
-        <thead className="text-muted text-xs uppercase">
+        <thead className="bg-surface-muted text-muted text-xs uppercase">
           <tr>
             <th scope="col" className="px-3 py-2 text-left">
               #
@@ -242,15 +228,15 @@ export function StandingsTable({
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.teamId}>
-              <td className="text-muted px-3 py-3 tabular-nums">{row.rank}</td>
-              <th scope="row" className="px-3 py-3 text-left font-medium">
+            <tr key={row.teamId} className="border-subtle border-t">
+              <td className="text-muted px-3 py-2 tabular-nums">{row.rank}</td>
+              <th scope="row" className="px-3 py-2 text-left font-medium">
                 <Link
                   href={`/teams/${row.teamSlug}`}
                   className="flex items-center gap-2 hover:underline"
                 >
                   <TeamColorBar team={row} />
-                  <span>{row.teamName}</span>
+                  <span className="truncate">{row.teamName}</span>
                 </Link>
                 {/*
                   A tiebreaker note only tells the reader something they cannot

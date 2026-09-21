@@ -573,6 +573,7 @@ async function main(): Promise<void> {
     "the home page can expand a published announcement body",
     announcementHome.includes("Read full announcement") && announcementHome.includes("Smoke body"),
   );
+
   if (announcement) {
     const editedHeadline = `${headline} edited`;
     await submit("/admin/content", `id="ann-${announcement.id}-title"`, {
@@ -665,7 +666,6 @@ async function main(): Promise<void> {
       })) === 1,
     );
   }
-
   console.log("\nMatch Control shell");
   const matchesHtml = await (await req("/admin/matches")).text();
   check(

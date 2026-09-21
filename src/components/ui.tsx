@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import { isValidElement, type ComponentPropsWithoutRef, type ReactNode } from "react";
 
 import { cn } from "@/lib/cn";
 import {
@@ -28,11 +28,9 @@ export function PageHeader({
     <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="max-w-2xl">
         {eyebrow ? (
-          <p className="text-muted text-xs font-medium tracking-wider uppercase">{eyebrow}</p>
+          <p className="text-brand text-xs font-semibold tracking-[0.18em] uppercase">{eyebrow}</p>
         ) : null}
-        <h1 className="font-display mt-2 text-4xl font-bold tracking-tight uppercase sm:text-5xl">
-          {title}
-        </h1>
+        <h1 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
         {description ? (
           <div className="text-muted mt-2 text-sm sm:text-base">{description}</div>
         ) : null}
@@ -51,7 +49,11 @@ export function Card({
   className?: string;
   as?: "div" | "section" | "article" | "li";
 }) {
-  return <As className={cn("bg-surface-muted squircle rounded-2xl", className)}>{children}</As>;
+  return (
+    <As className={cn("bg-surface border-subtle rounded-xl border shadow-sm", className)}>
+      {children}
+    </As>
+  );
 }
 
 export function SectionHeading({
@@ -67,14 +69,11 @@ export function SectionHeading({
 }) {
   return (
     <div className="mb-4 flex items-baseline justify-between gap-4">
-      <h2 className="font-display text-2xl font-bold tracking-tight uppercase">{title}</h2>
+      <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
       {children}
       {href ? (
-        <Link
-          href={href}
-          className="text-muted hover:text-brand shrink-0 py-1 text-xs hover:underline"
-        >
-          {linkLabel}
+        <Link href={href} className="text-accent text-sm font-medium hover:underline">
+          {linkLabel} &rarr;
         </Link>
       ) : null}
     </div>
@@ -83,7 +82,7 @@ export function SectionHeading({
 
 export function EmptyState({ title, hint }: { title: string; hint?: ReactNode }) {
   return (
-    <div className="bg-surface-muted text-muted squircle rounded-2xl p-6 text-sm">
+    <div className="border-subtle text-muted rounded-xl border border-dashed p-8 text-center text-sm">
       <p className="font-medium">{title}</p>
       {hint ? <p className="mt-1">{hint}</p> : null}
     </div>
@@ -117,7 +116,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap",
+        "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap",
         BADGE_TONES[tone],
         className,
       )}
@@ -146,18 +145,25 @@ export function MatchStatusBadge({ match }: { match: MatchDisplayInput }) {
 /* Buttons                                                                    */
 /* -------------------------------------------------------------------------- */
 
-export type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "danger";
+export type ButtonVariant =
+  | "primary"
+  | "secondary"
+  | "outline"
+  | "ghost"
+  | "success"
+  | "danger";
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
-  primary: "bg-brand text-brand-contrast hover:bg-brand-strong",
+  primary: "bg-brand text-brand-contrast hover:opacity-90",
   secondary: "bg-surface border-subtle border hover:bg-surface-muted",
-  outline: "border-subtle border hover:bg-surface-muted",
+  outline: "border-subtle border-2 hover:bg-surface-muted",
   ghost: "hover:bg-surface-muted",
-  danger: "bg-danger text-status-contrast hover:opacity-90",
+  success: "bg-success text-white hover:opacity-90",
+  danger: "bg-danger text-white hover:opacity-90",
 };
 
 const BUTTON_BASE =
-  "inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50";
 
 /**
  * The bare-outline control used for page-level secondary actions: no fill, just
@@ -165,7 +171,7 @@ const BUTTON_BASE =
  * dialog triggers stay identical.
  */
 export const outlineButtonClass =
-  "border-subtle hover:bg-surface-muted inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition";
+  "border-subtle hover:bg-surface-muted inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition";
 
 export function buttonClass(variant: ButtonVariant = "primary", className?: string) {
   return cn(BUTTON_BASE, BUTTON_VARIANTS[variant], className);
@@ -198,7 +204,7 @@ export function ButtonLink({
 /* -------------------------------------------------------------------------- */
 
 export const inputClass =
-  "bg-surface border-subtle squircle w-full rounded-lg border px-3 py-2 text-sm";
+  "bg-surface border-subtle w-full rounded-lg border px-3 py-2 text-sm shadow-sm";
 
 export const labelClass = "text-muted mb-1 block text-xs font-semibold uppercase tracking-wide";
 
@@ -206,17 +212,31 @@ export function Field({
   label,
   htmlFor,
   hint,
+  required,
   children,
 }: {
   label: string;
   htmlFor?: string;
   hint?: ReactNode;
+  required?: boolean;
   children: ReactNode;
 }) {
+  const isRequired =
+    required ??
+    (isValidElement<{ required?: boolean }>(children) && children.props.required === true);
+
   return (
     <div>
       <label className={labelClass} htmlFor={htmlFor}>
         {label}
+        {isRequired ? (
+          <>
+            <span aria-hidden="true" className="text-danger ml-0.5">
+              *
+            </span>
+            <span className="sr-only"> (required)</span>
+          </>
+        ) : null}
       </label>
       {children}
       {hint ? <p className="text-muted mt-1 text-xs">{hint}</p> : null}
@@ -247,10 +267,7 @@ export function Alert({
   const role = tone === "danger" || tone === "warning" ? "alert" : undefined;
 
   return (
-    <div
-      className={cn("squircle rounded-xl border px-4 py-3 text-sm", tones[tone], className)}
-      role={role}
-    >
+    <div className={cn("rounded-lg border px-4 py-3 text-sm", tones[tone], className)} role={role}>
       {title ? <p className="font-semibold">{title}</p> : null}
       <div className={title ? "mt-1" : undefined}>{children}</div>
     </div>
@@ -266,9 +283,9 @@ export function FormGuide({ form }: { form: ("W" | "D" | "L")[] }) {
     return <span className="text-muted text-xs">&mdash;</span>;
   }
   const tone = {
-    W: "bg-success text-status-contrast",
+    W: "bg-success text-white",
     D: "bg-muted/40 text-foreground",
-    L: "bg-danger text-status-contrast",
+    L: "bg-danger text-white",
   };
   return (
     <span className="inline-flex gap-1">
@@ -276,7 +293,7 @@ export function FormGuide({ form }: { form: ("W" | "D" | "L")[] }) {
         <span
           key={index}
           className={cn(
-            "squircle inline-flex h-5 w-5 items-center justify-center rounded-sm text-[10px] font-bold",
+            "inline-flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold",
             tone[result],
           )}
           title={{ W: "Win", D: "Draw", L: "Loss" }[result]}
