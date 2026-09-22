@@ -8,6 +8,7 @@ import {
   claimApplicationIdentity,
   loadAuthorization,
   revokeGlobalRole,
+  RoleMutationError,
   setActiveTeamMembership,
 } from "@/lib/rbac";
 
@@ -107,6 +108,7 @@ describe("Captain RBAC foundation", () => {
         status: "ACTIVE",
       },
     });
+
     const user = await prisma.appUser.create({
       data: {
         entraObjectId: "subject",
@@ -117,6 +119,11 @@ describe("Captain RBAC foundation", () => {
       },
     });
 
+    await assignGlobalRole(prisma, {
+      userId: actor.id,
+      role: "ADMIN",
+      actorId: actor.id,
+    });
     const assignment = await assignGlobalRole(prisma, {
       userId: user.id,
       role: "ADMIN",
@@ -133,6 +140,84 @@ describe("Captain RBAC foundation", () => {
         where: { userId_role: { userId: user.id, role: "ADMIN" } },
       }),
     ).resolves.toMatchObject({ revokedById: actor.id, revokedAt: expect.any(Date) });
+  });
+
+  it("preserves other roles and prevents removing the last active Admin", async () => {
+    const actor = await prisma.appUser.create({
+      data: {
+        entraObjectId: "sole-admin",
+        email: "sole-admin@example.com",
+        normalizedEmail: "sole-admin@example.com",
+        displayName: "Sole Admin",
+        status: "ACTIVE",
+        rolesAssigned: { create: [{ role: "ADMIN" }, { role: "REFEREE" }] },
+      },
+    });
+
+    await expect(
+      revokeGlobalRole(prisma, { userId: actor.id, role: "ADMIN", actorId: actor.id }),
+    ).rejects.toMatchObject({
+      code: "LAST_ADMIN",
+    } satisfies Partial<RoleMutationError>);
+    expect((await loadAuthorization(prisma, actor.id)).roles).toEqual(
+      expect.arrayContaining(["admin", "referee"]),
+    );
+
+    const second = await prisma.appUser.create({
+      data: {
+        entraObjectId: "second-admin",
+        email: "second-admin@example.com",
+        normalizedEmail: "second-admin@example.com",
+        displayName: "Second Admin",
+        status: "ACTIVE",
+        rolesAssigned: { create: { role: "ADMIN" } },
+      },
+    });
+    await expect(
+      revokeGlobalRole(prisma, { userId: actor.id, role: "ADMIN", actorId: second.id }),
+    ).resolves.toBe(true);
+    expect((await loadAuthorization(prisma, actor.id)).roles).toContain("referee");
+  });
+
+  it("serializes concurrent Admin revocations so one active Admin remains", async () => {
+    const first = await prisma.appUser.create({
+      data: {
+        entraObjectId: "concurrent-admin-1",
+        email: "concurrent-1@example.com",
+        normalizedEmail: "concurrent-1@example.com",
+        displayName: "Concurrent One",
+        status: "ACTIVE",
+        rolesAssigned: { create: { role: "ADMIN" } },
+      },
+    });
+    const second = await prisma.appUser.create({
+      data: {
+        entraObjectId: "concurrent-admin-2",
+        email: "concurrent-2@example.com",
+        normalizedEmail: "concurrent-2@example.com",
+        displayName: "Concurrent Two",
+        status: "ACTIVE",
+        rolesAssigned: { create: { role: "ADMIN" } },
+      },
+    });
+
+    const results = await Promise.allSettled([
+      revokeGlobalRole(prisma, { userId: first.id, role: "ADMIN", actorId: second.id }),
+      revokeGlobalRole(prisma, { userId: second.id, role: "ADMIN", actorId: first.id }),
+    ]);
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const rejected = results.find(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    );
+    expect(rejected?.reason).toMatchObject({
+      code: expect.stringMatching(/^(LAST_ADMIN|CONFLICT)$/),
+    });
+    expect(
+      await prisma.globalRoleAssignment.count({
+        where: { role: "ADMIN", revokedAt: null, user: { status: "ACTIVE" } },
+      }),
+    ).toBe(1);
   });
 
   it("composes multiple roles without hierarchy or implicit Referee access", async () => {

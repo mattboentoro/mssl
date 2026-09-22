@@ -354,22 +354,21 @@ export async function reviewCaptainResult(
     }
 
     const match = proposal.match;
-    if (
-      match.refereeId ||
-      match.status !== "SCHEDULED" ||
-      match.updatedAt.getTime() > proposal.createdAt.getTime()
-    ) {
-      throw new CaptainResultError(
-        "The fixture changed; the proposal cannot be finalized.",
-        409,
-        "NOT_ELIGIBLE",
-      );
-    }
-    if (await tx.gameReport.count({ where: { matchId: match.id } })) {
-      throw new CaptainResultError("An official report already exists.", 409, "NOT_ELIGIBLE");
-    }
-
     if (input.approve) {
+      if (
+        match.refereeId ||
+        match.status !== "SCHEDULED" ||
+        match.updatedAt.getTime() > proposal.createdAt.getTime()
+      ) {
+        throw new CaptainResultError(
+          "The fixture changed; the proposal cannot be finalized.",
+          409,
+          "NOT_ELIGIBLE",
+        );
+      }
+      if (await tx.gameReport.count({ where: { matchId: match.id } })) {
+        throw new CaptainResultError("An official report already exists.", 409, "NOT_ELIGIBLE");
+      }
       try {
         await createOfficialGameReport(tx, {
           matchId: match.id,

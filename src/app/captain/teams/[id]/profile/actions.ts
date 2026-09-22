@@ -3,17 +3,8 @@
 import { revalidatePath } from "next/cache";
 
 import { actorFrom } from "@/lib/api";
-import {
-  AuthzError,
-  requireCaptainForTeam,
-  requireUser,
-  type SessionUser,
-} from "@/lib/authz";
-import {
-  getTeamLogoStorage,
-  validateTeamLogo,
-  MAX_TEAM_LOGO_BYTES,
-} from "@/lib/team-logo-storage";
+import { AuthzError, requireCaptainForTeam, requireUser, type SessionUser } from "@/lib/authz";
+import { getTeamLogoStorage, validateTeamLogo, MAX_TEAM_LOGO_BYTES } from "@/lib/team-logo-storage";
 import { deleteTeamLogo, replaceTeamLogo, updateTeamProfile } from "@/lib/team-profile";
 import { flattenZodError, teamProfileSchema } from "@/lib/validation";
 

@@ -221,6 +221,13 @@ model GlobalRoleAssignment {
   @@index([revokedById])
 }
 
+/// A portable serialization point for cross-row authorization invariants.
+model AuthorizationInvariant {
+  id        String   @id
+  version   Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
 model TeamMembership {
   id           String    @id @default(cuid())
   seasonId     String

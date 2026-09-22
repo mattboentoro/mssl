@@ -16,7 +16,11 @@ export interface StoredTeamLogo {
 export type TeamLogoContentType = "image/png" | "image/jpeg" | "image/webp";
 
 export interface TeamLogoStorage {
-  upload(blobName: string, bytes: Uint8Array, contentType: TeamLogoContentType): Promise<StoredTeamLogo>;
+  upload(
+    blobName: string,
+    bytes: Uint8Array,
+    contentType: TeamLogoContentType,
+  ): Promise<StoredTeamLogo>;
   delete(blobName: string): Promise<void>;
   read(blobName: string): Promise<Uint8Array | null>;
 }
@@ -30,9 +34,7 @@ const signatures: Record<TeamLogoContentType, (bytes: Uint8Array) => boolean> = 
   "image/jpeg": (bytes) =>
     bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff,
   "image/webp": (bytes) =>
-    bytes.length >= 12 &&
-    ascii(bytes, 0, 4) === "RIFF" &&
-    ascii(bytes, 8, 12) === "WEBP",
+    bytes.length >= 12 && ascii(bytes, 0, 4) === "RIFF" && ascii(bytes, 8, 12) === "WEBP",
 };
 
 function ascii(bytes: Uint8Array, start: number, end: number): string {

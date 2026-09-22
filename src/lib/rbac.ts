@@ -1,4 +1,4 @@
-import type { AppUser, Prisma, PrismaClient } from "@prisma/client";
+import { Prisma, type AppUser, type PrismaClient } from "@prisma/client";
 
 import { config } from "@/lib/config";
 import type { AssignableRole, Role } from "@/lib/enums";
@@ -11,6 +11,16 @@ export class IdentityConflictError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "IdentityConflictError";
+  }
+}
+
+export class RoleMutationError extends Error {
+  constructor(
+    message: string,
+    readonly code: "USER_NOT_FOUND" | "BOOTSTRAP_ADMIN" | "LAST_ADMIN" | "CONFLICT",
+  ) {
+    super(message);
+    this.name = "RoleMutationError";
   }
 }
 
@@ -128,6 +138,7 @@ async function claimIdentityRows(
     db.teamCaptain.updateMany({
       where: {
         normalizedEmail: input.normalizedEmail,
+        seasonId: { not: null },
         status: "PENDING",
         OR: [{ userId: null }, { userId: user.id }],
       },
@@ -251,11 +262,85 @@ export async function revokeGlobalRole(
   db: DbClient,
   input: { userId: string; role: AssignableRole; actorId?: string },
 ): Promise<boolean> {
+  if ("$transaction" in db) {
+    return withSerializedRoleMutation(db, (tx) => revokeGlobalRole(tx, input));
+  }
+  const subject = await db.appUser.findUnique({
+    where: { id: input.userId },
+    select: { entraObjectId: true },
+  });
+  if (!subject) throw new RoleMutationError("That user no longer exists.", "USER_NOT_FOUND");
+  if (
+    input.role === "ADMIN" &&
+    subject.entraObjectId &&
+    config.roles.bootstrapAdminObjectIds.includes(subject.entraObjectId)
+  ) {
+    throw new RoleMutationError(
+      "This bootstrap administrator is configured by the environment and cannot be removed here.",
+      "BOOTSTRAP_ADMIN",
+    );
+  }
+  if (input.role === "ADMIN") {
+    await db.authorizationInvariant.upsert({
+      where: { id: "active-admin" },
+      create: { id: "active-admin", version: 1 },
+      update: { version: { increment: 1 } },
+    });
+    const activeAdmins = await db.globalRoleAssignment.count({
+      where: { role: "ADMIN", revokedAt: null, user: { status: "ACTIVE" } },
+    });
+    const subjectIsActiveAdmin = await db.globalRoleAssignment.count({
+      where: {
+        userId: input.userId,
+        role: "ADMIN",
+        revokedAt: null,
+        user: { status: "ACTIVE" },
+      },
+    });
+    if (subjectIsActiveAdmin && activeAdmins <= 1) {
+      throw new RoleMutationError(
+        "The league must retain at least one active administrator.",
+        "LAST_ADMIN",
+      );
+    }
+  }
   const result = await db.globalRoleAssignment.updateMany({
     where: { userId: input.userId, role: input.role, revokedAt: null },
     data: { revokedAt: new Date(), revokedById: input.actorId },
   });
   return result.count > 0;
+}
+
+const SERIALIZATION_RETRIES = 3;
+
+export async function withSerializedRoleMutation<T>(
+  db: PrismaClient,
+  operation: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  for (let attempt = 0; attempt < SERIALIZATION_RETRIES; attempt += 1) {
+    try {
+      return await db.$transaction(operation, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
+    } catch (error) {
+      if (error instanceof RoleMutationError) throw error;
+      const retryable =
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        (error.code === "P1008" || error.code === "P2034");
+      if (!retryable) throw error;
+      if (attempt + 1 === SERIALIZATION_RETRIES) {
+        throw new RoleMutationError(
+          "Another administrator change won the race. Refresh and try again.",
+          "CONFLICT",
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25 * (attempt + 1)));
+    }
+  }
+  throw new RoleMutationError(
+    "Another administrator change won the race. Refresh and try again.",
+    "CONFLICT",
+  );
 }
 
 export async function setActiveTeamMembership(

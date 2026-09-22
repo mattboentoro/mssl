@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
-import { Badge, Button, Card, EmptyState, PageHeader } from "@/components/ui";
+import { ActionForm, SubmitButton } from "@/components/admin-forms";
+import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
 import { ASSIGNABLE_ROLES } from "@/lib/enums";
 import { prisma } from "@/lib/prisma";
 
@@ -11,7 +12,17 @@ export const dynamic = "force-dynamic";
 
 export default async function UsersPage() {
   const users = await prisma.appUser.findMany({
-    include: { rolesAssigned: { where: { revokedAt: null }, orderBy: { role: "asc" } } },
+    include: {
+      rolesAssigned: { where: { revokedAt: null }, orderBy: { role: "asc" } },
+      memberships: {
+        where: { status: "ACTIVE", endedAt: null },
+        include: { team: { select: { name: true } }, season: { select: { name: true } } },
+      },
+      captainAssignments: {
+        where: { status: "ACTIVE", revokedAt: null, seasonId: { not: null } },
+        include: { team: { select: { name: true } }, season: { select: { name: true } } },
+      },
+    },
     orderBy: [{ displayName: "asc" }, { normalizedEmail: "asc" }],
   });
 
@@ -37,10 +48,21 @@ export default async function UsersPage() {
                   </Badge>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  <Badge>viewer</Badge>
+                  {user.memberships.map((membership) => (
+                    <Badge key={membership.id}>
+                      player · {membership.team.name} · {membership.season.name}
+                    </Badge>
+                  ))}
+                  {user.captainAssignments.map((captain) => (
+                    <Badge key={captain.id} tone="brand">
+                      captain · {captain.team.name} · {captain.season?.name ?? "all seasons"}
+                    </Badge>
+                  ))}
                   {ASSIGNABLE_ROLES.map((role) => {
                     const hasRole = assigned.has(role);
                     return (
-                      <form action={mutateRoleAction} key={role}>
+                      <ActionForm action={mutateRoleAction} key={role} className="inline-block">
                         <input type="hidden" name="userId" value={user.id} />
                         <input type="hidden" name="role" value={role} />
                         <input
@@ -48,10 +70,17 @@ export default async function UsersPage() {
                           name="operation"
                           value={hasRole ? "revoke" : "assign"}
                         />
-                        <Button type="submit" variant={hasRole ? "secondary" : "ghost"}>
+                        <SubmitButton
+                          variant={hasRole ? "danger" : "secondary"}
+                          confirm={
+                            hasRole
+                              ? `Remove only the ${role} role from ${user.displayName}? Their other roles and team assignments will remain.`
+                              : `Add the ${role} role to ${user.displayName} without changing their other roles?`
+                          }
+                        >
                           {hasRole ? `Remove ${role}` : `Add ${role}`}
-                        </Button>
-                      </form>
+                        </SubmitButton>
+                      </ActionForm>
                     );
                   })}
                 </div>

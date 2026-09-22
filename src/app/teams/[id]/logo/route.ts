@@ -1,15 +1,8 @@
 import { config } from "@/lib/config";
 import { prisma } from "@/lib/prisma";
-import {
-  getTeamLogoStorage,
-  type TeamLogoContentType,
-} from "@/lib/team-logo-storage";
+import { getTeamLogoStorage, type TeamLogoContentType } from "@/lib/team-logo-storage";
 
-const allowedContentTypes = new Set<TeamLogoContentType>([
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-]);
+const allowedContentTypes = new Set<TeamLogoContentType>(["image/png", "image/jpeg", "image/webp"]);
 
 export async function GET(
   request: Request,

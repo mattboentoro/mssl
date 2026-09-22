@@ -296,24 +296,9 @@ describe("Captain result proposals", () => {
     expect(await prisma.notification.count({ where: { type: "CAPTAIN_RESULT_APPROVED" } })).toBe(2);
   });
 
-  it("rejects league review without publishing and protects referee/report races", async () => {
+  it("keeps an ineligible proposal rejectable after approval fails", async () => {
     const fx = await fixture();
-    let proposal = await proposed(fx);
-    await respondToCaptainResult(prisma, {
-      proposalId: proposal.id,
-      teamId: fx.away.id,
-      approve: true,
-      actor: fx.actor(fx.awayCaptain),
-    });
-    await reviewCaptainResult(prisma, {
-      proposalId: proposal.id,
-      approve: false,
-      note: "Needs evidence",
-      actor: fx.actor(fx.admin),
-    });
-    expect(await prisma.gameReport.findUnique({ where: { matchId: fx.match.id } })).toBeNull();
-
-    proposal = await proposed(fx);
+    const proposal = await proposed(fx);
     await respondToCaptainResult(prisma, {
       proposalId: proposal.id,
       teamId: fx.away.id,
@@ -335,6 +320,29 @@ describe("Captain result proposals", () => {
       }),
     ).rejects.toMatchObject({ code: "NOT_ELIGIBLE" });
     expect(await prisma.gameReport.findUnique({ where: { matchId: fx.match.id } })).toBeNull();
+
+    await reviewCaptainResult(prisma, {
+      proposalId: proposal.id,
+      approve: false,
+      note: "A referee is now responsible for the official report.",
+      actor: fx.actor(fx.admin),
+    });
+    expect(
+      await prisma.captainResultProposal.findUniqueOrThrow({ where: { id: proposal.id } }),
+    ).toMatchObject({
+      status: "REJECTED_ADMIN",
+      reviewNote: "A referee is now responsible for the official report.",
+    });
+    expect(
+      await prisma.auditLog.count({
+        where: { action: "captain_result.reject_admin", entityId: proposal.id },
+      }),
+    ).toBe(1);
+    expect(
+      await prisma.notification.count({
+        where: { type: "CAPTAIN_RESULT_REJECTED", href: `/captain/results/${fx.match.id}` },
+      }),
+    ).toBe(2);
   });
 
   it("invalidates open proposals when an Admin enters an official result", async () => {

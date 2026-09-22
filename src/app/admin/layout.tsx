@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 
 const TABS: AdminTab[] = [
   { href: "/admin", label: "Overview" },
+  { href: "/admin/workflows", label: "Reviews" },
   { href: "/admin/matches", label: "Matches" },
   { href: "/admin/league", label: "League setup" },
   { href: "/admin/standings", label: "Standings" },
@@ -15,6 +16,7 @@ const TABS: AdminTab[] = [
   { href: "/admin/free-agents", label: "Free agents" },
   { href: "/admin/roster", label: "Rosters" },
   { href: "/admin/users", label: "Users & roles" },
+  { href: "/admin/ratings", label: "Ratings" },
   { href: "/admin/content", label: "Content" },
   { href: "/admin/audit", label: "Audit log" },
 ];

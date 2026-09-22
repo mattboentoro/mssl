@@ -8,11 +8,7 @@ import {
   validateTeamLogo,
   type TeamLogoStorage,
 } from "@/lib/team-logo-storage";
-import {
-  deleteTeamLogo,
-  replaceTeamLogo,
-  type TeamLogoPersistence,
-} from "@/lib/team-profile";
+import { deleteTeamLogo, replaceTeamLogo, type TeamLogoPersistence } from "@/lib/team-profile";
 
 vi.mock("server-only", () => ({}));
 

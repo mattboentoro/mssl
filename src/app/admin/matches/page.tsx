@@ -45,6 +45,11 @@ export default async function AdminMatchesPage({
   searchParams: Promise<Params>;
 }) {
   const params = await searchParams;
+  const workflowReviewCount = await prisma.$transaction([
+    prisma.rescheduleRequest.count({ where: { status: "PENDING_ADMIN" } }),
+    prisma.captainResultProposal.count({ where: { status: "PENDING_ADMIN" } }),
+    prisma.scoreAppeal.count({ where: { status: "PENDING" } }),
+  ]);
   const seasons = await prisma.season.findMany({ orderBy: { startsOn: "desc" } });
   const active = await getActiveSeason();
   const seasonId = params.season ?? active?.id ?? seasons[0]?.id;
@@ -202,6 +207,9 @@ export default async function AdminMatchesPage({
               : `Fixtures (${matches.length})`}
           </h2>
           <div className="flex flex-wrap items-center gap-2">
+            <Link href="/admin/workflows" className={outlineButtonClass}>
+              Reviews ({workflowReviewCount.reduce((sum, count) => sum + count, 0)})
+            </Link>
             <FormDialog
               trigger="Add fixture"
               title="Add a fixture"

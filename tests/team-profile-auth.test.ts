@@ -110,9 +110,11 @@ describe("team profile authorization", () => {
     await expect(updateTeamProfileAction({}, form(second.id))).resolves.toMatchObject({
       error: "Captain access for this team and season is required.",
     });
-    await expect(prisma.team.findUniqueOrThrow({ where: { id: first.id } })).resolves.toMatchObject({
-      name: "Renamed Club",
-    });
+    await expect(prisma.team.findUniqueOrThrow({ where: { id: first.id } })).resolves.toMatchObject(
+      {
+        name: "Renamed Club",
+      },
+    );
   });
 
   it("allows an Admin to update any team without changing its slug", async () => {
@@ -132,7 +134,9 @@ describe("team profile authorization", () => {
     await expect(updateTeamProfileAction({}, form(second.id))).resolves.toMatchObject({
       ok: "Team profile updated.",
     });
-    await expect(prisma.team.findUniqueOrThrow({ where: { id: second.id } })).resolves.toMatchObject({
+    await expect(
+      prisma.team.findUniqueOrThrow({ where: { id: second.id } }),
+    ).resolves.toMatchObject({
       name: "Renamed Club",
       slug: "profile-second",
     });
