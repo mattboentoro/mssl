@@ -56,7 +56,7 @@ export function BackLink({ href, children }: { href: string; children: ReactNode
   return (
     <Link
       href={href}
-      className="text-muted hover:text-foreground inline-flex items-center gap-1 text-sm font-medium transition"
+      className="bg-surface border-subtle text-muted hover:bg-surface-muted hover:text-foreground inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-semibold shadow-sm transition"
     >
       <span aria-hidden>&larr;</span>
       {children}
