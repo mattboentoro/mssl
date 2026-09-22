@@ -53,110 +53,70 @@ interface FixtureOption {
   label: string;
 }
 
+export interface RescheduleSlotOption {
+  id: string;
+  label: string;
+}
+
 export function RescheduleProposalForm({
-  fixtures,
-  selectedMatchId,
-  selectedTeamId,
+  fixture,
+  slots,
 }: {
-  fixtures: FixtureOption[];
-  selectedMatchId?: string;
-  selectedTeamId?: string;
+  fixture: FixtureOption;
+  slots: RescheduleSlotOption[];
 }) {
   const [state, action] = useActionState(proposeRescheduleAction, {});
-  const selected =
-    fixtures.find(
-      (fixture) =>
-        (!selectedMatchId || fixture.id === selectedMatchId) &&
-        (!selectedTeamId || fixture.requestingTeamId === selectedTeamId),
-    ) ?? fixtures[0];
 
   return (
     <form action={action} className="space-y-4">
       <Feedback state={state} />
-      <div>
-        <label className={labelClass} htmlFor="reschedule-fixture">
-          Fixture
-        </label>
-        <select
-          id="reschedule-fixture"
-          name="matchTeam"
-          defaultValue={selected ? `${selected.id}|${selected.requestingTeamId}` : ""}
-          className={inputClass}
-          required
-          onChange={(event) => {
-            const [matchId, teamId] = event.currentTarget.value.split("|");
-            const form = event.currentTarget.form;
-            if (form) {
-              (form.elements.namedItem("matchId") as HTMLInputElement).value = matchId ?? "";
-              (form.elements.namedItem("requestingTeamId") as HTMLInputElement).value =
-                teamId ?? "";
-            }
-          }}
-        >
-          {fixtures.map((fixture) => (
-            <option
-              key={`${fixture.id}-${fixture.requestingTeamId}`}
-              value={`${fixture.id}|${fixture.requestingTeamId}`}
-            >
-              {fixture.label}
-            </option>
-          ))}
-        </select>
-        <input type="hidden" name="matchId" defaultValue={selected?.id ?? ""} />
-        <input
-          type="hidden"
-          name="requestingTeamId"
-          defaultValue={selected?.requestingTeamId ?? ""}
-        />
-      </div>
-      <RescheduleFields />
+      <p className="text-sm font-medium">{fixture.label}</p>
+      <input type="hidden" name="matchId" value={fixture.id} />
+      <input type="hidden" name="requestingTeamId" value={fixture.requestingTeamId} />
+      <RescheduleFields slots={slots} />
       <Submit>Send proposal</Submit>
     </form>
   );
 }
 
 function RescheduleFields({
-  kickoff,
-  venue,
+  slots,
+  selectedSlotId,
   reason,
 }: {
-  kickoff?: string;
-  venue?: string | null;
+  slots: RescheduleSlotOption[];
+  selectedSlotId?: string;
   reason?: string;
 }) {
   return (
     <>
       <div>
-        <label className={labelClass} htmlFor={`proposed-kickoff-${kickoff ?? "new"}`}>
-          Proposed kickoff (required)
+        <label className={labelClass} htmlFor={`reschedule-slot-${selectedSlotId ?? "new"}`}>
+          Available date, time, and venue (required)
         </label>
-        <input
-          id={`proposed-kickoff-${kickoff ?? "new"}`}
-          type="datetime-local"
-          name="proposedKickoffAt"
-          defaultValue={kickoff}
+        <select
+          id={`reschedule-slot-${selectedSlotId ?? "new"}`}
+          name="slotId"
+          defaultValue={selectedSlotId ?? ""}
           className={inputClass}
           required
-        />
+        >
+          <option value="" disabled>
+            Select an available slot
+          </option>
+          {slots.map((slot) => (
+            <option key={slot.id} value={slot.id}>
+              {slot.label}
+            </option>
+          ))}
+        </select>
       </div>
       <div>
-        <label className={labelClass} htmlFor={`proposed-venue-${kickoff ?? "new"}`}>
-          Proposed venue (optional)
-        </label>
-        <input
-          id={`proposed-venue-${kickoff ?? "new"}`}
-          name="proposedVenueName"
-          defaultValue={venue ?? ""}
-          maxLength={300}
-          className={inputClass}
-        />
-      </div>
-      <div>
-        <label className={labelClass} htmlFor={`reschedule-reason-${kickoff ?? "new"}`}>
+        <label className={labelClass} htmlFor={`reschedule-reason-${selectedSlotId ?? "new"}`}>
           Rationale (required)
         </label>
         <textarea
-          id={`reschedule-reason-${kickoff ?? "new"}`}
+          id={`reschedule-reason-${selectedSlotId ?? "new"}`}
           name="reason"
           defaultValue={reason}
           maxLength={MAX_RESCHEDULE_REASON_LENGTH}
@@ -171,13 +131,13 @@ function RescheduleFields({
 
 export function RescheduleRevisionForm({
   requestId,
-  kickoff,
-  venue,
+  slots,
+  selectedSlotId,
   reason,
 }: {
   requestId: string;
-  kickoff: string;
-  venue: string | null;
+  slots: RescheduleSlotOption[];
+  selectedSlotId?: string;
   reason: string;
 }) {
   const [state, action] = useActionState(reviseRescheduleAction, {});
@@ -185,7 +145,7 @@ export function RescheduleRevisionForm({
     <form action={action} className="mt-4 space-y-3 border-t border-current/10 pt-4">
       <input type="hidden" name="requestId" value={requestId} />
       <Feedback state={state} />
-      <RescheduleFields kickoff={kickoff} venue={venue} reason={reason} />
+      <RescheduleFields slots={slots} selectedSlotId={selectedSlotId} reason={reason} />
       <Submit variant="secondary">Revise proposal</Submit>
     </form>
   );

@@ -13,41 +13,50 @@ import { pointsPerGame, type PrimaryMetric, type StandingsRow } from "@/lib/stan
 */
 const ASSIGNMENT_ONLY_STATUSES: readonly MatchListItem["status"][] = ["SCHEDULED", "ASSIGNED"];
 
-export function MatchRow({ match }: { match: MatchListItem }) {
+export function MatchRow({ match, action }: { match: MatchListItem; action?: React.ReactNode }) {
   const score = scoreText(match.report);
 
   return (
     <Card as="li" className="p-4">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-        <span className="text-muted">{formatDateTime(match.kickoffAt)}</span>
-        <Badge tone="neutral">{match.division.name}</Badge>
-        <Badge tone="neutral">MW {match.matchweek}</Badge>
-        {ASSIGNMENT_ONLY_STATUSES.includes(match.status) ? null : (
-          <MatchStatusBadge match={match} />
-        )}
-        {match.report?.status === "DISPUTED" ? <Badge tone="danger">Disputed</Badge> : null}
-      </div>
+      <div className="flex items-start gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+            <span className="text-muted">{formatDateTime(match.kickoffAt)}</span>
+            <Badge tone="neutral">{match.division.name}</Badge>
+            <Badge tone="neutral">MW {match.matchweek}</Badge>
+            {ASSIGNMENT_ONLY_STATUSES.includes(match.status) ? null : (
+              <MatchStatusBadge match={match} />
+            )}
+            {match.report?.status === "DISPUTED" ? <Badge tone="danger">Disputed</Badge> : null}
+          </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
-        <TeamCell
-          team={match.homeTeam}
-          kit={match.homeKit}
-          forfeited={Boolean(match.report?.homeForfeit)}
-        />
-        {score ? (
-          <span className="text-xl font-bold tabular-nums">{score}</span>
-        ) : (
-          <span className="text-muted text-sm font-semibold">vs</span>
-        )}
-        <TeamCell
-          team={match.awayTeam}
-          kit={match.awayKit}
-          forfeited={Boolean(match.report?.awayForfeit)}
-        />
-      </div>
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <TeamCell
+              team={match.homeTeam}
+              kit={match.homeKit}
+              forfeited={Boolean(match.report?.homeForfeit)}
+            />
+            {score ? (
+              <span className="text-xl font-bold tabular-nums">{score}</span>
+            ) : (
+              <span className="text-muted text-sm font-semibold">vs</span>
+            )}
+            <TeamCell
+              team={match.awayTeam}
+              kit={match.awayKit}
+              forfeited={Boolean(match.report?.awayForfeit)}
+            />
+          </div>
 
-      <div className="text-muted mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-        {match.venueName ? <span>&#128205; {match.venueName}</span> : <span>&#128205; TBD</span>}
+          <div className="text-muted mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+            {match.venueName ? (
+              <span>&#128205; {match.venueName}</span>
+            ) : (
+              <span>&#128205; TBD</span>
+            )}
+          </div>
+        </div>
+        {action ? <div className="shrink-0">{action}</div> : null}
       </div>
     </Card>
   );
@@ -85,11 +94,17 @@ function TeamCell({
   );
 }
 
-export function MatchList({ matches }: { matches: MatchListItem[] }) {
+export function MatchList({
+  matches,
+  actions,
+}: {
+  matches: MatchListItem[];
+  actions?: Record<string, React.ReactNode>;
+}) {
   return (
     <ul className="grid gap-3">
       {matches.map((match) => (
-        <MatchRow key={match.id} match={match} />
+        <MatchRow key={match.id} match={match} action={actions?.[match.id]} />
       ))}
     </ul>
   );

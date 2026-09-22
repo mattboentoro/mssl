@@ -4,7 +4,6 @@ import Link from "next/link";
 import { CalendarViewToggle, FixtureCalendar, parseView } from "@/components/fixture-calendar";
 import { MatchList } from "@/components/match-display";
 import { ButtonLink, Card, EmptyState, PageHeader, inputClass, labelClass } from "@/components/ui";
-import { getCurrentUser } from "@/lib/authz";
 import { parseMonthValue, shiftMonth } from "@/lib/dates";
 import { compareMatchweeks } from "@/lib/matchweek";
 import { getDivisions, getSeasons, listMatches, resolveSeason } from "@/lib/queries";
@@ -33,11 +32,7 @@ export default async function SchedulePage({
   searchParams: Promise<ScheduleParams>;
 }) {
   const params = await searchParams;
-  const [seasons, season, currentUser] = await Promise.all([
-    getSeasons(),
-    resolveSeason(params.season),
-    getCurrentUser(),
-  ]);
+  const [seasons, season] = await Promise.all([getSeasons(), resolveSeason(params.season)]);
   // Anonymous visitors get fixtures and results; who has been appointed to
   // referee them is only shown once you are signed in.
 
@@ -124,9 +119,6 @@ export default async function SchedulePage({
         description="Kickoff times are shown in Redmond time (Pacific). Subscribe to the calendar feed to get fixtures in Outlook."
         actions={
           <>
-            {currentUser?.isCaptain ? (
-              <ButtonLink href="/captain/reschedules">Request reschedule</ButtonLink>
-            ) : null}
             <ButtonLink href={`/schedule/calendar.ics?${icsQuery.toString()}`} variant="secondary">
               Export .ics
             </ButtonLink>

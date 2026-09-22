@@ -20,6 +20,7 @@ const PROPOSED_KICKOFF = new Date("2026-10-17T19:00:00Z");
 async function resetDatabase() {
   await prisma.notification.deleteMany();
   await prisma.rescheduleRequest.deleteMany();
+  await prisma.rescheduleSlot.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.gameReport.deleteMany();
   await prisma.match.deleteMany();
@@ -154,15 +155,22 @@ async function fixture(options: { assigned?: boolean } = {}) {
 }
 
 async function proposed(fx: Awaited<ReturnType<typeof fixture>>) {
+  const selectedSlot = await slot();
   return proposeReschedule(prisma, {
     matchId: fx.match.id,
     requestingTeamId: fx.home.id,
-    proposedKickoffAt: PROPOSED_KICKOFF,
-    proposedVenueName: "New Field",
+    slotId: selectedSlot.id,
     reason: "The team has a mandatory company event.",
     actor: fx.actor(fx.homeCaptain),
     now: NOW,
   });
+}
+
+async function slot(kickoffAt = PROPOSED_KICKOFF, venueName = "New Field") {
+  return (
+    (await prisma.rescheduleSlot.findFirst({ where: { kickoffAt, venueName } })) ??
+    prisma.rescheduleSlot.create({ data: { kickoffAt, venueName } })
+  );
 }
 
 function clientWithTransitionRace(): PrismaClient {
@@ -213,6 +221,8 @@ describe("Captain reschedule requests", () => {
       originalVenueName: "Original Field",
       expectedMatchVersion: 7,
       openMatchKey: fx.match.id,
+      activeSlotKey: request.slotId,
+      legacySlotExempt: false,
       proposedKickoffAt: PROPOSED_KICKOFF,
       proposedVenueName: "New Field",
     });
@@ -233,11 +243,12 @@ describe("Captain reschedule requests", () => {
 
   it("rejects outsiders, non-participants, past/final fixtures, missing rationale, and duplicate open requests", async () => {
     const fx = await fixture();
+    const selectedSlot = await slot();
     await expect(
       proposeReschedule(prisma, {
         matchId: fx.match.id,
         requestingTeamId: fx.home.id,
-        proposedKickoffAt: PROPOSED_KICKOFF,
+        slotId: selectedSlot.id,
         reason: "No authority",
         actor: fx.actor(fx.otherCaptain),
         now: NOW,
@@ -247,7 +258,7 @@ describe("Captain reschedule requests", () => {
       proposeReschedule(prisma, {
         matchId: fx.match.id,
         requestingTeamId: fx.other.id,
-        proposedKickoffAt: PROPOSED_KICKOFF,
+        slotId: selectedSlot.id,
         reason: "Not participating",
         actor: fx.actor(fx.otherCaptain),
         now: NOW,
@@ -257,7 +268,7 @@ describe("Captain reschedule requests", () => {
       proposeReschedule(prisma, {
         matchId: fx.match.id,
         requestingTeamId: fx.home.id,
-        proposedKickoffAt: PROPOSED_KICKOFF,
+        slotId: selectedSlot.id,
         reason: " ",
         actor: fx.actor(fx.homeCaptain),
         now: NOW,
@@ -278,11 +289,12 @@ describe("Captain reschedule requests", () => {
     const fx = await fixture();
     const request = await proposed(fx);
     const revisedKickoff = new Date("2026-10-24T20:00:00Z");
+    const revisedSlot = await slot(revisedKickoff, "Revised Field");
 
     await expect(
       reviseReschedule(prisma, {
         requestId: request.id,
-        proposedKickoffAt: revisedKickoff,
+        slotId: revisedSlot.id,
         reason: "A revised rationale.",
         actor: fx.actor(fx.awayCaptain),
         now: NOW,
@@ -290,15 +302,14 @@ describe("Captain reschedule requests", () => {
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
     const revised = await reviseReschedule(prisma, {
       requestId: request.id,
-      proposedKickoffAt: revisedKickoff,
-      proposedVenueName: "",
+      slotId: revisedSlot.id,
       reason: "A revised rationale.",
       actor: fx.actor(fx.homeCaptain),
       now: NOW,
     });
     expect(revised).toMatchObject({
       proposedKickoffAt: revisedKickoff,
-      proposedVenueName: null,
+      proposedVenueName: "Revised Field",
       originalKickoffAt: ORIGINAL_KICKOFF,
       expectedMatchVersion: 7,
     });
@@ -308,9 +319,12 @@ describe("Captain reschedule requests", () => {
     });
     expect(cancelled).toMatchObject({ status: "CANCELLED", openMatchKey: null });
     await expect(
+      prisma.rescheduleSlot.findUniqueOrThrow({ where: { id: revisedSlot.id } }),
+    ).resolves.toMatchObject({ status: "AVAILABLE" });
+    await expect(
       reviseReschedule(prisma, {
         requestId: request.id,
-        proposedKickoffAt: PROPOSED_KICKOFF,
+        slotId: revisedSlot.id,
         reason: "Too late.",
         actor: fx.actor(fx.homeCaptain),
         now: NOW,
@@ -417,6 +431,9 @@ describe("Captain reschedule requests", () => {
       adminReviewedById: fx.admin.id,
       adminReviewNote: "Facilities confirmed.",
     });
+    await expect(
+      prisma.rescheduleSlot.findUniqueOrThrow({ where: { id: request.slotId! } }),
+    ).resolves.toMatchObject({ status: "USED" });
     const match = await prisma.match.findUniqueOrThrow({ where: { id: fx.match.id } });
     expect(match).toMatchObject({
       kickoffAt: PROPOSED_KICKOFF,
@@ -443,12 +460,13 @@ describe("Captain reschedule requests", () => {
     ).resolves.toMatchObject({ actorRole: "admin", entityId: request.id });
   });
 
-  it("keeps the existing venue when the optional venue proposal is blank", async () => {
+  it("uses the selected slot venue rather than accepting a free-form venue", async () => {
     const fx = await fixture();
+    const selectedSlot = await slot(PROPOSED_KICKOFF, "League Reserved Field");
     const request = await proposeReschedule(prisma, {
       matchId: fx.match.id,
       requestingTeamId: fx.home.id,
-      proposedKickoffAt: PROPOSED_KICKOFF,
+      slotId: selectedSlot.id,
       reason: "Only the kickoff needs to change.",
       actor: fx.actor(fx.homeCaptain),
       now: NOW,
@@ -468,7 +486,7 @@ describe("Captain reschedule requests", () => {
       prisma.match.findUniqueOrThrow({ where: { id: fx.match.id } }),
     ).resolves.toMatchObject({
       kickoffAt: PROPOSED_KICKOFF,
-      venueName: "Original Field",
+      venueName: "League Reserved Field",
     });
   });
 
@@ -534,6 +552,9 @@ describe("Captain reschedule requests", () => {
       adminReviewedById: fx.admin.id,
     });
     await expect(
+      prisma.rescheduleSlot.findUniqueOrThrow({ where: { id: request.slotId! } }),
+    ).resolves.toMatchObject({ status: "AVAILABLE" });
+    await expect(
       prisma.match.findUniqueOrThrow({ where: { id: fx.match.id } }),
     ).resolves.toMatchObject({
       kickoffAt: ORIGINAL_KICKOFF,
@@ -590,7 +611,7 @@ describe("Captain reschedule requests", () => {
       (db: PrismaClient) =>
         reviseReschedule(db, {
           requestId: request.id,
-          proposedKickoffAt: new Date("2026-10-24T20:00:00Z"),
+          slotId: request.slotId!,
           reason: "Racing revision.",
           actor: fx.actor(fx.homeCaptain),
           now: NOW,
@@ -622,9 +643,141 @@ describe("Captain reschedule requests", () => {
     }
   });
 
+  it("enforces the 48-hour cutoff at submission even if a page was opened earlier", async () => {
+    const fx = await fixture();
+    const selectedSlot = await slot();
+    const stalePageOpenedAt = new Date("2026-10-08T17:00:00Z");
+    const submittedAt = new Date("2026-10-08T18:00:00Z");
+
+    expect(ORIGINAL_KICKOFF.getTime() - stalePageOpenedAt.getTime()).toBeGreaterThan(
+      48 * 60 * 60 * 1_000,
+    );
+    await expect(
+      proposeReschedule(prisma, {
+        matchId: fx.match.id,
+        requestingTeamId: fx.home.id,
+        slotId: selectedSlot.id,
+        reason: "This form was left open across the cutoff.",
+        actor: fx.actor(fx.homeCaptain),
+        now: submittedAt,
+      }),
+    ).rejects.toMatchObject({ code: "CUTOFF_REACHED" });
+    await expect(prisma.rescheduleRequest.count()).resolves.toBe(0);
+  });
+
+  it("blocks late opponent approval but still allows the request to be rejected and released", async () => {
+    const fx = await fixture();
+    const request = await proposed(fx);
+    const cutoff = new Date(ORIGINAL_KICKOFF.getTime() - 48 * 60 * 60 * 1_000);
+
+    await expect(
+      respondToReschedule(prisma, {
+        requestId: request.id,
+        approve: true,
+        actor: fx.actor(fx.awayCaptain),
+        now: cutoff,
+      }),
+    ).rejects.toMatchObject({ code: "CUTOFF_REACHED" });
+    await expect(
+      respondToReschedule(prisma, {
+        requestId: request.id,
+        approve: false,
+        responseNote: "The request reached the league cutoff.",
+        actor: fx.actor(fx.awayCaptain),
+        now: cutoff,
+      }),
+    ).resolves.toMatchObject({ status: "REJECTED_OPPONENT", activeSlotKey: null });
+    await expect(
+      prisma.rescheduleSlot.findUniqueOrThrow({ where: { id: request.slotId! } }),
+    ).resolves.toMatchObject({ status: "AVAILABLE" });
+  });
+
+  it("allows an agreed pre-slot request to complete through the explicit legacy path", async () => {
+    const fx = await fixture();
+    const request = await prisma.rescheduleRequest.create({
+      data: {
+        matchId: fx.match.id,
+        requestingTeamId: fx.home.id,
+        requestedById: fx.homeCaptain.id,
+        proposedKickoffAt: PROPOSED_KICKOFF,
+        proposedVenueName: "Legacy Agreed Field",
+        reason: "This request predates managed availability.",
+        originalKickoffAt: fx.match.kickoffAt,
+        originalVenueName: fx.match.venueName,
+        expectedMatchVersion: fx.match.version,
+        openMatchKey: fx.match.id,
+        legacySlotExempt: true,
+        status: "PENDING_ADMIN",
+        respondedById: fx.awayCaptain.id,
+        respondedAt: NOW,
+      },
+    });
+
+    await expect(
+      reviewRescheduleAsAdmin(prisma, {
+        requestId: request.id,
+        approve: true,
+        reviewNote: "Honor the already-agreed legacy request.",
+        actor: fx.actor(fx.admin, true),
+        now: NOW,
+      }),
+    ).resolves.toMatchObject({ status: "APPROVED", slotId: null });
+    await expect(
+      prisma.match.findUniqueOrThrow({ where: { id: fx.match.id } }),
+    ).resolves.toMatchObject({
+      kickoffAt: PROPOSED_KICKOFF,
+      venueName: "Legacy Agreed Field",
+    });
+  });
+
+  it("reserves a slot for only one active request and releases it after cancellation", async () => {
+    const fx = await fixture();
+    const selectedSlot = await slot();
+    const first = await proposeReschedule(prisma, {
+      matchId: fx.match.id,
+      requestingTeamId: fx.home.id,
+      slotId: selectedSlot.id,
+      reason: "Reserve the league slot.",
+      actor: fx.actor(fx.homeCaptain),
+      now: NOW,
+    });
+    const secondMatch = await prisma.match.create({
+      data: {
+        seasonId: fx.season.id,
+        divisionId: fx.match.divisionId,
+        homeTeamId: fx.home.id,
+        awayTeamId: fx.away.id,
+        kickoffAt: new Date("2026-10-11T18:00:00Z"),
+        venueName: "Original Field 2",
+        matchweek: "6",
+      },
+    });
+    const secondProposal = {
+      matchId: secondMatch.id,
+      requestingTeamId: fx.away.id,
+      slotId: selectedSlot.id,
+      reason: "Try the same league slot.",
+      actor: fx.actor(fx.awayCaptain),
+      now: NOW,
+    };
+
+    await expect(proposeReschedule(prisma, secondProposal)).rejects.toMatchObject({
+      code: "SLOT_UNAVAILABLE",
+    });
+    await cancelReschedule(prisma, {
+      requestId: first.id,
+      actor: fx.actor(fx.homeCaptain),
+    });
+    await expect(proposeReschedule(prisma, secondProposal)).resolves.toMatchObject({
+      matchId: secondMatch.id,
+      activeSlotKey: selectedSlot.id,
+    });
+  });
+
   it("migration converts and backfills a legacy pending request", async () => {
     const fx = await fixture();
     await prisma.$executeRawUnsafe('DROP TABLE "RescheduleRequest"');
+    await prisma.$executeRawUnsafe('DROP TABLE "RescheduleSlot"');
     await prisma.$executeRawUnsafe(`
         CREATE TABLE "RescheduleRequest" (
           "id" TEXT NOT NULL PRIMARY KEY,
@@ -668,6 +821,38 @@ describe("Captain reschedule requests", () => {
       .filter(Boolean)) {
       await prisma.$executeRawUnsafe(statement);
     }
+    const slotMigration = fs.readFileSync(
+      path.join(
+        process.cwd(),
+        "prisma",
+        "migrations",
+        "20260922190000_reschedule_slots",
+        "migration.sql",
+      ),
+      "utf8",
+    );
+    for (const statement of slotMigration
+      .split(";")
+      .map((part) => part.trim())
+      .filter(Boolean)) {
+      await prisma.$executeRawUnsafe(statement);
+    }
+    const compatibilityMigration = fs.readFileSync(
+      path.join(
+        process.cwd(),
+        "prisma",
+        "migrations",
+        "20260922191000_reschedule_legacy_compat",
+        "migration.sql",
+      ),
+      "utf8",
+    );
+    for (const statement of compatibilityMigration
+      .split(";")
+      .map((part) => part.trim())
+      .filter(Boolean)) {
+      await prisma.$executeRawUnsafe(statement);
+    }
 
     await expect(
       prisma.rescheduleRequest.findUniqueOrThrow({ where: { id: "legacy-request" } }),
@@ -677,6 +862,7 @@ describe("Captain reschedule requests", () => {
       originalVenueName: "Original Field",
       expectedMatchVersion: 7,
       openMatchKey: fx.match.id,
+      legacySlotExempt: true,
     });
 
     const defaulted = await prisma.rescheduleRequest.create({

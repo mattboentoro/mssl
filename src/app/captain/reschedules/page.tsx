@@ -9,7 +9,7 @@ import {
 } from "@/components/reschedule-forms";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
 import { AuthzError, requireCaptain } from "@/lib/authz";
-import { formatDateTime, toDateTimeInputValue } from "@/lib/dates";
+import { formatDateTime } from "@/lib/dates";
 import { RESCHEDULE_STATUS_LABELS, type RescheduleStatus } from "@/lib/enums";
 import { prisma } from "@/lib/prisma";
 import { listReschedulesForCaptain, OPEN_RESCHEDULE_STATUSES } from "@/lib/reschedules";
@@ -33,7 +33,7 @@ export default async function CaptainReschedulesPage({
     throw error;
   }
   const params = await searchParams;
-  const { eligibleMatches, requests, contexts } = await listReschedulesForCaptain(
+  const { eligibleMatches, requests, contexts, availableSlots } = await listReschedulesForCaptain(
     prisma,
     user.appUserId,
   );
@@ -61,29 +61,42 @@ export default async function CaptainReschedulesPage({
         label: `${formatDateTime(match.kickoffAt)} — ${match.homeTeam.name} v ${match.awayTeam.name}`,
       })),
   );
+  const selectedFixture = fixtures.find(
+    (fixture) =>
+      fixture.id === params.match && (!params.team || fixture.requestingTeamId === params.team),
+  );
+  const slotOptions = availableSlots.map((slot) => ({
+    id: slot.id,
+    label: `${formatDateTime(slot.kickoffAt)} — ${slot.venueName}`,
+  }));
 
   return (
     <div>
       <PageHeader
         eyebrow="Captain"
         title="Fixture reschedules"
-        description="Propose a future kickoff for the opposing team. The fixture changes only after the opponent and league both approve."
+        description="Start from an upcoming fixture and choose a league-provided slot. Requests close 48 hours before the original kickoff."
       />
-      <Card className="mb-8 p-5">
-        <h2 className="mb-4 text-lg font-semibold">New proposal</h2>
-        {fixtures.length ? (
-          <RescheduleProposalForm
-            fixtures={fixtures}
-            selectedMatchId={params.match}
-            selectedTeamId={params.team}
-          />
-        ) : (
+      {selectedFixture ? (
+        <Card className="mb-8 p-5">
+          <h2 className="mb-4 text-lg font-semibold">New proposal</h2>
+          {slotOptions.length ? (
+            <RescheduleProposalForm fixture={selectedFixture} slots={slotOptions} />
+          ) : (
+            <EmptyState
+              title="No reschedule slots available"
+              hint="League administrators must add or release a future date, time, and venue."
+            />
+          )}
+        </Card>
+      ) : params.match ? (
+        <Card className="mb-8 p-5">
           <EmptyState
-            title="No eligible fixtures"
-            hint="Only future, unfinished fixtures without another open request are available."
+            title="This fixture cannot be rescheduled"
+            hint="It may be inside the 48-hour cutoff, already have a request, be completed, or belong to another team."
           />
-        )}
-      </Card>
+        </Card>
+      ) : null}
 
       <section aria-labelledby="reschedule-history">
         <h2 id="reschedule-history" className="mb-3 text-lg font-semibold">
@@ -173,8 +186,18 @@ export default async function CaptainReschedulesPage({
                       <>
                         <RescheduleRevisionForm
                           requestId={request.id}
-                          kickoff={toDateTimeInputValue(request.proposedKickoffAt)}
-                          venue={request.proposedVenueName}
+                          slots={[
+                            ...(request.slotId
+                              ? [
+                                  {
+                                    id: request.slotId,
+                                    label: `${formatDateTime(request.proposedKickoffAt)} — ${request.proposedVenueName ?? "TBD"} (current)`,
+                                  },
+                                ]
+                              : []),
+                            ...slotOptions.filter((slot) => slot.id !== request.slotId),
+                          ]}
+                          selectedSlotId={request.slotId ?? undefined}
                           reason={request.reason}
                         />
                         <RescheduleCancelForm requestId={request.id} />

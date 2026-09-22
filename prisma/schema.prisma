@@ -194,6 +194,7 @@ model AppUser {
   rescheduleRequests          RescheduleRequest[]     @relation("RescheduleRequester")
   rescheduleResponses         RescheduleRequest[]     @relation("RescheduleResponder")
   rescheduleAdminReviews      RescheduleRequest[]     @relation("RescheduleAdminReviewer")
+  rescheduleSlotsCreated      RescheduleSlot[]        @relation("RescheduleSlotCreator")
   resultProposals             CaptainResultProposal[] @relation("ResultProposer")
   resultProposalConfirmations CaptainResultProposal[] @relation("ResultConfirmer")
   scoreAppeals                ScoreAppeal[]           @relation("AppealSubmitter")
@@ -422,6 +423,9 @@ model RescheduleRequest {
   matchId              String
   requestingTeamId     String
   requestedById        String
+  slotId               String?
+  activeSlotKey        String?   @unique
+  legacySlotExempt     Boolean   @default(false)
   proposedKickoffAt    DateTime?
   proposedVenueName    String?
   reason               String
@@ -439,15 +443,35 @@ model RescheduleRequest {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
-  match           Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  requestingTeam  Team     @relation(fields: [requestingTeamId], references: [id], onDelete: Cascade)
-  requestedBy     AppUser  @relation("RescheduleRequester", fields: [requestedById], references: [id], onDelete: Cascade)
-  respondedBy     AppUser? @relation("RescheduleResponder", fields: [respondedById], references: [id], onDelete: SetNull)
-  adminReviewedBy AppUser? @relation("RescheduleAdminReviewer", fields: [adminReviewedById], references: [id], onDelete: SetNull)
+  match           Match           @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  requestingTeam  Team            @relation(fields: [requestingTeamId], references: [id], onDelete: Cascade)
+  requestedBy     AppUser         @relation("RescheduleRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+  slot            RescheduleSlot? @relation(fields: [slotId], references: [id], onDelete: SetNull)
+  respondedBy     AppUser?        @relation("RescheduleResponder", fields: [respondedById], references: [id], onDelete: SetNull)
+  adminReviewedBy AppUser?        @relation("RescheduleAdminReviewer", fields: [adminReviewedById], references: [id], onDelete: SetNull)
 
   @@index([matchId, status])
   @@index([requestingTeamId, status])
+  @@index([slotId])
   @@index([adminReviewedById])
+}
+
+model RescheduleSlot {
+  id          String    @id @default(cuid())
+  kickoffAt   DateTime
+  venueName   String
+  status      String    @default("AVAILABLE")
+  createdById String?
+  disabledAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  createdBy AppUser?            @relation("RescheduleSlotCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  requests  RescheduleRequest[]
+
+  @@unique([kickoffAt, venueName])
+  @@index([status, kickoffAt])
+  @@index([createdById])
 }
 
 model CaptainResultProposal {

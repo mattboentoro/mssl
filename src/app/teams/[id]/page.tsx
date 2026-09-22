@@ -4,12 +4,13 @@ import { notFound } from "next/navigation";
 import { CalendarViewToggle, FixtureCalendar, parseView } from "@/components/fixture-calendar";
 import { MatchList } from "@/components/match-display";
 import { TeamLogo } from "@/components/team-logo";
-import { ButtonLink, Card, EmptyState, PageHeader } from "@/components/ui";
+import { buttonClass, ButtonLink, Card, EmptyState, PageHeader } from "@/components/ui";
 import { getCurrentUser } from "@/lib/authz";
 import { CARD_LABELS, type CardType } from "@/lib/enums";
 import { formatDate, parseMonthValue, shiftMonth } from "@/lib/dates";
 import { zonedToUtc } from "@/lib/timezone";
 import { kitColorName, resolveKit } from "@/lib/kits";
+import { prisma } from "@/lib/prisma";
 import {
   getActiveSeason,
   getDisciplinaryRecords,
@@ -18,6 +19,7 @@ import {
   getTeamMatches,
   splitTeamMatches,
 } from "@/lib/queries";
+import { isRescheduleCutoffReached, OPEN_RESCHEDULE_STATUSES } from "@/lib/reschedules";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +68,99 @@ export default async function TeamPage({
 
   const { played, upcoming } = splitTeamMatches(matches);
   const teamCards = discipline.filter((d) => d.teamId === team.id);
+  const now = new Date();
+  const [openReschedules, availableSlot] = captainContext
+    ? await Promise.all([
+        prisma.rescheduleRequest.findMany({
+          where: {
+            matchId: { in: upcoming.map((match) => match.id) },
+            status: { in: [...OPEN_RESCHEDULE_STATUSES] },
+          },
+          select: { id: true, matchId: true },
+        }),
+        prisma.rescheduleSlot.findFirst({
+          where: {
+            status: "AVAILABLE",
+            kickoffAt: { gt: now },
+            requests: { none: { activeSlotKey: { not: null } } },
+          },
+          select: { id: true },
+        }),
+      ])
+    : [[], null];
+  const openRescheduleByMatch = new Map(
+    openReschedules.map((request) => [request.matchId, request.id]),
+  );
+  const rescheduleActions = captainContext
+    ? Object.fromEntries(
+        upcoming.flatMap((match) => {
+          if (
+            match.seasonId !== captainContext.seasonId ||
+            !["SCHEDULED", "ASSIGNED"].includes(match.status) ||
+            match.report
+          ) {
+            return [];
+          }
+          const openRequestId = openRescheduleByMatch.get(match.id);
+          if (openRequestId) {
+            return [
+              [
+                match.id,
+                <ButtonLink
+                  key={match.id}
+                  href={`/captain/reschedules#request-${encodeURIComponent(openRequestId)}`}
+                  variant="secondary"
+                >
+                  View request
+                </ButtonLink>,
+              ],
+            ];
+          }
+          if (isRescheduleCutoffReached(match.kickoffAt, now)) {
+            return [
+              [
+                match.id,
+                <span
+                  key={match.id}
+                  aria-disabled="true"
+                  title="Rescheduling closes 48 hours before kickoff."
+                  className={buttonClass("secondary")}
+                >
+                  Reschedule locked
+                </span>,
+              ],
+            ];
+          }
+          if (!availableSlot) {
+            return [
+              [
+                match.id,
+                <span
+                  key={match.id}
+                  aria-disabled="true"
+                  title="No league-provided reschedule slots are available."
+                  className={buttonClass("secondary")}
+                >
+                  No slots
+                </span>,
+              ],
+            ];
+          }
+          return [
+            [
+              match.id,
+              <ButtonLink
+                key={match.id}
+                href={`/captain/reschedules?match=${encodeURIComponent(match.id)}&team=${encodeURIComponent(team.id)}`}
+                variant="secondary"
+              >
+                Reschedule
+              </ButtonLink>,
+            ],
+          ];
+        }),
+      )
+    : undefined;
 
   const view = parseView(viewParam);
   // The calendar shows every fixture in the month, played or not, because a
@@ -106,16 +201,6 @@ export default async function TeamPage({
           eyebrow={team.division.name}
           title={team.name}
           description={team.shortName ? `Also known as ${team.shortName}.` : undefined}
-          actions={
-            captainContext ? (
-              <ButtonLink
-                href={`/captain/reschedules?team=${encodeURIComponent(team.id)}`}
-                variant="secondary"
-              >
-                Request reschedule
-              </ButtonLink>
-            ) : undefined
-          }
         />
       </div>
 
@@ -219,7 +304,7 @@ export default async function TeamPage({
             ) : upcoming.length === 0 ? (
               <EmptyState title="No fixtures scheduled" />
             ) : (
-              <MatchList matches={upcoming} />
+              <MatchList matches={upcoming} actions={rescheduleActions} />
             )}
           </section>
         </div>

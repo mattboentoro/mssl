@@ -11,7 +11,6 @@ import {
   respondToReschedule,
   reviseReschedule,
 } from "@/lib/reschedules";
-import { parseLeagueDateTime } from "@/lib/timezone";
 
 export interface RescheduleActionState {
   ok?: string;
@@ -36,18 +35,6 @@ function errorState(error: unknown): RescheduleActionState {
   return { error: "The reschedule request could not be updated. Please try again." };
 }
 
-function proposedKickoff(formData: FormData): Date {
-  const parsed = parseLeagueDateTime(String(formData.get("proposedKickoffAt") ?? ""));
-  if (!parsed) {
-    throw new RescheduleError(
-      "Enter a valid proposed kickoff date and time.",
-      422,
-      "VALIDATION_FAILED",
-    );
-  }
-  return parsed;
-}
-
 export async function proposeRescheduleAction(
   _previous: RescheduleActionState,
   formData: FormData,
@@ -57,8 +44,7 @@ export async function proposeRescheduleAction(
     await proposeReschedule(prisma, {
       matchId: String(formData.get("matchId") ?? ""),
       requestingTeamId: String(formData.get("requestingTeamId") ?? ""),
-      proposedKickoffAt: proposedKickoff(formData),
-      proposedVenueName: String(formData.get("proposedVenueName") ?? ""),
+      slotId: String(formData.get("slotId") ?? ""),
       reason: String(formData.get("reason") ?? ""),
       actor: actor(user),
     });
@@ -77,8 +63,7 @@ export async function reviseRescheduleAction(
     const user = await requireCaptain();
     await reviseReschedule(prisma, {
       requestId: String(formData.get("requestId") ?? ""),
-      proposedKickoffAt: proposedKickoff(formData),
-      proposedVenueName: String(formData.get("proposedVenueName") ?? ""),
+      slotId: String(formData.get("slotId") ?? ""),
       reason: String(formData.get("reason") ?? ""),
       actor: actor(user),
     });

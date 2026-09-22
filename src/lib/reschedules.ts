@@ -6,6 +6,7 @@ type DbClient = PrismaClient | Prisma.TransactionClient;
 
 export const MAX_RESCHEDULE_REASON_LENGTH = 2_000;
 export const MAX_RESCHEDULE_NOTE_LENGTH = 2_000;
+export const RESCHEDULE_CUTOFF_MS = 48 * 60 * 60 * 1_000;
 export const OPEN_RESCHEDULE_STATUSES = ["PENDING_OPPONENT", "PENDING_ADMIN"] as const;
 const ELIGIBLE_MATCH_STATUSES = ["SCHEDULED", "ASSIGNED"] as const;
 
@@ -20,6 +21,8 @@ export class RescheduleError extends Error {
       | "VERSION_CONFLICT"
       | "TRANSITION_CONFLICT"
       | "DUPLICATE_OPEN_REQUEST"
+      | "SLOT_UNAVAILABLE"
+      | "CUTOFF_REACHED"
       | "VALIDATION_FAILED",
   ) {
     super(message);
@@ -65,15 +68,60 @@ function optionalText(value: string | null | undefined, maximum: number): string
   return normalized || null;
 }
 
-function validateKickoff(value: Date, now: Date): Date {
-  if (Number.isNaN(value.getTime()) || value.getTime() <= now.getTime()) {
+export function isRescheduleCutoffReached(kickoffAt: Date, now = new Date()): boolean {
+  return kickoffAt.getTime() - now.getTime() <= RESCHEDULE_CUTOFF_MS;
+}
+
+function requireBeforeCutoff(kickoffAt: Date, now: Date) {
+  if (isRescheduleCutoffReached(kickoffAt, now)) {
     throw new RescheduleError(
-      "The proposed kickoff must be a valid future date and time.",
-      422,
-      "VALIDATION_FAILED",
+      "Reschedule requests close 48 hours before the original fixture.",
+      409,
+      "CUTOFF_REACHED",
     );
   }
-  return value;
+}
+
+async function getSlot(db: DbClient, slotId: string) {
+  const slot = await db.rescheduleSlot.findUnique({
+    where: { id: slotId },
+    select: { id: true, kickoffAt: true, venueName: true, status: true, updatedAt: true },
+  });
+  if (!slot) {
+    throw new RescheduleError("That reschedule slot does not exist.", 404, "NOT_FOUND");
+  }
+  return slot;
+}
+
+async function reserveAvailableSlot(db: DbClient, slotId: string, now: Date) {
+  const slot = await getSlot(db, slotId);
+  if (slot.status !== "AVAILABLE" || slot.kickoffAt.getTime() <= now.getTime()) {
+    throw new RescheduleError(
+      "That reschedule slot is no longer available.",
+      409,
+      "SLOT_UNAVAILABLE",
+    );
+  }
+  const reserved = await db.rescheduleSlot.updateMany({
+    where: { id: slot.id, status: "AVAILABLE", updatedAt: slot.updatedAt },
+    data: { status: "RESERVED" },
+  });
+  if (reserved.count !== 1) {
+    throw new RescheduleError(
+      "That reschedule slot was just reserved or changed.",
+      409,
+      "SLOT_UNAVAILABLE",
+    );
+  }
+  return slot;
+}
+
+async function releaseReservedSlot(db: DbClient, slotId: string | null) {
+  if (!slotId) return;
+  await db.rescheduleSlot.updateMany({
+    where: { id: slotId, status: "RESERVED" },
+    data: { status: "AVAILABLE" },
+  });
 }
 
 async function requireActiveCaptain(
@@ -164,16 +212,13 @@ export async function proposeReschedule(
   input: {
     matchId: string;
     requestingTeamId: string;
-    proposedKickoffAt: Date;
-    proposedVenueName?: string | null;
+    slotId: string;
     reason: string;
     actor: RescheduleActor;
     now?: Date;
   },
 ): Promise<RescheduleRequest> {
   const now = input.now ?? new Date();
-  const proposedKickoffAt = validateKickoff(input.proposedKickoffAt, now);
-  const proposedVenueName = optionalText(input.proposedVenueName, 300);
   const reason = requiredText(input.reason, "Rationale", MAX_RESCHEDULE_REASON_LENGTH);
 
   return runTransaction(db, async (tx) => {
@@ -193,6 +238,7 @@ export async function proposeReschedule(
         "INVALID_STATE",
       );
     }
+    requireBeforeCutoff(match.kickoffAt, now);
     if (
       input.requestingTeamId !== match.homeTeamId &&
       input.requestingTeamId !== match.awayTeamId
@@ -215,6 +261,7 @@ export async function proposeReschedule(
         "DUPLICATE_OPEN_REQUEST",
       );
     }
+    const slot = await reserveAvailableSlot(tx, input.slotId, now);
 
     let request: RescheduleRequest;
     try {
@@ -223,8 +270,11 @@ export async function proposeReschedule(
           matchId: match.id,
           requestingTeamId: input.requestingTeamId,
           requestedById: input.actor.appUserId,
-          proposedKickoffAt,
-          proposedVenueName,
+          slotId: slot.id,
+          activeSlotKey: slot.id,
+          legacySlotExempt: false,
+          proposedKickoffAt: slot.kickoffAt,
+          proposedVenueName: slot.venueName,
           reason,
           originalKickoffAt: match.kickoffAt,
           originalVenueName: match.venueName,
@@ -235,6 +285,14 @@ export async function proposeReschedule(
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        const target = String(error.meta?.target ?? "");
+        if (target.includes("activeSlotKey")) {
+          throw new RescheduleError(
+            "That reschedule slot was just reserved by another request.",
+            409,
+            "SLOT_UNAVAILABLE",
+          );
+        }
         throw new RescheduleError(
           "This fixture already has an open reschedule request.",
           409,
@@ -262,8 +320,9 @@ export async function proposeReschedule(
         expectedMatchVersion: match.version,
         originalKickoffAt: match.kickoffAt,
         originalVenueName: match.venueName,
-        proposedKickoffAt,
-        proposedVenueName,
+        slotId: slot.id,
+        proposedKickoffAt: slot.kickoffAt,
+        proposedVenueName: slot.venueName,
         reason,
       },
     });
@@ -275,16 +334,13 @@ export async function reviseReschedule(
   db: PrismaClient,
   input: {
     requestId: string;
-    proposedKickoffAt: Date;
-    proposedVenueName?: string | null;
+    slotId: string;
     reason: string;
     actor: RescheduleActor;
     now?: Date;
   },
 ): Promise<RescheduleRequest> {
   const now = input.now ?? new Date();
-  const proposedKickoffAt = validateKickoff(input.proposedKickoffAt, now);
-  const proposedVenueName = optionalText(input.proposedVenueName, 300);
   const reason = requiredText(input.reason, "Rationale", MAX_RESCHEDULE_REASON_LENGTH);
   return runTransaction(db, async (tx) => {
     const request = await tx.rescheduleRequest.findUnique({
@@ -322,21 +378,59 @@ export async function reviseReschedule(
         "VERSION_CONFLICT",
       );
     }
-    const updated = await tx.rescheduleRequest.updateMany({
-      where: {
-        id: request.id,
-        status: "PENDING_OPPONENT",
-        expectedMatchVersion: request.expectedMatchVersion,
-        updatedAt: request.updatedAt,
-      },
-      data: { proposedKickoffAt, proposedVenueName, reason },
-    });
+    requireBeforeCutoff(request.match.kickoffAt, now);
+    const slot =
+      input.slotId === request.slotId && request.activeSlotKey === request.slotId
+        ? await getSlot(tx, input.slotId)
+        : await reserveAvailableSlot(tx, input.slotId, now);
+    if (
+      input.slotId === request.slotId &&
+      request.activeSlotKey === request.slotId &&
+      (slot.status !== "RESERVED" || slot.kickoffAt.getTime() <= now.getTime())
+    ) {
+      throw new RescheduleError(
+        "The selected reschedule slot is no longer reserved.",
+        409,
+        "SLOT_UNAVAILABLE",
+      );
+    }
+    let updated;
+    try {
+      updated = await tx.rescheduleRequest.updateMany({
+        where: {
+          id: request.id,
+          status: "PENDING_OPPONENT",
+          expectedMatchVersion: request.expectedMatchVersion,
+          updatedAt: request.updatedAt,
+        },
+        data: {
+          slotId: slot.id,
+          activeSlotKey: slot.id,
+          legacySlotExempt: false,
+          proposedKickoffAt: slot.kickoffAt,
+          proposedVenueName: slot.venueName,
+          reason,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        throw new RescheduleError(
+          "That reschedule slot was just reserved by another request.",
+          409,
+          "SLOT_UNAVAILABLE",
+        );
+      }
+      throw error;
+    }
     if (updated.count !== 1) {
       throw new RescheduleError(
         "This request changed while you were revising it. Refresh and try again.",
         409,
         "TRANSITION_CONFLICT",
       );
+    }
+    if (request.slotId !== slot.id) {
+      await releaseReservedSlot(tx, request.slotId);
     }
     const saved = await tx.rescheduleRequest.findUniqueOrThrow({ where: { id: request.id } });
     const opponentId =
@@ -360,7 +454,12 @@ export async function reviseReschedule(
           proposedVenueName: request.proposedVenueName,
           reason: request.reason,
         },
-        after: { proposedKickoffAt, proposedVenueName, reason },
+        after: {
+          slotId: slot.id,
+          proposedKickoffAt: slot.kickoffAt,
+          proposedVenueName: slot.venueName,
+          reason,
+        },
       },
     });
     return saved;
@@ -400,7 +499,7 @@ export async function cancelReschedule(
         expectedMatchVersion: request.expectedMatchVersion,
         updatedAt: request.updatedAt,
       },
-      data: { status: "CANCELLED", openMatchKey: null },
+      data: { status: "CANCELLED", openMatchKey: null, activeSlotKey: null },
     });
     if (updated.count !== 1) {
       throw new RescheduleError(
@@ -409,6 +508,7 @@ export async function cancelReschedule(
         "TRANSITION_CONFLICT",
       );
     }
+    await releaseReservedSlot(tx, request.slotId);
     const saved = await tx.rescheduleRequest.findUniqueOrThrow({ where: { id: request.id } });
     const opponentId =
       request.match.homeTeamId === request.requestingTeamId
@@ -438,9 +538,11 @@ export async function respondToReschedule(
     approve: boolean;
     responseNote?: string | null;
     actor: RescheduleActor;
+    now?: Date;
   },
 ): Promise<RescheduleRequest> {
   const responseNote = optionalText(input.responseNote, MAX_RESCHEDULE_NOTE_LENGTH);
+  const now = input.now ?? new Date();
   return runTransaction(db, async (tx) => {
     const request = await tx.rescheduleRequest.findUnique({
       where: { id: input.requestId },
@@ -464,6 +566,34 @@ export async function respondToReschedule(
     }
 
     const status = input.approve ? "PENDING_ADMIN" : "REJECTED_OPPONENT";
+    if (input.approve) {
+      requireBeforeCutoff(request.match.kickoffAt, now);
+      if (
+        !request.legacySlotExempt &&
+        (!request.slotId || request.activeSlotKey !== request.slotId)
+      ) {
+        throw new RescheduleError(
+          "The selected reschedule slot is no longer reserved.",
+          409,
+          "SLOT_UNAVAILABLE",
+        );
+      }
+      if (!request.legacySlotExempt && request.slotId) {
+        const slot = await getSlot(tx, request.slotId);
+        if (
+          slot.status !== "RESERVED" ||
+          slot.kickoffAt.getTime() <= now.getTime() ||
+          request.proposedKickoffAt?.getTime() !== slot.kickoffAt.getTime() ||
+          request.proposedVenueName !== slot.venueName
+        ) {
+          throw new RescheduleError(
+            "The selected reschedule slot changed. The proposer must revise the request.",
+            409,
+            "SLOT_UNAVAILABLE",
+          );
+        }
+      }
+    }
     const updated = await tx.rescheduleRequest.updateMany({
       where: {
         id: request.id,
@@ -474,6 +604,7 @@ export async function respondToReschedule(
       data: {
         status,
         openMatchKey: input.approve ? request.matchId : null,
+        activeSlotKey: input.approve ? request.activeSlotKey : null,
         respondedById: input.actor.appUserId,
         responseNote,
         respondedAt: new Date(),
@@ -485,6 +616,9 @@ export async function respondToReschedule(
         409,
         "TRANSITION_CONFLICT",
       );
+    }
+    if (!input.approve) {
+      await releaseReservedSlot(tx, request.slotId);
     }
     const saved = await tx.rescheduleRequest.findUniqueOrThrow({ where: { id: request.id } });
     const recipientIds = input.approve
@@ -563,6 +697,32 @@ export async function reviewRescheduleAsAdmin(
           "VERSION_CONFLICT",
         );
       }
+      requireBeforeCutoff(request.match.kickoffAt, now);
+      if (
+        !request.legacySlotExempt &&
+        (!request.slotId || request.activeSlotKey !== request.slotId)
+      ) {
+        throw new RescheduleError(
+          "The selected reschedule slot is no longer reserved.",
+          409,
+          "SLOT_UNAVAILABLE",
+        );
+      }
+      if (!request.legacySlotExempt && request.slotId) {
+        const slot = await getSlot(tx, request.slotId);
+        if (
+          slot.status !== "RESERVED" ||
+          slot.kickoffAt.getTime() <= now.getTime() ||
+          request.proposedKickoffAt.getTime() !== slot.kickoffAt.getTime() ||
+          request.proposedVenueName !== slot.venueName
+        ) {
+          throw new RescheduleError(
+            "The selected reschedule slot changed after this request was proposed.",
+            409,
+            "SLOT_UNAVAILABLE",
+          );
+        }
+      }
       if (
         request.match.report ||
         !ELIGIBLE_MATCH_STATUSES.includes(
@@ -597,6 +757,12 @@ export async function reviewRescheduleAsAdmin(
           "VERSION_CONFLICT",
         );
       }
+      if (request.slotId) {
+        await tx.rescheduleSlot.updateMany({
+          where: { id: request.slotId, status: "RESERVED" },
+          data: { status: "USED" },
+        });
+      }
     }
 
     const status = input.approve ? "APPROVED" : "REJECTED_ADMIN";
@@ -610,6 +776,7 @@ export async function reviewRescheduleAsAdmin(
       data: {
         status,
         openMatchKey: null,
+        activeSlotKey: input.approve ? request.activeSlotKey : null,
         adminReviewedById: input.actor.appUserId,
         adminReviewNote: reviewNote,
         adminReviewedAt: now,
@@ -621,6 +788,9 @@ export async function reviewRescheduleAsAdmin(
         409,
         "TRANSITION_CONFLICT",
       );
+    }
+    if (!input.approve) {
+      await releaseReservedSlot(tx, request.slotId);
     }
     const recipientIds = await activeTeamUserIds(tx, request.match.seasonId, [
       request.match.homeTeamId,
@@ -678,7 +848,9 @@ export async function listReschedulesForCaptain(db: PrismaClient, appUserId: str
   const contexts = assignments.flatMap(({ seasonId, teamId }) =>
     seasonId ? [{ seasonId, teamId }] : [],
   );
-  if (!contexts.length) return { eligibleMatches: [], requests: [], contexts };
+  if (!contexts.length) {
+    return { eligibleMatches: [], requests: [], contexts, availableSlots: [] };
+  }
   const matches = await db.match.findMany({
     where: {
       OR: contexts.map(({ seasonId, teamId }) => ({
@@ -692,7 +864,7 @@ export async function listReschedulesForCaptain(db: PrismaClient, appUserId: str
   const now = new Date();
   const eligibleMatches = matches.filter(
     (match) =>
-      match.kickoffAt > now &&
+      !isRescheduleCutoffReached(match.kickoffAt, now) &&
       !match.report &&
       ELIGIBLE_MATCH_STATUSES.includes(match.status as (typeof ELIGIBLE_MATCH_STATUSES)[number]),
   );
@@ -712,5 +884,12 @@ export async function listReschedulesForCaptain(db: PrismaClient, appUserId: str
     },
     orderBy: { updatedAt: "desc" },
   });
-  return { eligibleMatches, requests, contexts };
+  const availableSlots = await db.rescheduleSlot.findMany({
+    where: {
+      status: "AVAILABLE",
+      kickoffAt: { gt: now },
+    },
+    orderBy: { kickoffAt: "asc" },
+  });
+  return { eligibleMatches, requests, contexts, availableSlots };
 }

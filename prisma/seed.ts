@@ -302,6 +302,7 @@ async function reset() {
   await prisma.scoreAppeal.deleteMany();
   await prisma.captainResultProposal.deleteMany();
   await prisma.rescheduleRequest.deleteMany();
+  await prisma.rescheduleSlot.deleteMany();
   await prisma.rosterJoinRequest.deleteMany();
   await prisma.rosterInvitation.deleteMany();
   await prisma.teamMembership.deleteMany();
@@ -1249,6 +1250,16 @@ async function main() {
   console.log("Seeding RBAC development personas...");
   await seedRbacPersonas(active.id, league);
 
+  console.log("Seeding reschedule availability...");
+  const slotBase = new Date();
+  slotBase.setUTCMinutes(0, 0, 0);
+  await prisma.rescheduleSlot.createMany({
+    data: [7, 14, 21, 28].map((days, index) => ({
+      kickoffAt: new Date(slotBase.getTime() + days * 24 * 60 * 60 * 1_000),
+      venueName: VENUE_NAMES[index % VENUE_NAMES.length],
+    })),
+  });
+
   console.log("Seeding league sanctions for the referee warning board...");
   await seedLeagueSanctions(active.id);
 
@@ -1271,6 +1282,7 @@ async function main() {
     adjustments: await prisma.pointsAdjustment.count(),
     freeAgents: await prisma.freeAgentRequest.count(),
     users: await prisma.appUser.count(),
+    rescheduleSlots: await prisma.rescheduleSlot.count(),
     autoBans: suspensions.automatic,
     redsToReview: suspensions.pending,
   };
