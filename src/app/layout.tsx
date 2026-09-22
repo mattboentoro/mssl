@@ -5,6 +5,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { themeInitScript } from "@/components/theme-toggle";
 import { getCurrentUser } from "@/lib/authz";
+import { getActiveTeamAssociation } from "@/lib/free-agent-eligibility";
 import { unreadNotificationCount } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
@@ -24,7 +25,12 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
-  const unreadNotifications = user ? await unreadNotificationCount(prisma, user.appUserId) : 0;
+  const [unreadNotifications, activeTeam] = user
+    ? await Promise.all([
+        unreadNotificationCount(prisma, user.appUserId),
+        getActiveTeamAssociation(prisma, user.appUserId),
+      ])
+    : [0, null];
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -44,6 +50,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   isPlayer: user.isPlayer,
                   isCaptain: user.isCaptain,
                   isDevBypass: user.isDevBypass,
+                  canSignUpAsFreeAgent: activeTeam === null,
                   unreadNotifications,
                 }
               : null
