@@ -137,6 +137,26 @@ export const FREE_AGENT_STATUS_LABELS: Record<FreeAgentStatus, string> = {
 /** Statuses a player can still edit their own request under. */
 export const OPEN_FREE_AGENT_STATUSES: readonly FreeAgentStatus[] = ["PENDING", "CONTACTED"];
 
+export const RESCHEDULE_STATUSES = [
+  "PENDING_OPPONENT",
+  "PENDING_ADMIN",
+  "APPROVED",
+  "REJECTED_OPPONENT",
+  "REJECTED_ADMIN",
+  "CANCELLED",
+] as const;
+export type RescheduleStatus = (typeof RESCHEDULE_STATUSES)[number];
+export const rescheduleStatusSchema = z.enum(RESCHEDULE_STATUSES);
+
+export const RESCHEDULE_STATUS_LABELS: Record<RescheduleStatus, string> = {
+  PENDING_OPPONENT: "Awaiting opponent",
+  PENDING_ADMIN: "Awaiting league approval",
+  APPROVED: "Approved",
+  REJECTED_OPPONENT: "Rejected by opponent",
+  REJECTED_ADMIN: "Rejected by league",
+  CANCELLED: "Cancelled",
+};
+
 export const MATCH_STATUS_LABELS: Record<MatchStatus, string> = {
   SCHEDULED: "Needs a referee",
   ASSIGNED: "Referee assigned",

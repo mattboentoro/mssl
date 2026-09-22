@@ -79,6 +79,28 @@ export const gameReportSchema = z
 
 export type GameReportPayload = z.infer<typeof gameReportSchema>;
 
+export const captainResultSchema = z
+  .object({
+    homeScore: scoreSchema,
+    awayScore: scoreSchema,
+    homeForfeit: z.boolean().default(false),
+    awayForfeit: z.boolean().default(false),
+    notes: optionalText(4000).nullable().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (
+      value.homeForfeit &&
+      value.awayForfeit &&
+      (value.homeScore !== 0 || value.awayScore !== 0)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["homeScore"],
+        message: "A double forfeit must be recorded as 0-0.",
+      });
+    }
+  });
+
 /** A league-issued sanction added by an admin outside any single fixture. */
 export const disciplinaryActionSchema = z.object({
   seasonId: z.string().min(1, "Pick a season."),

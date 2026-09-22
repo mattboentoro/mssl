@@ -193,6 +193,7 @@ model AppUser {
   rosterJoinRequestsDecided   RosterJoinRequest[]     @relation("RosterJoinDecider")
   rescheduleRequests          RescheduleRequest[]     @relation("RescheduleRequester")
   rescheduleResponses         RescheduleRequest[]     @relation("RescheduleResponder")
+  rescheduleAdminReviews      RescheduleRequest[]     @relation("RescheduleAdminReviewer")
   resultProposals             CaptainResultProposal[] @relation("ResultProposer")
   resultProposalConfirmations CaptainResultProposal[] @relation("ResultConfirmer")
   scoreAppeals                ScoreAppeal[]           @relation("AppealSubmitter")
@@ -410,27 +411,36 @@ model Match {
 }
 
 model RescheduleRequest {
-  id                String    @id @default(cuid())
-  matchId           String
-  requestingTeamId  String
-  requestedById     String
-  proposedKickoffAt DateTime?
-  proposedVenueName String?
-  reason            String
-  status            String    @default("PENDING")
-  respondedById     String?
-  responseNote      String?
-  respondedAt       DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id                   String    @id @default(cuid())
+  matchId              String
+  requestingTeamId     String
+  requestedById        String
+  proposedKickoffAt    DateTime?
+  proposedVenueName    String?
+  reason               String
+  originalKickoffAt    DateTime?
+  originalVenueName    String?
+  expectedMatchVersion Int?
+  openMatchKey         String?   @unique
+  status               String    @default("PENDING_OPPONENT")
+  respondedById        String?
+  responseNote         String?
+  respondedAt          DateTime?
+  adminReviewedById    String?
+  adminReviewNote      String?
+  adminReviewedAt      DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
-  match          Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  requestingTeam Team     @relation(fields: [requestingTeamId], references: [id], onDelete: Cascade)
-  requestedBy    AppUser  @relation("RescheduleRequester", fields: [requestedById], references: [id], onDelete: Cascade)
-  respondedBy    AppUser? @relation("RescheduleResponder", fields: [respondedById], references: [id], onDelete: SetNull)
+  match           Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  requestingTeam  Team     @relation(fields: [requestingTeamId], references: [id], onDelete: Cascade)
+  requestedBy     AppUser  @relation("RescheduleRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+  respondedBy     AppUser? @relation("RescheduleResponder", fields: [respondedById], references: [id], onDelete: SetNull)
+  adminReviewedBy AppUser? @relation("RescheduleAdminReviewer", fields: [adminReviewedById], references: [id], onDelete: SetNull)
 
   @@index([matchId, status])
   @@index([requestingTeamId, status])
+  @@index([adminReviewedById])
 }
 
 model CaptainResultProposal {
@@ -458,24 +468,37 @@ model CaptainResultProposal {
 }
 
 model ScoreAppeal {
-  id            String    @id @default(cuid())
-  matchId       String
-  teamId        String
-  submittedById String
-  reason        String
-  status        String    @default("PENDING")
-  decidedById   String?
-  decisionNote  String?
-  decidedAt     DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                      String    @id @default(cuid())
+  matchId                 String
+  teamId                  String
+  submittedById           String
+  reason                  String
+  originalReportId        String
+  originalMatchVersion    Int
+  originalMatchStatus     String
+  originalReportUpdatedAt DateTime
+  originalHomeScore       Int
+  originalAwayScore       Int
+  originalHomeForfeit     Boolean
+  originalAwayForfeit     Boolean
+  requestedHomeScore      Int
+  requestedAwayScore      Int
+  requestedHomeForfeit    Boolean
+  requestedAwayForfeit    Boolean
+  status                  String    @default("PENDING")
+  openKey                 String?   @unique
+  decidedById             String?
+  decisionNote            String?
+  decidedAt               DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   match       Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
   team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
   submittedBy AppUser  @relation("AppealSubmitter", fields: [submittedById], references: [id], onDelete: Cascade)
   decidedBy   AppUser? @relation("AppealDecider", fields: [decidedById], references: [id], onDelete: SetNull)
 
-  @@unique([matchId, teamId])
+  @@index([matchId, teamId])
   @@index([status])
 }
 

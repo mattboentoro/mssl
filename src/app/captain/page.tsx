@@ -38,7 +38,23 @@ export default async function CaptainPage() {
         eyebrow="Captain"
         title="Your teams"
         description="Captain access is scoped independently to each team and season."
-        actions={<ButtonLink href="/captain/roster">Manage rosters</ButtonLink>}
+        actions={
+          <>
+            <ButtonLink href="/captain/reschedules" variant="secondary">
+              Fixture reschedules
+            </ButtonLink>
+            <ButtonLink href="/captain/results" variant="secondary">
+              Match results
+            </ButtonLink>
+            <ButtonLink href="/captain/appeals" variant="secondary">
+              Score appeals
+            </ButtonLink>
+            <ButtonLink href="/captain/free-agents" variant="secondary">
+              Browse free agents
+            </ButtonLink>
+            <ButtonLink href="/captain/roster">Manage rosters</ButtonLink>
+          </>
+        }
       />
       {assignments.length ? (
         <div className="grid gap-4 sm:grid-cols-2">

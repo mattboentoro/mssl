@@ -4,7 +4,8 @@ import { notFound } from "next/navigation";
 import { CalendarViewToggle, FixtureCalendar, parseView } from "@/components/fixture-calendar";
 import { MatchList } from "@/components/match-display";
 import { TeamLogo } from "@/components/team-logo";
-import { Card, EmptyState, PageHeader } from "@/components/ui";
+import { ButtonLink, Card, EmptyState, PageHeader } from "@/components/ui";
+import { getCurrentUser } from "@/lib/authz";
 import { CARD_LABELS, type CardType } from "@/lib/enums";
 import { formatDate, parseMonthValue, shiftMonth } from "@/lib/dates";
 import { zonedToUtc } from "@/lib/timezone";
@@ -45,7 +46,13 @@ export default async function TeamPage({
 
   // A club belongs to the league, not to a season, so its form and discipline
   // are shown for whichever season is currently running.
-  const season = await getActiveSeason();
+  const [season, currentUser] = await Promise.all([getActiveSeason(), getCurrentUser()]);
+  const captainContext = currentUser?.teamContexts.find(
+    (context) =>
+      context.role === "captain" &&
+      context.teamId === team.id &&
+      (!season || context.seasonId === season.id),
+  );
 
   const [matches, standings, discipline] = await Promise.all([
     getTeamMatches(team.id),
@@ -99,6 +106,16 @@ export default async function TeamPage({
           eyebrow={team.division.name}
           title={team.name}
           description={team.shortName ? `Also known as ${team.shortName}.` : undefined}
+          actions={
+            captainContext ? (
+              <ButtonLink
+                href={`/captain/reschedules?team=${encodeURIComponent(team.id)}`}
+                variant="secondary"
+              >
+                Request reschedule
+              </ButtonLink>
+            ) : undefined
+          }
         />
       </div>
 

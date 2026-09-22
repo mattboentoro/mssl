@@ -426,7 +426,12 @@ export async function decideJoinRequest(
 export async function createRosterInvitation(
   db: PrismaClient,
   input: TeamSeasonInput &
-    MessageInput & { invitedById: string; invitedUserId?: string | null; email?: string | null },
+    MessageInput & {
+      invitedById: string;
+      invitedUserId?: string | null;
+      email?: string | null;
+      freeAgentRequestId?: string;
+    },
 ) {
   return inTransaction(db, async (tx) => {
     const actor = await actorFor(tx, input.invitedById);
@@ -434,13 +439,41 @@ export async function createRosterInvitation(
     const { team, season } = await assertTeamSeason(tx, input);
 
     let invitedUser: AppUser | null = null;
+    let freeAgentRequest: {
+      id: string;
+      submittedByEmail: string;
+      submittedByName: string;
+      status: string;
+    } | null = null;
+    if (input.freeAgentRequestId) {
+      freeAgentRequest = await tx.freeAgentRequest.findUnique({
+        where: { id: input.freeAgentRequestId },
+        select: {
+          id: true,
+          submittedByEmail: true,
+          submittedByName: true,
+          status: true,
+        },
+      });
+      if (!freeAgentRequest) {
+        throw new RosterError("That free-agent request no longer exists.", 404, "NOT_FOUND");
+      }
+      if (freeAgentRequest.status !== "PENDING" && freeAgentRequest.status !== "CONTACTED") {
+        throw new RosterError(
+          "Only an open free-agent request can be placed.",
+          409,
+          "INVALID_STATE",
+        );
+      }
+    }
     if (input.invitedUserId) {
       invitedUser = await tx.appUser.findUnique({ where: { id: input.invitedUserId } });
       if (!invitedUser) {
         throw new RosterError("That application user does not exist.", 404, "NOT_FOUND");
       }
     }
-    const email = invitedUser?.email ?? input.email?.trim() ?? "";
+    const email =
+      invitedUser?.email ?? freeAgentRequest?.submittedByEmail ?? input.email?.trim() ?? "";
     const normalizedEmail = normalizeEmail(email);
     if (!normalizedEmail || !normalizedEmail.includes("@")) {
       throw new RosterError("Enter a valid player e-mail address.", 400, "INVALID_REQUEST");
@@ -511,8 +544,28 @@ export async function createRosterInvitation(
       action: "roster.invitation.create",
       entity: "RosterInvitation",
       entityId: invitation.id,
-      metadata: { teamId: input.teamId, seasonId: input.seasonId, normalizedEmail },
+      metadata: { teamId: input.teamId, seasonId: input.seasonId },
     });
+    if (freeAgentRequest) {
+      const coCaptains = (await captainIds(tx, input)).filter((id) => id !== actor.id);
+      await notify(tx, coCaptains, {
+        type: "FREE_AGENT_INVITED",
+        title: `Free agent invited to ${team.name}`,
+        body: `${actor.displayName} sent a roster invitation for ${season.name}.`,
+        href: "/captain/free-agents",
+      });
+      await writeAudit(tx, {
+        actor: auditActor(actor, "captain"),
+        action: "free_agent.placement.invited",
+        entity: "RosterInvitation",
+        entityId: invitation.id,
+        metadata: {
+          freeAgentRequestId: freeAgentRequest.id,
+          teamId: input.teamId,
+          seasonId: input.seasonId,
+        },
+      });
+    }
     return invitation;
   });
 }
@@ -561,7 +614,7 @@ export async function respondToRosterInvitation(
     const actor = await actorFor(tx, input.actorId);
     const invitation = await tx.rosterInvitation.findUnique({
       where: { id: input.invitationId },
-      include: { team: true, season: true },
+      include: { team: true, season: true, invitedBy: { select: { email: true } } },
     });
     if (!invitation) throw new RosterError("That invitation does not exist.", 404, "NOT_FOUND");
     if (
@@ -595,6 +648,65 @@ export async function respondToRosterInvitation(
         respondedAt: new Date(),
       },
     });
+    if (input.decision === "ACCEPTED") {
+      const placementAudit = await tx.auditLog.findFirst({
+        where: {
+          action: "free_agent.placement.invited",
+          entity: "RosterInvitation",
+          entityId: invitation.id,
+        },
+        select: { metadata: true },
+      });
+      if (placementAudit?.metadata) {
+        let freeAgentRequestId: string | undefined;
+        try {
+          const metadata = JSON.parse(placementAudit.metadata) as {
+            freeAgentRequestId?: unknown;
+          };
+          if (typeof metadata.freeAgentRequestId === "string") {
+            freeAgentRequestId = metadata.freeAgentRequestId;
+          }
+        } catch {
+          // A malformed historical audit row must not break roster acceptance.
+        }
+        if (freeAgentRequestId) {
+          const placed = await tx.freeAgentRequest.updateMany({
+            where: {
+              id: freeAgentRequestId,
+              submittedByEmail: invitation.normalizedEmail,
+              status: { in: ["PENDING", "CONTACTED"] },
+            },
+            data: {
+              status: "PLACED",
+              reviewedAt: new Date(),
+              reviewedByEmail: invitation.invitedBy.email,
+            },
+          });
+          if (placed.count === 1) {
+            const coCaptains = (await captainIds(tx, invitation)).filter(
+              (id) => id !== invitation.invitedById,
+            );
+            await notify(tx, coCaptains, {
+              type: "FREE_AGENT_PLACED",
+              title: `${actor.displayName} joined ${invitation.team.name}`,
+              body: `The free-agent roster invitation was accepted for ${invitation.season.name}.`,
+              href: "/captain/roster",
+            });
+            await writeAudit(tx, {
+              actor: auditActor(actor, "player"),
+              action: "free_agent.placement.accepted",
+              entity: "FreeAgentRequest",
+              entityId: freeAgentRequestId,
+              metadata: {
+                invitationId: invitation.id,
+                teamId: invitation.teamId,
+                seasonId: invitation.seasonId,
+              },
+            });
+          }
+        }
+      }
+    }
     await notify(tx, [invitation.invitedById], {
       type: `ROSTER_INVITATION_${input.decision}`,
       title: `Invitation ${input.decision.toLowerCase()}`,
