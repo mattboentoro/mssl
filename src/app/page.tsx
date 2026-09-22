@@ -10,7 +10,9 @@ import {
   SectionHeading,
   outlineButtonClass,
 } from "@/components/ui";
+import { getCurrentUser } from "@/lib/authz";
 import { formatLongDate } from "@/lib/dates";
+import { prisma } from "@/lib/prisma";
 import {
   getActiveSeason,
   getAnnouncements,
@@ -76,8 +78,7 @@ function AnnouncementBody({
 }
 
 export default async function HomePage() {
-  const season = await getActiveSeason();
-  // Referee appointments are league business: only signed-in members see them.
+  const [season, user] = await Promise.all([getActiveSeason(), getCurrentUser()]);
 
   if (!season) {
     return (
@@ -92,16 +93,49 @@ export default async function HomePage() {
     );
   }
 
-  const [announcements, upcoming, results, standings] = await Promise.all([
+  const teamContext =
+    user?.teamContexts.find(
+      (context) => context.seasonId === season.id && context.role === "player",
+    ) ??
+    user?.teamContexts.find((context) => context.seasonId === season.id) ??
+    user?.teamContexts.find((context) => context.role === "player") ??
+    user?.teamContexts[0];
+  const [announcements, upcoming, results, standings, team] = await Promise.all([
     getAnnouncements(4),
     getUpcomingMatches(season.id, 4),
     getRecentResults(season.id, 4),
     getStandingsForSeason(season.id),
+    teamContext
+      ? prisma.team.findUnique({
+          where: { id: teamContext.teamId },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            divisionId: true,
+            seasons: {
+              where: { seasonId: season.id },
+              select: { divisionId: true },
+              take: 1,
+            },
+          },
+        })
+      : Promise.resolve(null),
   ]);
 
   const pinned = announcements.filter((a) => a.pinned);
   const rest = announcements.filter((a) => !a.pinned);
-  const topDivision = standings.find((division) => division.rows.length > 0);
+  const teamDivisionId = team?.seasons[0]?.divisionId ?? team?.divisionId;
+  const topDivision =
+    standings.find((division) => division.divisionId === teamDivisionId) ??
+    standings.find((division) => division.rows.length > 0);
+  const scheduleHref = team ? `/schedule?team=${encodeURIComponent(team.id)}` : "/schedule";
+  const personalizedHref = team
+    ? `/teams/${team.slug}`
+    : user
+      ? "/free-agents"
+      : "/signin?callbackUrl=/free-agents";
+  const personalizedLabel = team?.name ?? "Sign up as free agent";
 
   return (
     <div className="space-y-14">
@@ -120,12 +154,12 @@ export default async function HomePage() {
           Season runs {formatLongDate(season.startsOn)} &ndash; {formatLongDate(season.endsOn)}.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
-          <ButtonLink href="/schedule">View the schedule</ButtonLink>
+          <ButtonLink href={scheduleHref}>View the schedule</ButtonLink>
           <ButtonLink href="/standings" variant="secondary">
             Standings
           </ButtonLink>
-          <ButtonLink href="/referee" variant="secondary">
-            Referee sign-in
+          <ButtonLink href={personalizedHref} variant="secondary">
+            {personalizedLabel}
           </ButtonLink>
         </div>
       </section>
