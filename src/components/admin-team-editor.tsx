@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { deleteTeamAction, updateTeamAction } from "@/app/admin/actions";
 import { ActionForm, FieldError, SubmitButton } from "@/components/admin-forms";
 import { CaptainFields, type CaptainInput } from "@/components/captain-fields";
@@ -129,6 +131,12 @@ export function TeamEditor({
           <CaptainFields idPrefix={`team-${team.id}`} defaultCaptains={team.captains} />
 
           <div className="border-subtle flex items-center justify-end gap-2 border-t pt-3 sm:col-span-2">
+            <Link
+              href={`/captain/teams/${team.id}/profile`}
+              className={buttonClass("ghost", "mr-auto")}
+            >
+              Profile &amp; logo
+            </Link>
             <DialogCancel />
             <SubmitButton>Save changes</SubmitButton>
           </div>

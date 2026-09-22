@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { forbidden, redirect } from "next/navigation";
 
-import { Card, EmptyState, PageHeader } from "@/components/ui";
+import { ButtonLink, Card, EmptyState, PageHeader } from "@/components/ui";
 import { AuthzError, requirePlayer } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 
@@ -32,6 +32,7 @@ export default async function PlayerPage() {
         eyebrow="Player"
         title="Your teams"
         description="Roster membership is scoped to one team in each season."
+        actions={<ButtonLink href="/roster">Roster requests</ButtonLink>}
       />
       {memberships.length ? (
         <div className="grid gap-4 sm:grid-cols-2">

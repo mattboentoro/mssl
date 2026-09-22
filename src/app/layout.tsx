@@ -5,6 +5,8 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { themeInitScript } from "@/components/theme-toggle";
 import { getCurrentUser } from "@/lib/authz";
+import { unreadNotificationCount } from "@/lib/notifications";
+import { prisma } from "@/lib/prisma";
 
 import "./globals.css";
 
@@ -22,6 +24,7 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
+  const unreadNotifications = user ? await unreadNotificationCount(prisma, user.appUserId) : 0;
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -41,6 +44,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   isPlayer: user.isPlayer,
                   isCaptain: user.isCaptain,
                   isDevBypass: user.isDevBypass,
+                  unreadNotifications,
                 }
               : null
           }

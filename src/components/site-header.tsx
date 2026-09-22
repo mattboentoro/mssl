@@ -20,6 +20,7 @@ export interface HeaderUser {
   isPlayer: boolean;
   isCaptain: boolean;
   isDevBypass: boolean;
+  unreadNotifications: number;
 }
 
 const PUBLIC_LINKS: NavLink[] = [
@@ -50,6 +51,13 @@ export function SiteHeader({ user }: { user: HeaderUser | null }) {
   if (user?.isCaptain) links.push({ href: "/captain", label: "Captain" });
   if (user?.isReferee) links.push({ href: "/referee", label: "Referee" });
   if (user?.isAdmin) links.push({ href: "/admin/matches", label: "Admin" });
+  if (user)
+    links.push({
+      href: "/notifications",
+      label: user.unreadNotifications
+        ? `Notifications (${user.unreadNotifications})`
+        : "Notifications",
+    });
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
@@ -183,6 +191,14 @@ function AccountChip({ user }: { user: HeaderUser | null }) {
           <span className="text-warning block text-[10px] font-semibold">DEV</span>
         ) : null}
       </span>
+      {user.unreadNotifications ? (
+        <span
+          className="bg-accent inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white"
+          aria-label={`${user.unreadNotifications} unread notification${user.unreadNotifications === 1 ? "" : "s"}`}
+        >
+          {user.unreadNotifications > 99 ? "99+" : user.unreadNotifications}
+        </span>
+      ) : null}
     </Link>
   );
 }

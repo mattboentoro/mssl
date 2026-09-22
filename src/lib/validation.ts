@@ -212,6 +212,15 @@ export const teamSchema = z.object({
 
 export const updateTeamSchema = teamSchema.extend({ teamId: z.string().min(1) });
 
+export const teamProfileSchema = teamSchema
+  .pick({
+    name: true,
+    shortName: true,
+    colorPrimary: true,
+    colorAlternate: true,
+  })
+  .extend({ teamId: z.string().min(1) });
+
 /**
  * Deleting a season or a team is irreversible, so the admin has to retype the
  * name exactly. The comparison itself happens in the action, which knows the

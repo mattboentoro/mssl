@@ -24,6 +24,25 @@ npm run seed
 npm run dev
 ```
 
+### Team logo storage
+
+Team logos use a private Azure Blob container and are read through
+`/teams/<team-id-or-slug>/logo`; storage credentials are never sent to the
+browser. Set `AZURE_STORAGE_CONNECTION_STRING` and optionally
+`AZURE_STORAGE_TEAM_LOGO_CONTAINER` (defaults to `team-logos`).
+
+For local development, run [Azurite](https://learn.microsoft.com/azure/storage/common/storage-use-azurite)
+on its default ports and use:
+
+```dotenv
+AZURE_STORAGE_CONNECTION_STRING="UseDevelopmentStorage=true"
+AZURE_STORAGE_TEAM_LOGO_CONTAINER="team-logos"
+```
+
+The application creates the container with private access on first use. In
+Azure, store the connection string in the app's secret configuration rather
+than in source control.
+
 Open <http://localhost:3000>. The site is fully browsable anonymously.
 
 ### Importing a schedule from CSV

@@ -45,6 +45,11 @@ export const config = {
     bootstrapAdminObjectIds: idList(process.env.MSSL_BOOTSTRAP_ADMIN_OBJECT_IDS),
   },
 
+  teamLogos: {
+    connectionString: process.env.AZURE_STORAGE_CONNECTION_STRING ?? "",
+    container: process.env.AZURE_STORAGE_TEAM_LOGO_CONTAINER?.trim() || "team-logos",
+  },
+
   standings: {
     includeUnconfirmed: bool(process.env.STANDINGS_INCLUDE_UNCONFIRMED, true),
     forfeit: parseForfeitScore(process.env.STANDINGS_FORFEIT_SCORE),

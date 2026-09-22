@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { forbidden, redirect } from "next/navigation";
 
-import { Card, EmptyState, PageHeader } from "@/components/ui";
+import { ButtonLink, Card, EmptyState, PageHeader } from "@/components/ui";
 import { AuthzError, requireCaptain } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 
@@ -38,6 +38,7 @@ export default async function CaptainPage() {
         eyebrow="Captain"
         title="Your teams"
         description="Captain access is scoped independently to each team and season."
+        actions={<ButtonLink href="/captain/roster">Manage rosters</ButtonLink>}
       />
       {assignments.length ? (
         <div className="grid gap-4 sm:grid-cols-2">

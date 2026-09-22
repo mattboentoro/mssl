@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { CalendarViewToggle, FixtureCalendar, parseView } from "@/components/fixture-calendar";
 import { MatchList } from "@/components/match-display";
+import { TeamLogo } from "@/components/team-logo";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { CARD_LABELS, type CardType } from "@/lib/enums";
 import { formatDate, parseMonthValue, shiftMonth } from "@/lib/dates";
@@ -87,11 +88,19 @@ export default async function TeamPage({
 
   return (
     <div>
-      <PageHeader
-        eyebrow={team.division.name}
-        title={team.name}
-        description={team.shortName ? `Also known as ${team.shortName}.` : undefined}
-      />
+      <div className="flex items-start gap-4">
+        <TeamLogo
+          teamId={team.id}
+          name={team.name}
+          hasLogo={Boolean(team.logoBlobName)}
+          size={72}
+        />
+        <PageHeader
+          eyebrow={team.division.name}
+          title={team.name}
+          description={team.shortName ? `Also known as ${team.shortName}.` : undefined}
+        />
+      </div>
 
       {team.captains.length > 0 ? (
         <section

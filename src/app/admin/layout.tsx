@@ -13,6 +13,7 @@ const TABS: AdminTab[] = [
   { href: "/admin/standings", label: "Standings" },
   { href: "/admin/discipline", label: "Discipline" },
   { href: "/admin/free-agents", label: "Free agents" },
+  { href: "/admin/roster", label: "Rosters" },
   { href: "/admin/users", label: "Users & roles" },
   { href: "/admin/content", label: "Content" },
   { href: "/admin/audit", label: "Audit log" },
