@@ -26,7 +26,6 @@ const PUBLIC_LINKS: NavLink[] = [
   { href: "/teams", label: "Teams" },
   { href: "/rules", label: "Rules" },
   { href: "/faq", label: "FAQ" },
-  { href: "/free-agents", label: "Sign up as free agent" },
 ];
 
 export function SiteHeader({ user }: { user: HeaderUser | null }) {
@@ -42,6 +41,9 @@ export function SiteHeader({ user }: { user: HeaderUser | null }) {
   }
 
   const links = [...PUBLIC_LINKS];
+  // A request is filed against the signed-in account, so the tab would only
+  // lead a signed-out visitor to a page that asks them to sign in first.
+  if (user) links.push({ href: "/free-agents", label: "Sign up as free agent" });
   if (user?.isReferee || user?.isAdmin) links.push({ href: "/referee", label: "Referee" });
   if (user?.isAdmin) links.push({ href: "/admin/matches", label: "Admin" });
 

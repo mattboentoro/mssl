@@ -9,7 +9,6 @@ export type FreeAgentFormDefaults = {
   yearsExperience: number | null;
   preferredPosition: string;
   preferredDivisionId: string | null;
-  phone: string | null;
   notes: string | null;
 };
 
@@ -92,22 +91,6 @@ export function FreeAgentForm({
             ))}
           </select>
           <FieldError name="preferredDivisionId" />
-        </Field>
-
-        <Field
-          label="Phone number"
-          htmlFor="phone"
-          hint="Optional. Only used to reach you about a team."
-        >
-          <input
-            autoComplete="tel"
-            className={inputClass}
-            defaultValue={defaults?.phone ?? ""}
-            id="phone"
-            name="phone"
-            type="tel"
-          />
-          <FieldError name="phone" />
         </Field>
 
         <Field

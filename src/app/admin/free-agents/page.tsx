@@ -120,7 +120,6 @@ export default async function AdminFreeAgentsPage({
                       <a className="hover:underline" href={`mailto:${request.submittedByEmail}`}>
                         {request.submittedByEmail}
                       </a>
-                      {request.phone ? ` \u00B7 ${request.phone}` : ""}
                     </p>
                   </div>
                   <Badge tone={STATUS_TONES[status]}>

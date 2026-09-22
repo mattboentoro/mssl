@@ -14,7 +14,6 @@ const answers = {
   yearsExperience: "5",
   preferredPosition: "MIDFIELDER",
   preferredDivisionId: "",
-  phone: "",
   notes: "",
 };
 
@@ -49,7 +48,6 @@ describe("freeAgentRequestSchema", () => {
     // Prisma stores these as nullable columns; "" would read back as a value.
     const parsed = freeAgentRequestSchema.parse(answers);
     expect(parsed.preferredDivisionId).toBeNull();
-    expect(parsed.phone).toBeNull();
     expect(parsed.notes).toBeNull();
   });
 
@@ -57,11 +55,9 @@ describe("freeAgentRequestSchema", () => {
     const parsed = freeAgentRequestSchema.parse({
       ...answers,
       preferredDivisionId: "div_1",
-      phone: "425-555-0148",
       notes: "Available Tuesdays.",
     });
     expect(parsed.preferredDivisionId).toBe("div_1");
-    expect(parsed.phone).toBe("425-555-0148");
     expect(parsed.notes).toBe("Available Tuesdays.");
   });
 

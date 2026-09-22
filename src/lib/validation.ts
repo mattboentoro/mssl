@@ -364,9 +364,6 @@ export const freeAgentRequestSchema = z.object({
   preferredDivisionId: optionalText(60)
     .nullable()
     .transform((v) => v ?? null),
-  phone: optionalText(40)
-    .nullable()
-    .transform((v) => v ?? null),
   notes: optionalText(2000)
     .nullable()
     .transform((v) => v ?? null),

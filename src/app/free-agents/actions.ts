@@ -65,7 +65,6 @@ export async function submitFreeAgentRequest(
     yearsExperience: form.get("yearsExperience"),
     preferredPosition: str(form, "preferredPosition"),
     preferredDivisionId: str(form, "preferredDivisionId"),
-    phone: str(form, "phone"),
     notes: str(form, "notes"),
   });
 
@@ -100,7 +99,7 @@ export async function submitFreeAgentRequest(
 
   // A request the league has already closed is reopened by submitting again;
   // one still in play keeps its status, so an administrator's work in progress
-  // is not thrown away by a player correcting their phone number.
+  // is not thrown away by a player correcting their answers.
   const reopened =
     existing !== null && !OPEN_FREE_AGENT_STATUSES.includes(existing.status as FreeAgentStatus);
 
@@ -110,7 +109,6 @@ export async function submitFreeAgentRequest(
     yearsExperience: input.yearsExperience,
     preferredPosition: input.preferredPosition,
     preferredDivisionId: input.preferredDivisionId,
-    phone: input.phone,
     notes: input.notes,
   };
 

@@ -81,7 +81,6 @@ export default async function FreeAgentsPage() {
                       yearsExperience: existing.yearsExperience,
                       preferredPosition: existing.preferredPosition,
                       preferredDivisionId: existing.preferredDivisionId,
-                      phone: existing.phone,
                       notes: existing.notes,
                     }
                   : null
