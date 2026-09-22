@@ -93,6 +93,46 @@ export const DOCUMENT_CATEGORY_LABELS: Record<DocumentCategory, string> = {
 export const ROLES = ["public", "viewer", "referee", "admin"] as const;
 export type Role = (typeof ROLES)[number];
 
+/**
+ * Where a free agent would rather play.
+ *
+ * Deliberately coarse. The league has no squad register, so this is a hint for
+ * whichever captain ends up reading the request, not a position a player is
+ * held to once they are placed.
+ */
+export const PLAYER_POSITIONS = ["GOALKEEPER", "DEFENDER", "MIDFIELDER", "FORWARD", "ANY"] as const;
+export type PlayerPosition = (typeof PLAYER_POSITIONS)[number];
+export const playerPositionSchema = z.enum(PLAYER_POSITIONS);
+
+export const PLAYER_POSITION_LABELS: Record<PlayerPosition, string> = {
+  GOALKEEPER: "Goalkeeper",
+  DEFENDER: "Defender",
+  MIDFIELDER: "Midfielder",
+  FORWARD: "Forward",
+  ANY: "Happy anywhere",
+};
+
+/**
+ * How far along a free-agent request is.
+ *
+ * Placing a player happens off-site — an administrator puts them in touch with
+ * a captain who has room — so these record what the league has done about a
+ * request rather than driving anything in the app.
+ */
+export const FREE_AGENT_STATUSES = ["PENDING", "CONTACTED", "PLACED", "DECLINED"] as const;
+export type FreeAgentStatus = (typeof FREE_AGENT_STATUSES)[number];
+export const freeAgentStatusSchema = z.enum(FREE_AGENT_STATUSES);
+
+export const FREE_AGENT_STATUS_LABELS: Record<FreeAgentStatus, string> = {
+  PENDING: "Awaiting review",
+  CONTACTED: "Contacted",
+  PLACED: "Placed with a team",
+  DECLINED: "Not placed",
+};
+
+/** Statuses a player can still edit their own request under. */
+export const OPEN_FREE_AGENT_STATUSES: readonly FreeAgentStatus[] = ["PENDING", "CONTACTED"];
+
 export const MATCH_STATUS_LABELS: Record<MatchStatus, string> = {
   SCHEDULED: "Needs a referee",
   ASSIGNED: "Referee assigned",

@@ -1,6 +1,13 @@
 import { z } from "zod";
 
-import { CARD_TYPES, DOCUMENT_CATEGORIES, KIT_CHOICES, MATCH_STATUSES } from "@/lib/enums";
+import {
+  CARD_TYPES,
+  DOCUMENT_CATEGORIES,
+  FREE_AGENT_STATUSES,
+  KIT_CHOICES,
+  MATCH_STATUSES,
+  PLAYER_POSITIONS,
+} from "@/lib/enums";
 import { normalizeHex } from "@/lib/kits";
 
 /** Shared Zod schemas. Every API route and server action validates with these. */
@@ -336,6 +343,51 @@ export const csvMatchRowSchema = z.object({
 });
 
 export type CsvMatchRow = z.infer<typeof csvMatchRowSchema>;
+
+/**
+ * A player's free-agent request.
+ *
+ * Name and e-mail are deliberately absent: they come from the signed-in
+ * Microsoft account, so there is nothing for the player to type and nothing to
+ * validate. Everything here is an answer to a question on the form.
+ */
+export const freeAgentRequestSchema = z.object({
+  yearsExperience: z.coerce
+    .number({ invalid_type_error: "Enter a number of years." })
+    .int("Enter whole years.")
+    .min(0, "Years cannot be negative.")
+    .max(60, "Enter 60 years or fewer."),
+  preferredPosition: z.enum(PLAYER_POSITIONS, {
+    errorMap: () => ({ message: "Pick a position." }),
+  }),
+  /** Blank means "no preference", which the form offers as its first option. */
+  preferredDivisionId: optionalText(60)
+    .nullable()
+    .transform((v) => v ?? null),
+  phone: optionalText(40)
+    .nullable()
+    .transform((v) => v ?? null),
+  notes: optionalText(2000)
+    .nullable()
+    .transform((v) => v ?? null),
+});
+
+export type FreeAgentRequestInput = z.infer<typeof freeAgentRequestSchema>;
+
+/** An administrator recording what the league did about a request. */
+export const freeAgentReviewSchema = z.object({
+  requestId: trimmed(60).min(1, "Missing request."),
+  status: z.enum(FREE_AGENT_STATUSES, {
+    errorMap: () => ({ message: "Pick a status." }),
+  }),
+  reviewNote: optionalText(500)
+    .nullable()
+    .transform((v) => v ?? null),
+});
+
+export const deleteFreeAgentRequestSchema = z.object({
+  requestId: trimmed(60).min(1, "Missing request."),
+});
 
 /** Flatten a ZodError into `{ field: message }` for form display. */
 export function flattenZodError(error: z.ZodError): Record<string, string> {

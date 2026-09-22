@@ -304,6 +304,7 @@ async function reset() {
   await prisma.pointsAdjustment.deleteMany();
   await prisma.seasonTeam.deleteMany();
   await prisma.team.deleteMany();
+  await prisma.freeAgentRequest.deleteMany();
   await prisma.division.deleteMany();
   await prisma.announcement.deleteMany();
   await prisma.season.deleteMany();
@@ -686,6 +687,95 @@ async function createReport(args: {
 }
 
 /**
+ * A handful of players waiting for a team, so Match Control's review screen has
+ * something in it on a fresh database.
+ *
+ * The dev-bypass "Player" persona is deliberately absent: signing in as them
+ * should land on an empty form so the submit flow can be exercised end to end.
+ */
+async function seedFreeAgents() {
+  const divisions = await prisma.division.findMany({
+    orderBy: { sortOrder: "asc" },
+    select: { id: true, slug: true },
+  });
+  const divisionBySlug = new Map(divisions.map((d) => [d.slug, d.id]));
+
+  const requests = [
+    {
+      submittedByName: "Priya Raman",
+      submittedByEmail: "priya.raman@example.com",
+      yearsExperience: 12,
+      preferredPosition: "MIDFIELDER",
+      divisionSlug: "premier-league",
+      phone: "425-555-0148",
+      notes: "Played university soccer. Can make any Tuesday or Thursday kickoff.",
+      status: "PENDING",
+      reviewNote: null as string | null,
+      daysAgo: 2,
+    },
+    {
+      submittedByName: "Tomas Lindqvist",
+      submittedByEmail: "tomas.lindqvist@example.com",
+      yearsExperience: 3,
+      preferredPosition: "GOALKEEPER",
+      divisionSlug: null,
+      phone: null,
+      notes: "Keeper, but happy to play out if a side already has one.",
+      status: "CONTACTED",
+      reviewNote: "Sent your details to two sides short of a keeper.",
+      daysAgo: 9,
+    },
+    {
+      submittedByName: "Amara Okafor",
+      submittedByEmail: "amara.okafor@example.com",
+      yearsExperience: 7,
+      preferredPosition: "FORWARD",
+      divisionSlug: "first-division",
+      phone: null,
+      notes: null,
+      status: "PLACED",
+      reviewNote: "Signed for a First Division club ahead of matchweek 3.",
+      daysAgo: 24,
+    },
+    {
+      submittedByName: "Chris Delacroix",
+      submittedByEmail: "chris.delacroix@example.com",
+      yearsExperience: 0,
+      preferredPosition: "ANY",
+      divisionSlug: null,
+      phone: "206-555-0122",
+      notes: "Brand new to the game and keen to learn. Fit and reliable.",
+      status: "PENDING",
+      reviewNote: null,
+      daysAgo: 1,
+    },
+  ];
+
+  for (const request of requests) {
+    const createdAt = new Date(Date.now() - request.daysAgo * DAY);
+    const reviewed = request.status !== "PENDING";
+    await prisma.freeAgentRequest.create({
+      data: {
+        submittedByName: request.submittedByName,
+        submittedByEmail: request.submittedByEmail,
+        yearsExperience: request.yearsExperience,
+        preferredPosition: request.preferredPosition,
+        preferredDivisionId: request.divisionSlug
+          ? (divisionBySlug.get(request.divisionSlug) ?? null)
+          : null,
+        phone: request.phone,
+        notes: request.notes,
+        status: request.status,
+        reviewNote: request.reviewNote,
+        reviewedAt: reviewed ? new Date(Date.now() - Math.max(0, request.daysAgo - 1) * DAY) : null,
+        reviewedByEmail: reviewed ? "alex.board@example.com" : null,
+        createdAt,
+      },
+    });
+  }
+}
+
+/**
  * League sanctions issued by the Game Administrator outside any fixture. These
  * are what the referee taking a game sees on their warning board, so they are
  * aimed deliberately at teams playing in the still-unclaimed fixtures.
@@ -1007,6 +1097,9 @@ async function main() {
   console.log("Seeding announcements and documents...");
   await seedContent(active.id);
 
+  console.log("Seeding free-agent requests...");
+  await seedFreeAgents();
+
   console.log("Seeding league sanctions for the referee warning board...");
   await seedLeagueSanctions(active.id);
 
@@ -1027,6 +1120,7 @@ async function main() {
     cards: await prisma.disciplinaryAction.count(),
     sanctions: await prisma.disciplinaryAction.count({ where: { issuedBy: "ADMIN" } }),
     adjustments: await prisma.pointsAdjustment.count(),
+    freeAgents: await prisma.freeAgentRequest.count(),
     autoBans: suspensions.automatic,
     redsToReview: suspensions.pending,
   };

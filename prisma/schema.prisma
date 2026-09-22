@@ -90,9 +90,10 @@ model Division {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  teams   Team[]
-  matches Match[]
-  entries SeasonTeam[]
+  teams          Team[]
+  matches        Match[]
+  entries        SeasonTeam[]
+  freeAgentHopes FreeAgentRequest[]
 }
 
 model Team {
@@ -371,4 +372,53 @@ model AuditLog {
   @@index([createdAt])
   @@index([entity, entityId])
   @@index([actorEmail])
+}
+
+/// A player asking the league to find them a team.
+///
+/// Not a squad record: MSSL keeps no player register, and referees type player
+/// names as free text on a game report. This is an expression of interest that
+/// an administrator reads and acts on off-site, by putting the player in touch
+/// with a captain who has room.
+///
+/// One open request per person, keyed on the e-mail of the Microsoft account
+/// that submitted it. Submitting again edits the request already on file
+/// rather than queueing a second one for the same player.
+model FreeAgentRequest {
+  id String @id @default(cuid())
+
+  /// Entra object id of the submitter. Null for a dev-bypass session.
+  submittedById    String?
+  submittedByName  String
+  submittedByEmail String  @unique
+
+  /// Optional second contact route, for captains who would rather call.
+  phone String?
+
+  /// Whole years of playing experience, as answered on the form.
+  yearsExperience Int
+
+  /// One of PlayerPosition: GOALKEEPER | DEFENDER | MIDFIELDER | FORWARD | ANY
+  preferredPosition String
+
+  /// Null means no preference, which is the form's default answer.
+  preferredDivisionId String?
+
+  /// Anything else the player wants a captain to know.
+  notes String?
+
+  /// One of FreeAgentStatus: PENDING | CONTACTED | PLACED | DECLINED
+  status          String    @default("PENDING")
+  reviewNote      String?
+  reviewedAt      DateTime?
+  reviewedByEmail String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  preferredDivision Division? @relation(fields: [preferredDivisionId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([preferredDivisionId])
 }

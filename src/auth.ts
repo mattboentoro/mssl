@@ -63,6 +63,15 @@ export const DEV_BYPASS_IDENTITIES = {
     email: "casey.fan@example.com",
     roles: ["viewer"] as Role[],
   },
+  // A player has no privileges beyond a viewer's: the free-agent form is open
+  // to anyone signed in. The persona exists so the flow can be exercised as
+  // somebody who is not already a referee or an administrator.
+  player: {
+    id: "dev-player",
+    name: "Jordan Striker (dev player)",
+    email: "jordan.striker@example.com",
+    roles: ["viewer"] as Role[],
+  },
 } as const;
 
 export type DevBypassPersona = keyof typeof DEV_BYPASS_IDENTITIES;

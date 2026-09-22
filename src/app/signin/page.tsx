@@ -32,6 +32,11 @@ const PERSONA_COPY: Record<
     badge: "Viewer",
     tone: "neutral",
   },
+  player: {
+    blurb: "Looking for a team \u2014 use this one to submit a free-agent request.",
+    badge: "Player",
+    tone: "neutral",
+  },
 };
 
 export default async function SignInPage({

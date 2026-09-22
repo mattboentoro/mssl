@@ -26,6 +26,7 @@ const PUBLIC_LINKS: NavLink[] = [
   { href: "/teams", label: "Teams" },
   { href: "/rules", label: "Rules" },
   { href: "/faq", label: "FAQ" },
+  { href: "/free-agents", label: "Sign up as free agent" },
 ];
 
 export function SiteHeader({ user }: { user: HeaderUser | null }) {
