@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { CalendarViewToggle, FixtureCalendar, parseView } from "@/components/fixture-calendar";
 import { MatchList } from "@/components/match-display";
 import { TeamLogo } from "@/components/team-logo";
-import { buttonClass, ButtonLink, Card, EmptyState, PageHeader } from "@/components/ui";
+import { BackLink, buttonClass, ButtonLink, Card, EmptyState, PageHeader } from "@/components/ui";
 import { getCurrentUser } from "@/lib/authz";
 import { CARD_LABELS, type CardType } from "@/lib/enums";
 import { formatDate, parseMonthValue, shiftMonth } from "@/lib/dates";
@@ -190,6 +190,9 @@ export default async function TeamPage({
 
   return (
     <div>
+      <div className="mb-4">
+        <BackLink href="/teams">All teams</BackLink>
+      </div>
       <div className="flex items-start gap-4">
         <TeamLogo
           teamId={team.id}

@@ -66,6 +66,8 @@ export default async function CaptainFreeAgentsPage({
   return (
     <div>
       <PageHeader
+        backHref="/captain"
+        backLabel="Captain dashboard"
         eyebrow="Captain"
         title="Free agents"
         description="Contact details are restricted to active Captains and access is audited. Placement sends an invitation; the player joins only after accepting it."

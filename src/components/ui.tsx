@@ -18,17 +18,29 @@ export function PageHeader({
   description,
   actions,
   eyebrow,
+  backHref,
+  backLabel,
 }: {
   title: string;
   description?: ReactNode;
   actions?: ReactNode;
   eyebrow?: string;
+  backHref?: string;
+  backLabel?: string;
 }) {
   return (
     <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="max-w-2xl">
+        {backHref ? <BackLink href={backHref}>{backLabel ?? "Back"}</BackLink> : null}
         {eyebrow ? (
-          <p className="text-brand text-xs font-semibold tracking-[0.18em] uppercase">{eyebrow}</p>
+          <p
+            className={cn(
+              "text-brand text-xs font-semibold tracking-[0.18em] uppercase",
+              backHref && "mt-3",
+            )}
+          >
+            {eyebrow}
+          </p>
         ) : null}
         <h1 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
         {description ? (
@@ -37,6 +49,18 @@ export function PageHeader({
       </div>
       {actions ? <div className="flex shrink-0 flex-wrap gap-2">{actions}</div> : null}
     </div>
+  );
+}
+
+export function BackLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="text-muted hover:text-foreground inline-flex items-center gap-1 text-sm font-medium transition"
+    >
+      <span aria-hidden>&larr;</span>
+      {children}
+    </Link>
   );
 }
 
@@ -145,13 +169,7 @@ export function MatchStatusBadge({ match }: { match: MatchDisplayInput }) {
 /* Buttons                                                                    */
 /* -------------------------------------------------------------------------- */
 
-export type ButtonVariant =
-  | "primary"
-  | "secondary"
-  | "outline"
-  | "ghost"
-  | "success"
-  | "danger";
+export type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "success" | "danger";
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   primary: "bg-brand text-brand-contrast hover:opacity-90",

@@ -39,6 +39,8 @@ export default async function CaptainResultPage({ params }: { params: Promise<{ 
   return (
     <div>
       <PageHeader
+        backHref="/captain/results"
+        backLabel="Match results"
         eyebrow="Captain result"
         title={`${match.homeTeam.name} v ${match.awayTeam.name}`}
         description={formatDateTime(match.kickoffAt)}

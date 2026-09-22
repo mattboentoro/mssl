@@ -26,6 +26,8 @@ export default async function RefereeRatingsPage() {
   return (
     <div>
       <PageHeader
+        backHref="/referee"
+        backLabel="Referee Control"
         eyebrow="Referee"
         title="Your rating"
         description="Team feedback is private. Only the combined average and number of ratings are shown here."

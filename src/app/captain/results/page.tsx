@@ -34,6 +34,8 @@ export default async function CaptainResultsPage() {
   return (
     <div>
       <PageHeader
+        backHref="/captain"
+        backLabel="Captain dashboard"
         eyebrow="Captain"
         title="Match results"
         description="For matches without a referee, submit a score after kickoff and track approval by the opposing Captain and league."

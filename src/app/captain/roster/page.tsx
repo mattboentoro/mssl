@@ -60,7 +60,12 @@ export default async function CaptainRosterPage({
   if (!selected) {
     return (
       <div>
-        <PageHeader title="Manage roster" eyebrow={user.isAdmin ? "Admin" : "Captain"} />
+        <PageHeader
+          backHref={user.isAdmin ? "/admin/roster" : "/captain"}
+          backLabel={user.isAdmin ? "Admin rosters" : "Captain dashboard"}
+          title="Manage roster"
+          eyebrow={user.isAdmin ? "Admin" : "Captain"}
+        />
         <Card className="p-6">
           <EmptyState title="No team-season assignments are available." />
         </Card>
@@ -118,6 +123,8 @@ export default async function CaptainRosterPage({
   return (
     <div>
       <PageHeader
+        backHref={user.isAdmin ? "/admin/roster" : "/captain"}
+        backLabel={user.isAdmin ? "Admin rosters" : "Captain dashboard"}
         eyebrow={user.isAdmin ? "Admin fallback" : "Captain"}
         title={`${selected.team.name} roster`}
         description={`${selected.season.name}. Membership changes and role changes are audited.`}

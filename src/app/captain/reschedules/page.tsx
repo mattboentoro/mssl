@@ -73,6 +73,8 @@ export default async function CaptainReschedulesPage({
   return (
     <div>
       <PageHeader
+        backHref="/captain"
+        backLabel="Captain dashboard"
         eyebrow="Captain"
         title="Fixture reschedules"
         description="Start from an upcoming fixture and choose a league-provided slot. Requests close 48 hours before the original kickoff."

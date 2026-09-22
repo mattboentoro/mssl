@@ -33,6 +33,8 @@ export default async function CaptainAppealsPage() {
   return (
     <div>
       <PageHeader
+        backHref="/captain"
+        backLabel="Captain dashboard"
         eyebrow="Captain"
         title="Score appeals"
         description="Appeal an official result for your team. Appeals have no elapsed-time or season-close deadline."

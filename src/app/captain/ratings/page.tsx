@@ -28,6 +28,8 @@ export default async function CaptainRatingsPage() {
   return (
     <div>
       <PageHeader
+        backHref="/captain"
+        backLabel="Captain dashboard"
         eyebrow="Captain"
         title="Rate referees"
         description="Each participating team may keep one private rating after the assigned referee files the official result. Any current co-Captain can update it."

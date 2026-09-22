@@ -6,7 +6,7 @@ import { AdminMatchForms } from "@/components/admin-match-forms";
 import { AdminWorkflowReview } from "@/components/admin-workflow-review";
 import { ActionButton } from "@/components/match-actions";
 import { KitSwatch } from "@/components/team-colors";
-import { Alert, Badge, Card, MatchStatusBadge } from "@/components/ui";
+import { Alert, BackLink, Badge, Card, MatchStatusBadge } from "@/components/ui";
 import { deleteMatchAction } from "@/app/admin/actions";
 import {
   reviewCaptainResultAdminAction,
@@ -92,11 +92,7 @@ export default async function AdminMatchDetailPage({
 
   return (
     <div className="space-y-8">
-      <p>
-        <Link href="/admin/matches" className="text-muted text-sm hover:underline">
-          &larr; All fixtures
-        </Link>
-      </p>
+      <BackLink href="/admin/matches">All fixtures</BackLink>
 
       <Card className="p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">

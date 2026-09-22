@@ -11,8 +11,9 @@ export const dynamic = "force-dynamic";
 
 export default async function TeamProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  let user;
   try {
-    const user = await requireUser();
+    user = await requireUser();
     if (!user.isAdmin) await requireCaptainForTeam(id);
   } catch (error) {
     if (error instanceof AuthzError) {
@@ -39,6 +40,8 @@ export default async function TeamProfilePage({ params }: { params: Promise<{ id
   return (
     <div>
       <PageHeader
+        backHref={user.isAdmin ? "/admin/league" : "/captain"}
+        backLabel={user.isAdmin ? "League setup" : "Captain dashboard"}
         eyebrow="Team management"
         title={team.name}
         description="Update the club identity shared across public, Captain, and Admin views. Web addresses remain Admin-only."
