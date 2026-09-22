@@ -201,18 +201,34 @@ export async function loadAuthorization(
     const role = assignment.role.toLowerCase();
     if (role === "admin" || role === "referee" || role === "captain" || role === "player") {
       roles.add(role);
+      if (role === "captain") roles.add("player");
     }
   }
   if (user.memberships.length) roles.add("player");
-  if (user.captainAssignments.length) roles.add("captain");
+  if (user.captainAssignments.length) {
+    roles.add("captain");
+    roles.add("player");
+  }
+
+  const playerContexts = new Map(
+    user.memberships.map((membership) => [
+      `${membership.seasonId}:${membership.teamId}`,
+      { ...membership, role: "player" as const },
+    ]),
+  );
+  for (const captain of user.captainAssignments) {
+    const seasonId = captain.seasonId as string;
+    playerContexts.set(`${seasonId}:${captain.teamId}`, {
+      seasonId,
+      teamId: captain.teamId,
+      role: "player",
+    });
+  }
 
   return {
     roles: [...roles],
     teamContexts: [
-      ...user.memberships.map((membership) => ({
-        ...membership,
-        role: "player" as const,
-      })),
+      ...playerContexts.values(),
       ...user.captainAssignments.map((captain) => ({
         seasonId: captain.seasonId as string,
         teamId: captain.teamId,

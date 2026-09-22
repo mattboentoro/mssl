@@ -111,8 +111,11 @@ describe("Admin RBAC operational controls", () => {
       normalizedEmail: "legacy@example.com",
     });
     expect(await loadAuthorization(prisma, identity.id)).toMatchObject({
-      roles: expect.arrayContaining(["captain"]),
-      teamContexts: [{ seasonId: season.id, teamId: team.id, role: "captain" }],
+      roles: expect.arrayContaining(["captain", "player"]),
+      teamContexts: expect.arrayContaining([
+        { seasonId: season.id, teamId: team.id, role: "player" },
+        { seasonId: season.id, teamId: team.id, role: "captain" },
+      ]),
     });
     expect(await prisma.teamMembership.count()).toBe(0);
     await expect(

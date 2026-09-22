@@ -297,6 +297,12 @@ describe("Captain RBAC foundation", () => {
 
     const snapshot = await loadAuthorization(prisma, user.id);
     expect(snapshot.roles).toContain("captain");
+    expect(snapshot.roles).toContain("player");
+    expect(snapshot.teamContexts).toContainEqual({
+      seasonId: season.id,
+      teamId: home.id,
+      role: "player",
+    });
     expect(snapshot.teamContexts).toContainEqual({
       seasonId: season.id,
       teamId: home.id,
