@@ -428,7 +428,6 @@ export async function createRosterInvitation(
   input: TeamSeasonInput &
     MessageInput & {
       invitedById: string;
-      invitedUserId?: string | null;
       email?: string | null;
       freeAgentRequestId?: string;
     },
@@ -466,14 +465,7 @@ export async function createRosterInvitation(
         );
       }
     }
-    if (input.invitedUserId) {
-      invitedUser = await tx.appUser.findUnique({ where: { id: input.invitedUserId } });
-      if (!invitedUser) {
-        throw new RosterError("That application user does not exist.", 404, "NOT_FOUND");
-      }
-    }
-    const email =
-      invitedUser?.email ?? freeAgentRequest?.submittedByEmail ?? input.email?.trim() ?? "";
+    const email = freeAgentRequest?.submittedByEmail ?? input.email?.trim() ?? "";
     const normalizedEmail = normalizeEmail(email);
     if (!normalizedEmail || !normalizedEmail.includes("@")) {
       throw new RosterError("Enter a valid player e-mail address.", 400, "INVALID_REQUEST");
@@ -482,16 +474,22 @@ export async function createRosterInvitation(
       throw new RosterError("You cannot invite yourself.", 400, "INVALID_REQUEST");
     }
 
+    invitedUser = await tx.appUser.findUnique({ where: { normalizedEmail } });
+    if (!freeAgentRequest && invitedUser && invitedUser.status !== "PROVISIONAL") {
+      throw new RosterError(
+        "This e-mail belongs to an existing user. Ask them to submit a join request instead.",
+        409,
+        "INVALID_REQUEST",
+      );
+    }
     if (!invitedUser) {
-      invitedUser = await tx.appUser.upsert({
-        where: { normalizedEmail },
-        create: {
+      invitedUser = await tx.appUser.create({
+        data: {
           email: email.trim(),
           normalizedEmail,
           displayName: email.trim(),
           status: "PROVISIONAL",
         },
-        update: {},
       });
     }
     const membership = await activeMembership(tx, input.seasonId, invitedUser.id);

@@ -113,7 +113,6 @@ export async function invitePlayerAction(
       invitedById: user.appUserId,
       seasonId: required(form, "seasonId"),
       teamId: required(form, "teamId"),
-      invitedUserId: value(form, "invitedUserId") || null,
       email: value(form, "email") || null,
       message: value(form, "message"),
     });

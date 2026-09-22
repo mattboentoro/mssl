@@ -190,15 +190,19 @@ describe("bidirectional roster onboarding", () => {
 
   it("creates no membership until the invited player accepts", async () => {
     const { season, home, captain } = await fixture();
-    const player = await user("invited-player", { player: true });
     const invitation = await createRosterInvitation(prisma, {
       seasonId: season.id,
       teamId: home.id,
       invitedById: captain.id,
-      invitedUserId: player.id,
+      email: "new-player@example.com",
     });
     expect(await prisma.teamMembership.count()).toBe(0);
 
+    const player = await claimApplicationIdentity(prisma, {
+      entraObjectId: "entra-new-player",
+      email: "new-player@example.com",
+      displayName: "New Player",
+    });
     await respondToRosterInvitation(prisma, {
       invitationId: invitation.id,
       actorId: player.id,
@@ -214,13 +218,12 @@ describe("bidirectional roster onboarding", () => {
 
   it("prevents duplicate invitations and limits cancellation to the sender or Admin", async () => {
     const { season, home, captain, awayCaptain } = await fixture();
-    const player = await user("invited-player", { player: true });
     const admin = await user("admin", { admin: true });
     const invitation = await createRosterInvitation(prisma, {
       seasonId: season.id,
       teamId: home.id,
       invitedById: captain.id,
-      email: player.email.toUpperCase(),
+      email: "invited-player@example.com",
     });
 
     await expect(
@@ -228,7 +231,7 @@ describe("bidirectional roster onboarding", () => {
         seasonId: season.id,
         teamId: home.id,
         invitedById: captain.id,
-        invitedUserId: player.id,
+        email: "INVITED-PLAYER@EXAMPLE.COM",
       }),
     ).rejects.toMatchObject({ code: "DUPLICATE_OPEN" } satisfies Partial<RosterError>);
     await expect(
@@ -245,7 +248,7 @@ describe("bidirectional roster onboarding", () => {
       seasonId: season.id,
       teamId: home.id,
       invitedById: captain.id,
-      invitedUserId: player.id,
+      email: "invited-player@example.com",
     });
     await expect(
       cancelRosterInvitation(prisma, { invitationId: adminCancelled.id, actorId: admin.id }),
@@ -285,13 +288,17 @@ describe("bidirectional roster onboarding", () => {
 
   it("rejects invitation acceptance by another identity", async () => {
     const { season, home, captain } = await fixture();
-    const invited = await user("invited", { player: true });
     const intruder = await user("intruder", { player: true });
     const invitation = await createRosterInvitation(prisma, {
       seasonId: season.id,
       teamId: home.id,
       invitedById: captain.id,
-      invitedUserId: invited.id,
+      email: "invited@example.com",
+    });
+    await claimApplicationIdentity(prisma, {
+      entraObjectId: "entra-invited",
+      email: "invited@example.com",
+      displayName: "Invited Player",
     });
 
     await expect(
@@ -303,42 +310,43 @@ describe("bidirectional roster onboarding", () => {
     ).rejects.toMatchObject({ code: "FORBIDDEN" } satisfies Partial<RosterError>);
   });
 
-  it("does not roster an active captain with another team in the same season", async () => {
+  it("rejects manual invitations for existing users", async () => {
     const { season, home, captain, awayCaptain } = await fixture();
-    const invitation = await createRosterInvitation(prisma, {
-      seasonId: season.id,
-      teamId: home.id,
-      invitedById: captain.id,
-      invitedUserId: awayCaptain.id,
-    });
-
     await expect(
-      respondToRosterInvitation(prisma, {
-        invitationId: invitation.id,
-        actorId: awayCaptain.id,
-        decision: "ACCEPTED",
+      createRosterInvitation(prisma, {
+        seasonId: season.id,
+        teamId: home.id,
+        invitedById: captain.id,
+        email: awayCaptain.email,
       }),
-    ).rejects.toMatchObject({ code: "ALREADY_ROSTERED" } satisfies Partial<RosterError>);
-    expect(await prisma.teamMembership.count({ where: { userId: awayCaptain.id } })).toBe(0);
+    ).rejects.toMatchObject({
+      code: "INVALID_REQUEST",
+      message: expect.stringContaining("existing user"),
+    } satisfies Partial<RosterError>);
+    expect(await prisma.rosterInvitation.count()).toBe(0);
   });
 
   it("allows only one of two competing cross-team invitations to activate membership", async () => {
     const { season, home, away, captain, awayCaptain } = await fixture();
-    const player = await user("racing-player", { player: true });
     const [homeInvite, awayInvite] = await Promise.all([
       createRosterInvitation(prisma, {
         seasonId: season.id,
         teamId: home.id,
         invitedById: captain.id,
-        invitedUserId: player.id,
+        email: "racing-player@example.com",
       }),
       createRosterInvitation(prisma, {
         seasonId: season.id,
         teamId: away.id,
         invitedById: awayCaptain.id,
-        invitedUserId: player.id,
+        email: "racing-player@example.com",
       }),
     ]);
+    const player = await claimApplicationIdentity(prisma, {
+      entraObjectId: "entra-racing-player",
+      email: "racing-player@example.com",
+      displayName: "Racing Player",
+    });
 
     await respondToRosterInvitation(prisma, {
       invitationId: homeInvite.id,
@@ -372,9 +380,14 @@ describe("bidirectional roster onboarding", () => {
         seasonId: season.id,
         teamId: home.id,
         invitedById: captain.id,
-        invitedUserId: player.id,
+        email: "future-rejected-player@example.com",
       }),
     ]);
+    const invited = await claimApplicationIdentity(prisma, {
+      entraObjectId: "entra-future-rejected-player",
+      email: "future-rejected-player@example.com",
+      displayName: "Future Rejected Player",
+    });
     await decideJoinRequest(prisma, {
       requestId: request.id,
       actorId: captain.id,
@@ -382,7 +395,7 @@ describe("bidirectional roster onboarding", () => {
     });
     await respondToRosterInvitation(prisma, {
       invitationId: invitation.id,
-      actorId: player.id,
+      actorId: invited.id,
       decision: "REJECTED",
     });
     expect(await prisma.teamMembership.count()).toBe(0);

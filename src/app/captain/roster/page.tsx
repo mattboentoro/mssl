@@ -73,7 +73,7 @@ export default async function CaptainRosterPage({
     );
   }
 
-  const [memberships, captains, requests, invitations, users] = await Promise.all([
+  const [memberships, captains, requests, invitations] = await Promise.all([
     prisma.teamMembership.findMany({
       where: {
         seasonId: selected.seasonId,
@@ -111,11 +111,6 @@ export default async function CaptainRosterPage({
       },
       include: { invitedBy: true },
       orderBy: { createdAt: "asc" },
-    }),
-    prisma.appUser.findMany({
-      where: { status: "ACTIVE" },
-      select: { id: true, displayName: true, email: true },
-      orderBy: { displayName: "asc" },
     }),
   ]);
   const captainUserIds = new Set(captains.flatMap(({ userId }) => (userId ? [userId] : [])));
@@ -158,8 +153,8 @@ export default async function CaptainRosterPage({
         <Card className="p-6">
           <h2 className="text-lg font-semibold">Invite a player</h2>
           <p className="text-muted mt-1 text-sm">
-            Choose an existing user or enter an e-mail. E-mail-only invitations are claimed on first
-            sign-in.
+            Enter the e-mail address of someone who does not have an MSSL account yet. Existing
+            users should submit a join request from their roster page.
           </p>
           <RosterActionForm
             action={invitePlayerAction}
@@ -168,18 +163,8 @@ export default async function CaptainRosterPage({
           >
             <input type="hidden" name="seasonId" value={selected.seasonId} />
             <input type="hidden" name="teamId" value={selected.teamId} />
-            <Field label="Existing user" htmlFor="invitedUserId">
-              <select className={inputClass} id="invitedUserId" name="invitedUserId">
-                <option value="">Invite by e-mail instead</option>
-                {users.map((candidate) => (
-                  <option key={candidate.id} value={candidate.id}>
-                    {candidate.displayName} ({candidate.email})
-                  </option>
-                ))}
-              </select>
-            </Field>
             <Field label="E-mail" htmlFor="email">
-              <input className={inputClass} id="email" name="email" type="email" />
+              <input className={inputClass} id="email" name="email" required type="email" />
             </Field>
             <Field label="Message (optional)" htmlFor="message">
               <textarea
