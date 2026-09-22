@@ -1,28 +1,34 @@
 import NextAuth, { type DefaultSession } from "next-auth";
-import type { JWT } from "next-auth/jwt";
+import type { JWT as _JWT } from "next-auth/jwt";
 import Credentials from "next-auth/providers/credentials";
 import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 
-import { ROLE_CACHE_TTL_MS, config, hasEntraConfig } from "@/lib/config";
+import { config, hasEntraConfig } from "@/lib/config";
 import type { Role } from "@/lib/enums";
-import { isAllowlistedAdmin, resolveGroupMembership } from "@/lib/graph";
+import { prisma } from "@/lib/prisma";
+import { claimApplicationIdentity, loadAuthorization, type TeamContext } from "@/lib/rbac";
 
 declare module "next-auth" {
   interface Session {
     user: {
       id: string;
+      appUserId: string;
       roles: Role[];
+      teamContexts: TeamContext[];
+      isPlayer: boolean;
+      isCaptain: boolean;
       isReferee: boolean;
       isAdmin: boolean;
       /** True when the session came from the dev-only bypass provider. */
       isDevBypass: boolean;
-      /** Set when Graph could not be reached during role resolution. */
+      /** Set when application identity or authorization could not be loaded. */
       roleError?: string;
     } & DefaultSession["user"];
   }
 
   interface User {
-    roles?: Role[];
+    appUserId?: string;
+    teamContexts?: TeamContext[];
     isDevBypass?: boolean;
   }
 }
@@ -30,11 +36,8 @@ declare module "next-auth" {
 declare module "next-auth/jwt" {
   interface JWT {
     uid?: string;
-    accessToken?: string;
-    roles?: Role[];
-    rolesCheckedAt?: number;
+    appUserId?: string;
     isDevBypass?: boolean;
-    roleError?: string;
   }
 }
 
@@ -43,34 +46,46 @@ export const DEV_BYPASS_IDENTITIES = {
     id: "dev-referee",
     name: "Riley Whistle (dev referee)",
     email: "riley.whistle@example.com",
-    roles: ["viewer", "referee"] as Role[],
   },
   referee2: {
     id: "dev-referee-2",
     name: "Sam Sideline (dev referee)",
     email: "sam.sideline@example.com",
-    roles: ["viewer", "referee"] as Role[],
   },
   admin: {
     id: "dev-admin",
     name: "Alex Board (dev admin)",
     email: "alex.board@example.com",
-    roles: ["viewer", "referee", "admin"] as Role[],
   },
   viewer: {
     id: "dev-viewer",
     name: "Casey Fan (dev viewer)",
     email: "casey.fan@example.com",
-    roles: ["viewer"] as Role[],
   },
-  // A player has no privileges beyond a viewer's: the free-agent form is open
-  // to anyone signed in. The persona exists so the flow can be exercised as
-  // somebody who is not already a referee or an administrator.
   player: {
     id: "dev-player",
     name: "Jordan Striker (dev player)",
     email: "jordan.striker@example.com",
-    roles: ["viewer"] as Role[],
+  },
+  player2: {
+    id: "dev-player-2",
+    name: "Taylor Keeper (dev player)",
+    email: "taylor.keeper@example.com",
+  },
+  captainHome: {
+    id: "dev-captain-home",
+    name: "Morgan Home (dev captain)",
+    email: "morgan.home@example.com",
+  },
+  captainAway: {
+    id: "dev-captain-away",
+    name: "Avery Away (dev captain)",
+    email: "avery.away@example.com",
+  },
+  multiRole: {
+    id: "dev-multi-role",
+    name: "Quinn Utility (dev multi-role)",
+    email: "quinn.utility@example.com",
   },
 } as const;
 
@@ -86,7 +101,7 @@ if (hasEntraConfig()) {
       issuer: `https://login.microsoftonline.com/${config.entra.tenantId}/v2.0`,
       authorization: {
         params: {
-          scope: "openid profile email offline_access User.Read GroupMember.Read.All",
+          scope: "openid profile email offline_access User.Read",
         },
       },
     }),
@@ -114,36 +129,11 @@ if (config.devAuthBypass) {
           id: identity.id,
           name: identity.name,
           email: identity.email,
-          roles: [...identity.roles],
           isDevBypass: true,
         };
       },
     }),
   );
-}
-
-async function resolveRoles(token: JWT): Promise<JWT> {
-  if (token.isDevBypass) return token;
-
-  const email = typeof token.email === "string" ? token.email : null;
-  const roles: Role[] = ["viewer"];
-  let roleError: string | undefined;
-
-  if (token.accessToken) {
-    const membership = await resolveGroupMembership(token.accessToken);
-    if (membership.error) roleError = membership.error;
-    if (membership.isReferee) roles.push("referee");
-    if (membership.isAdmin) roles.push("admin");
-  } else {
-    roleError = "No Microsoft Graph access token on the session.";
-  }
-
-  if (isAllowlistedAdmin(email) && !roles.includes("admin")) roles.push("admin");
-
-  token.roles = roles;
-  token.rolesCheckedAt = Date.now();
-  token.roleError = roleError;
-  return token;
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -152,37 +142,48 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   pages: { signIn: "/signin" },
   providers,
   callbacks: {
-    async jwt({ token, account, user, trigger }) {
+    async jwt({ token, account, user }) {
       if (user) {
-        token.uid = user.id ?? token.sub;
+        token.uid = account?.providerAccountId ?? user.id ?? token.sub;
         token.isDevBypass = Boolean(user.isDevBypass);
-        if (user.roles) token.roles = [...user.roles];
       }
-
-      if (account?.access_token) {
-        token.accessToken = account.access_token;
-        token.rolesCheckedAt = undefined; // force a fresh Graph check
-      }
-
-      const stale = !token.rolesCheckedAt || Date.now() - token.rolesCheckedAt > ROLE_CACHE_TTL_MS;
-
-      if (trigger === "update" || stale) {
-        return resolveRoles(token);
-      }
-
       return token;
     },
 
     async session({ session, token }) {
-      const roles = (token.roles ?? ["viewer"]) as Role[];
+      let roles: Role[] = ["viewer"];
+      let teamContexts: TeamContext[] = [];
+      let appUserId = "";
+      let roleError: string | undefined;
+      const objectId = token.uid ?? token.sub ?? "";
+      const email = typeof token.email === "string" ? token.email : "";
+      try {
+        const appUser = await claimApplicationIdentity(prisma, {
+          entraObjectId: objectId,
+          email,
+          displayName: typeof token.name === "string" ? token.name : email,
+        });
+        appUserId = appUser.id;
+        token.appUserId = appUser.id;
+        const authorization = await loadAuthorization(prisma, appUser.id);
+        roles = authorization.roles;
+        teamContexts = authorization.teamContexts;
+      } catch (error) {
+        roleError =
+          error instanceof Error ? error.message : "Application roles could not be loaded.";
+      }
       session.user = {
         ...session.user,
-        id: token.uid ?? token.sub ?? "",
+        id: objectId,
+        appUserId,
         roles,
+        teamContexts,
+        isPlayer: roles.includes("player"),
+        isCaptain: roles.includes("captain"),
         isReferee: roles.includes("referee"),
         isAdmin: roles.includes("admin"),
         isDevBypass: Boolean(token.isDevBypass),
-        roleError: token.roleError,
+        roleError,
       };
       return session;
     },

@@ -13,6 +13,7 @@ import {
   setSuspensionLength,
 } from "@/lib/matches";
 import { prisma } from "@/lib/prisma";
+import { ensureProvisionalIdentity, normalizeEmail } from "@/lib/rbac";
 import { pinSeasonDivisions, setSeasonDivision } from "@/lib/season-teams";
 import { parseLeagueDateTime } from "@/lib/timezone";
 import {
@@ -467,14 +468,7 @@ export async function createTeamAction(_prev: ActionState, form: FormData): Prom
 
       const team = await prisma.$transaction(async (tx) => {
         const { captains, ...teamData } = data;
-        const created = await tx.team.create({
-          data: {
-            ...teamData,
-            captains: {
-              create: captains.map((captain, sortOrder) => ({ ...captain, sortOrder })),
-            },
-          },
-        });
+        const created = await tx.team.create({ data: teamData });
         // Record the club against the running season straight away, so a later
         // promotion has something concrete to move away from.
         const active = await tx.season.findFirst({
@@ -484,6 +478,27 @@ export async function createTeamAction(_prev: ActionState, form: FormData): Prom
         if (active) {
           await tx.seasonTeam.create({
             data: { seasonId: active.id, teamId: created.id, divisionId: teamData.divisionId },
+          });
+        }
+        for (const [sortOrder, captain] of captains.entries()) {
+          const normalizedEmail = captain.email ? normalizeEmail(captain.email) : null;
+          const linkedUser = normalizedEmail
+            ? await ensureProvisionalIdentity(tx, {
+                email: captain.email as string,
+                displayName: captain.name,
+              })
+            : null;
+          await tx.teamCaptain.create({
+            data: {
+              ...captain,
+              normalizedEmail,
+              userId: linkedUser?.id,
+              seasonId: active?.id,
+              teamId: created.id,
+              sortOrder,
+              status: linkedUser?.status === "ACTIVE" ? "ACTIVE" : "PENDING",
+              assignedById: actor.appUserId,
+            },
           });
         }
         return created;
@@ -542,15 +557,15 @@ export async function updateTeamAction(_prev: ActionState, form: FormData): Prom
       }
 
       const team = await prisma.$transaction(async (tx) => {
+        const active = await tx.season.findFirst({
+          where: { isActive: true },
+          select: { id: true },
+        });
         // A division change is a promotion or a relegation, so it must not
         // touch seasons that have already been played. Pinning first freezes
         // every existing season at the club's current division; the move then
         // applies to the active season alone.
         if (data.divisionId !== before.divisionId) {
-          const active = await tx.season.findFirst({
-            where: { isActive: true },
-            select: { id: true },
-          });
           await pinSeasonDivisions(tx, teamId);
           if (active) {
             await setSeasonDivision(tx, {
@@ -561,10 +576,28 @@ export async function updateTeamAction(_prev: ActionState, form: FormData): Prom
           }
         }
         const team = await tx.team.update({ where: { id: teamId }, data });
-        await tx.teamCaptain.deleteMany({ where: { teamId } });
-        if (captains.length > 0) {
-          await tx.teamCaptain.createMany({
-            data: captains.map((captain, sortOrder) => ({ ...captain, sortOrder, teamId })),
+        await tx.teamCaptain.deleteMany({
+          where: { teamId, seasonId: active?.id ?? null },
+        });
+        for (const [sortOrder, captain] of captains.entries()) {
+          const normalizedEmail = captain.email ? normalizeEmail(captain.email) : null;
+          const linkedUser = normalizedEmail
+            ? await ensureProvisionalIdentity(tx, {
+                email: captain.email as string,
+                displayName: captain.name,
+              })
+            : null;
+          await tx.teamCaptain.create({
+            data: {
+              ...captain,
+              normalizedEmail,
+              userId: linkedUser?.id,
+              seasonId: active?.id,
+              teamId,
+              sortOrder,
+              status: linkedUser?.status === "ACTIVE" ? "ACTIVE" : "PENDING",
+              assignedById: actor.appUserId,
+            },
           });
         }
         return team;

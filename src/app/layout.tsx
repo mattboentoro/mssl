@@ -38,6 +38,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   email: user.email,
                   isReferee: user.isReferee,
                   isAdmin: user.isAdmin,
+                  isPlayer: user.isPlayer,
+                  isCaptain: user.isCaptain,
                   isDevBypass: user.isDevBypass,
                 }
               : null

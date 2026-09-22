@@ -23,7 +23,7 @@ const PERSONA_COPY: Record<
     tone: "brand",
   },
   admin: {
-    blurb: "Everything a referee can do, plus Match Control and the audit log.",
+    blurb: "League administration only; Referee access must be assigned separately.",
     badge: "Admin",
     tone: "accent",
   },
@@ -36,6 +36,26 @@ const PERSONA_COPY: Record<
     blurb: "Looking for a team \u2014 use this one to submit a free-agent request.",
     badge: "Player",
     tone: "neutral",
+  },
+  player2: {
+    blurb: "A second rostered player on an opposing team.",
+    badge: "Player",
+    tone: "neutral",
+  },
+  captainHome: {
+    blurb: "Captain of one seeded team in the active season.",
+    badge: "Captain",
+    tone: "brand",
+  },
+  captainAway: {
+    blurb: "Captain of an opposing seeded team in the active season.",
+    badge: "Captain",
+    tone: "brand",
+  },
+  multiRole: {
+    blurb: "A database-backed Player, Captain, and Referee identity.",
+    badge: "Multi-role",
+    tone: "accent",
   },
 };
 
@@ -66,7 +86,7 @@ export default async function SignInPage({
       <PageHeader
         eyebrow="MSSL"
         title="Sign in"
-        description="Referees and league admins sign in with their Microsoft work account. Everything else on this site is public."
+        description="Players, captains, referees and league admins sign in with their Microsoft work account."
       />
 
       {user ? (
@@ -92,9 +112,8 @@ export default async function SignInPage({
         <Card className="p-6">
           <h2 className="font-semibold">Microsoft Entra ID</h2>
           <p className="text-muted mt-1 text-sm">
-            Uses your Microsoft work account. Referee access is granted by membership of the{" "}
-            <code className="font-mono">msslrefs</code> distribution list, checked live against
-            Microsoft Graph on every sign-in.
+            Microsoft Entra verifies your identity. Application roles and team access are then
+            loaded from the MSSL database.
           </p>
           {authProviderStatus.entraConfigured ? (
             <form action={entraSignIn} className="mt-4">

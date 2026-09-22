@@ -14,10 +14,12 @@ import { getRoleFlags } from "@/lib/authz";
 export const dynamic = "force-dynamic";
 
 export default async function AfterSignInPage() {
-  const { signedIn, isAdmin, isReferee } = await getRoleFlags();
+  const { signedIn, isAdmin, isReferee, isCaptain, isPlayer } = await getRoleFlags();
 
   if (!signedIn) redirect("/signin");
   if (isAdmin) redirect("/admin");
   if (isReferee) redirect("/referee");
+  if (isCaptain) redirect("/captain");
+  if (isPlayer) redirect("/player");
   redirect("/");
 }

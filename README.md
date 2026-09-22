@@ -5,7 +5,7 @@ internal SharePoint site at `teams/MicrosoftSoccerLeagueMSSL`.
 
 The whole point of the app is one flow:
 
-> A referee who belongs to the **`msslrefs`** distribution list signs in, claims
+> A referee with an explicit application-database role signs in, claims
 > a match (claiming _is_ the lock), and submits the game report — and the
 > standings recompute from that report.
 
@@ -71,11 +71,12 @@ Then walk the critical path:
 
 ### Roles at a glance
 
-| Role                     | Can do                                                                                                                                                                                                                                                                                                                                                           |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Public** (anonymous)   | Standings for both divisions (**Premier League** and **First Division**), match dates and fixture details, team pages, rules.                                                                                                                                                                                                                                    |
-| **Referee** (`msslrefs`) | Claim a match, read the pre-match **warning board**, input the score, input disciplinary actions.                                                                                                                                                                                                                                                                |
-| **Game Administrator**   | Create **and delete** a season, add **and delete** a team (with its two kit colours), choose which kit each side wears in a fixture, add a disciplinary result (which reaches the referee taking the game as a warning), **override a score**, **deduct or restore league points**, plus divisions, venues, the schedule, report confirmation and the audit log. |
+| Role                   | Can do                                                                                                                                                                                                                                                                                                                                                           |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Public** (anonymous) | Standings for both divisions (**Premier League** and **First Division**), match dates and fixture details, team pages, rules.                                                                                                                                                                                                                                    |
+| **Referee**            | Claim a match, read the pre-match **warning board**, input the score, input disciplinary actions.                                                                                                                                                                                                                                                                |
+| **Player / Captain**   | See season-scoped team context. Captain and roster workflow surfaces build on these database assignments.                                                                                                                                                                                                                                                        |
+| **Game Administrator** | Create **and delete** a season, add **and delete** a team (with its two kit colours), choose which kit each side wears in a fixture, add a disciplinary result (which reaches the referee taking the game as a warning), **override a score**, **deduct or restore league points**, plus divisions, venues, the schedule, report confirmation and the audit log. |
 
 ### Verifying it without a browser
 
@@ -108,8 +109,8 @@ Next.js 16 App Router (React 19, TypeScript strict, Tailwind v4)
 │   ├── standings.ts            PURE calculator — no I/O, heavily unit tested
 │   ├── kits.ts                 PURE kit colour resolution + clash check
 │   ├── matches.ts              claim / submit / confirm state machine
-│   ├── authz.ts                requireReferee(), requireAdmin()
-│   ├── graph.ts                Microsoft Graph group membership
+│   ├── authz.ts                database-backed role and team guards
+│   ├── rbac.ts                 identity claim, roles and team membership
 │   └── validation.ts           every Zod schema
 ├── prisma/schema.prisma        12 models
 └── tests/                      Vitest — 76 tests
@@ -124,17 +125,17 @@ flowchart LR
   B -- no --> D[Microsoft Entra ID OIDC]
   C --> E[JWT callback]
   D --> E
-  E --> F["Graph POST /me/checkMemberGroups"]
-  F --> G{msslrefs member?}
-  G -- yes --> H[role = referee]
-  G -- no --> I[role = viewer]
-  E --> J{admin group or UPN allowlist?}
-  J -- yes --> K[role = admin]
+  E --> F[Claim AppUser by immutable Entra object ID]
+  F --> G[Load database roles and team contexts]
+  G --> H[Server guard reloads authorization]
 ```
 
-Roles are cached on the JWT for `ROLE_CACHE_TTL_MS` (5 minutes) and re-checked on
-every privileged action. `msslrefs` is a **distribution list**, so membership can
-only come from Graph — it is never present in token group claims.
+Entra authenticates the user but does not authorize application actions. Roles
+are cumulative and non-hierarchical in the application database. Every server
+guard reloads roles and season/team contexts and fails closed if that lookup fails.
+Set `MSSL_BOOTSTRAP_ADMIN_OBJECT_IDS` to one or more immutable Entra object IDs
+to establish the first administrator; subsequent assignments are managed at
+`/admin/users`.
 
 There is deliberately **no `middleware.ts`**: Prisma cannot run on the Edge
 runtime, so every route handler and page does its own server-side authorization
@@ -367,31 +368,10 @@ deployment:
 4. Copy **Application (client) ID** → `AUTH_MICROSOFT_ENTRA_ID_ID` and
    **Directory (tenant) ID** → `AUTH_MICROSOFT_ENTRA_ID_TENANT_ID`.
 5. **API permissions → Add a permission → Microsoft Graph → Delegated**, add:
-   `openid`, `profile`, `email`, `offline_access`, `User.Read`,
-   **`GroupMember.Read.All`**.
-6. Click **Grant admin consent**. `GroupMember.Read.All` requires it — without
-   consent every user silently resolves to `viewer`.
-
-### Finding the `msslrefs` group object ID
-
-Portal: **Entra ID → Groups → All groups**, search `msslrefs`, copy the
-**Object Id** into `MSSL_REFS_GROUP_ID`.
-
-Or with the CLI:
-
-```powershell
-az ad group show --group msslrefs --query id -o tsv
-```
-
-Or Graph Explorer: `GET https://graph.microsoft.com/v1.0/groups?$filter=displayName eq 'msslrefs'`.
-
-If `MSSL_REFS_GROUP_ID` is blank the app falls back to resolving the group by
-display name (`MSSL_REFS_GROUP_NAME`, default `msslrefs`), which costs an extra
-Graph call per resolution — set the ID in production.
-
-Do the same for the admin security group → `MSSL_ADMIN_GROUP_ID`. A
-comma-separated `MSSL_ADMIN_UPNS` allowlist also grants admin, which is handy
-for bootstrapping before the group exists.
+   `openid`, `profile`, `email`, `offline_access`, and `User.Read`.
+6. Copy the first administrator's immutable Entra object ID into
+   `MSSL_BOOTSTRAP_ADMIN_OBJECT_IDS`. After that account signs in, use
+   **Admin → Users & roles** for role management.
 
 ---
 
@@ -429,7 +409,7 @@ az webapp config appsettings set --name mssl-web --resource-group <rg> --setting
   AUTH_SECRET=<...> AUTH_URL=https://mssl-web.azurewebsites.net AUTH_TRUST_HOST=true `
   AUTH_MICROSOFT_ENTRA_ID_ID=<...> AUTH_MICROSOFT_ENTRA_ID_SECRET=<...> `
   AUTH_MICROSOFT_ENTRA_ID_TENANT_ID=<...> DATABASE_URL=<...> `
-  MSSL_REFS_GROUP_ID=<...> MSSL_ADMIN_GROUP_ID=<...> DEV_AUTH_BYPASS=false
+  MSSL_BOOTSTRAP_ADMIN_OBJECT_IDS=<entra-object-id> DEV_AUTH_BYPASS=false
 ```
 
 Startup command: `npx prisma migrate deploy && npm run start`.
@@ -529,8 +509,9 @@ Ambiguous product decisions, resolved and recorded rather than escalated.
     Credentials-based dev bypass, and it keeps role resolution in one place.
 17. **`experimental.authInterrupts` is enabled** so denied requests return a real
     **403** via `forbidden()` instead of rendering a 200 with an error panel.
-18. **Referee rows are auto-provisioned** on first sign-in by a `msslrefs`
-    member, so no manual roster sync is needed.
+18. **Roles are database-authoritative.** Entra proves identity only. Referee
+    access requires both an explicit Referee role and an active linked record;
+    Admin does not imply Referee.
 19. **Matchweeks are capped at 60**, which is well beyond any plausible season
     and catches typos in CSV imports.
 20. **No `middleware.ts`.** Prisma needs the Node runtime; authorization lives in

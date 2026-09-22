@@ -297,6 +297,15 @@ function roundRobin(count: number): [number, number][][] {
 
 async function reset() {
   // Order matters: children first (SQLite foreign keys are enforced by Prisma).
+  await prisma.notification.deleteMany();
+  await prisma.refereeRating.deleteMany();
+  await prisma.scoreAppeal.deleteMany();
+  await prisma.captainResultProposal.deleteMany();
+  await prisma.rescheduleRequest.deleteMany();
+  await prisma.rosterJoinRequest.deleteMany();
+  await prisma.rosterInvitation.deleteMany();
+  await prisma.teamMembership.deleteMany();
+  await prisma.globalRoleAssignment.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.disciplinaryAction.deleteMany();
   await prisma.gameReport.deleteMany();
@@ -310,6 +319,7 @@ async function reset() {
   await prisma.season.deleteMany();
   await prisma.referee.deleteMany();
   await prisma.document.deleteMany();
+  await prisma.appUser.deleteMany();
 }
 
 /**
@@ -1051,6 +1061,147 @@ async function seedPointsAdjustment(seasonId: string) {
   });
 }
 
+async function seedRbacPersonas(seasonId: string, league: League) {
+  const specs = [
+    {
+      id: "dev-referee",
+      name: "Riley Whistle (dev referee)",
+      email: "riley.whistle@example.com",
+      roles: ["REFEREE"],
+    },
+    {
+      id: "dev-referee-2",
+      name: "Sam Sideline (dev referee)",
+      email: "sam.sideline@example.com",
+      roles: ["REFEREE"],
+    },
+    {
+      id: "dev-admin",
+      name: "Alex Board (dev admin)",
+      email: "alex.board@example.com",
+      roles: ["ADMIN"],
+    },
+    {
+      id: "dev-viewer",
+      name: "Casey Fan (dev viewer)",
+      email: "casey.fan@example.com",
+      roles: [],
+    },
+    {
+      id: "dev-player",
+      name: "Jordan Striker (dev player)",
+      email: "jordan.striker@example.com",
+      roles: ["PLAYER"],
+    },
+    {
+      id: "dev-player-2",
+      name: "Taylor Keeper (dev player)",
+      email: "taylor.keeper@example.com",
+      roles: ["PLAYER"],
+    },
+    {
+      id: "dev-captain-home",
+      name: "Morgan Home (dev captain)",
+      email: "morgan.home@example.com",
+      roles: ["CAPTAIN"],
+    },
+    {
+      id: "dev-captain-away",
+      name: "Avery Away (dev captain)",
+      email: "avery.away@example.com",
+      roles: ["CAPTAIN"],
+    },
+    {
+      id: "dev-multi-role",
+      name: "Quinn Utility (dev multi-role)",
+      email: "quinn.utility@example.com",
+      roles: ["PLAYER", "CAPTAIN", "REFEREE"],
+    },
+  ] as const;
+
+  const users = new Map<string, { id: string }>();
+  for (const spec of specs) {
+    const user = await prisma.appUser.create({
+      data: {
+        entraObjectId: spec.id,
+        email: spec.email,
+        normalizedEmail: spec.email,
+        displayName: spec.name,
+        status: "ACTIVE",
+        claimedAt: new Date(),
+        rolesAssigned: {
+          create: spec.roles.map((role) => ({ role })),
+        },
+      },
+    });
+    users.set(spec.id, user);
+  }
+
+  for (const [objectId, email] of [
+    ["dev-referee", "riley.whistle@example.com"],
+    ["dev-referee-2", "sam.sideline@example.com"],
+  ] as const) {
+    await prisma.referee.update({
+      where: { email },
+      data: { userId: users.get(objectId)?.id, entraObjectId: objectId },
+    });
+  }
+  await prisma.referee.create({
+    data: {
+      name: "Quinn Utility",
+      email: "quinn.utility@example.com",
+      userId: users.get("dev-multi-role")?.id,
+      entraObjectId: "dev-multi-role",
+    },
+  });
+
+  const [home, away] = league[0]?.teams ?? [];
+  if (!home || !away) return;
+
+  await prisma.teamMembership.createMany({
+    data: [
+      { seasonId, teamId: home.id, userId: users.get("dev-player")!.id },
+      { seasonId, teamId: away.id, userId: users.get("dev-player-2")!.id },
+      { seasonId, teamId: home.id, userId: users.get("dev-multi-role")!.id },
+    ],
+  });
+
+  for (const [index, assignment] of [
+    {
+      userKey: "dev-captain-home",
+      team: home,
+      name: "Morgan Home",
+      email: "morgan.home@example.com",
+    },
+    {
+      userKey: "dev-captain-away",
+      team: away,
+      name: "Avery Away",
+      email: "avery.away@example.com",
+    },
+    {
+      userKey: "dev-multi-role",
+      team: home,
+      name: "Quinn Utility",
+      email: "quinn.utility@example.com",
+    },
+  ].entries()) {
+    await prisma.teamCaptain.create({
+      data: {
+        seasonId,
+        teamId: assignment.team.id,
+        userId: users.get(assignment.userKey)!.id,
+        name: assignment.name,
+        email: assignment.email,
+        normalizedEmail: assignment.email,
+        sortOrder: index + 10,
+        status: "ACTIVE",
+        activatedAt: new Date(),
+      },
+    });
+  }
+}
+
 async function main() {
   console.log("Resetting database...");
   await reset();
@@ -1095,6 +1246,9 @@ async function main() {
   console.log("Seeding free-agent requests...");
   await seedFreeAgents();
 
+  console.log("Seeding RBAC development personas...");
+  await seedRbacPersonas(active.id, league);
+
   console.log("Seeding league sanctions for the referee warning board...");
   await seedLeagueSanctions(active.id);
 
@@ -1116,6 +1270,7 @@ async function main() {
     sanctions: await prisma.disciplinaryAction.count({ where: { issuedBy: "ADMIN" } }),
     adjustments: await prisma.pointsAdjustment.count(),
     freeAgents: await prisma.freeAgentRequest.count(),
+    users: await prisma.appUser.count(),
     autoBans: suspensions.automatic,
     redsToReview: suspensions.pending,
   };

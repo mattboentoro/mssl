@@ -17,6 +17,8 @@ export interface HeaderUser {
   email: string | null;
   isReferee: boolean;
   isAdmin: boolean;
+  isPlayer: boolean;
+  isCaptain: boolean;
   isDevBypass: boolean;
 }
 
@@ -44,7 +46,9 @@ export function SiteHeader({ user }: { user: HeaderUser | null }) {
   // A request is filed against the signed-in account, so the tab would only
   // lead a signed-out visitor to a page that asks them to sign in first.
   if (user) links.push({ href: "/free-agents", label: "Sign up as free agent" });
-  if (user?.isReferee || user?.isAdmin) links.push({ href: "/referee", label: "Referee" });
+  if (user?.isPlayer) links.push({ href: "/player", label: "Player" });
+  if (user?.isCaptain) links.push({ href: "/captain", label: "Captain" });
+  if (user?.isReferee) links.push({ href: "/referee", label: "Referee" });
   if (user?.isAdmin) links.push({ href: "/admin/matches", label: "Admin" });
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
@@ -151,7 +155,15 @@ function AccountChip({ user }: { user: HeaderUser | null }) {
     .map((part) => part[0]?.toUpperCase())
     .join("");
 
-  const role = user.isAdmin ? "Admin" : user.isReferee ? "Referee" : "Viewer";
+  const role =
+    [
+      user.isAdmin ? "Admin" : null,
+      user.isReferee ? "Referee" : null,
+      user.isCaptain ? "Captain" : null,
+      user.isPlayer ? "Player" : null,
+    ]
+      .filter(Boolean)
+      .join(" + ") || "Viewer";
 
   return (
     <Link

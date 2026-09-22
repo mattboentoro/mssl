@@ -12,13 +12,10 @@ const team = {
 };
 
 describe("team captains", () => {
-  it("requires at least one captain", () => {
+  it("allows a team to be temporarily captainless", () => {
     const result = teamSchema.safeParse({ ...team, captains: [] });
 
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues[0]?.message).toBe("A team must have at least 1 captain.");
-    }
+    expect(result.success).toBe(true);
   });
 
   it("accepts up to five independently-addressable captains", () => {

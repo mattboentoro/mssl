@@ -11,10 +11,10 @@ const bool = (value: string | undefined, fallback: boolean): boolean => {
   return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
 };
 
-const list = (value: string | undefined): string[] =>
+const idList = (value: string | undefined): string[] =>
   (value ?? "")
     .split(",")
-    .map((v) => v.trim().toLowerCase())
+    .map((v) => v.trim())
     .filter(Boolean);
 
 const parseForfeitScore = (value: string | undefined): { winner: number; loser: number } => {
@@ -42,10 +42,7 @@ export const config = {
   },
 
   roles: {
-    refsGroupId: process.env.MSSL_REFS_GROUP_ID?.trim() ?? "",
-    refsGroupName: process.env.MSSL_REFS_GROUP_NAME?.trim() || "msslrefs",
-    adminGroupId: process.env.MSSL_ADMIN_GROUP_ID?.trim() ?? "",
-    adminUpns: list(process.env.MSSL_ADMIN_UPNS),
+    bootstrapAdminObjectIds: idList(process.env.MSSL_BOOTSTRAP_ADMIN_OBJECT_IDS),
   },
 
   standings: {
@@ -53,9 +50,6 @@ export const config = {
     forfeit: parseForfeitScore(process.env.STANDINGS_FORFEIT_SCORE),
   },
 } as const;
-
-/** How long a Graph-derived role decision is trusted before it is re-checked. */
-export const ROLE_CACHE_TTL_MS = 5 * 60 * 1000;
 
 /** True when a real Entra app registration is configured. */
 export const hasEntraConfig = (): boolean =>

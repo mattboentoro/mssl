@@ -188,8 +188,7 @@ export default async function RefereePage({
 
       {user.isDevBypass ? (
         <Alert tone="warning" title="Development session">
-          Roles come from the dev bypass, not from the <code className="font-mono">msslrefs</code>{" "}
-          distribution list.
+          This development identity uses the same database-backed Referee role as Microsoft sign-in.
         </Alert>
       ) : null}
 
