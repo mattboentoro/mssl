@@ -14,7 +14,6 @@ const COLUMNS = [
     links: [
       { href: "/rules", label: "Rules & regulations" },
       { href: "/faq", label: "FAQ" },
-      { href: "/schedule/calendar.ics", label: "Calendar (.ics)" },
     ],
   },
   {
