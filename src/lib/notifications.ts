@@ -4,6 +4,18 @@ import { writeAudit, type AuditActor } from "@/lib/audit";
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
 
+export async function createNotifications(
+  db: DbClient,
+  userIds: Array<string | null | undefined>,
+  data: { type: string; title: string; body: string; href?: string },
+) {
+  const recipients = [...new Set(userIds.filter((id): id is string => Boolean(id)))];
+  if (!recipients.length) return;
+  await db.notification.createMany({
+    data: recipients.map((userId) => ({ userId, ...data })),
+  });
+}
+
 export const MAX_NOTIFICATION_PAGE_SIZE = 100;
 export const MAX_BROADCAST_RECIPIENTS = 100;
 export const MAX_NOTIFICATION_TITLE_LENGTH = 120;
@@ -186,14 +198,11 @@ export async function broadcastToTeam(
       );
     }
 
-    await tx.notification.createMany({
-      data: recipientIds.map((userId) => ({
-        userId,
-        type: "TEAM_BROADCAST",
-        title,
-        body,
-        href: `/teams/${encodeURIComponent(input.teamId)}`,
-      })),
+    await createNotifications(tx, recipientIds, {
+      type: "TEAM_BROADCAST",
+      title,
+      body,
+      href: `/teams/${encodeURIComponent(input.teamId)}`,
     });
     await writeAudit(tx, {
       actor: input.actor,

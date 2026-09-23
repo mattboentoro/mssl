@@ -1,6 +1,6 @@
 import type { PrismaClient, RefereeRating } from "@prisma/client";
 
-import { writeAudit } from "@/lib/audit";
+import { toAuditActor, writeAudit } from "@/lib/audit";
 
 export const MAX_RATING_COMMENT_LENGTH = 1000;
 
@@ -148,12 +148,7 @@ export async function saveRefereeRating(
     });
 
     await writeAudit(tx, {
-      actor: {
-        id: input.actor.appUserId,
-        email: input.actor.email,
-        name: input.actor.name,
-        role: "captain",
-      },
+      actor: toAuditActor(input.actor, "captain"),
       action: previous ? "referee_rating.update" : "referee_rating.create",
       entity: "RefereeRating",
       entityId: saved.id,

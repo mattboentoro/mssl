@@ -1,6 +1,7 @@
 import { Prisma, type PrismaClient, type RescheduleRequest } from "@prisma/client";
 
-import { writeAudit } from "@/lib/audit";
+import { toAuditActor, writeAudit } from "@/lib/audit";
+import { createNotifications } from "@/lib/notifications";
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
 
@@ -35,10 +36,6 @@ export interface RescheduleActor {
   email?: string | null;
   name?: string | null;
   isAdmin?: boolean;
-}
-
-function actorForAudit(actor: RescheduleActor, role: "captain" | "admin") {
-  return { id: actor.appUserId, email: actor.email, name: actor.name, role };
 }
 
 function requiredText(value: string | null | undefined, label: string, maximum: number): string {
@@ -187,24 +184,12 @@ async function notify(
   userIds: string[],
   input: { type: string; title: string; body: string; requestId: string },
 ) {
-  const recipients = [...new Set(userIds)];
-  if (!recipients.length) return;
-  await db.notification.createMany({
-    data: recipients.map((userId) => ({
-      userId,
-      type: input.type,
-      title: input.title,
-      body: input.body,
-      href: `/captain/reschedules#request-${encodeURIComponent(input.requestId)}`,
-    })),
+  await createNotifications(db, userIds, {
+    type: input.type,
+    title: input.title,
+    body: input.body,
+    href: `/captain/reschedules#request-${encodeURIComponent(input.requestId)}`,
   });
-}
-
-async function runTransaction<T>(
-  db: PrismaClient,
-  operation: (tx: Prisma.TransactionClient) => Promise<T>,
-) {
-  return db.$transaction(operation);
 }
 
 export async function proposeReschedule(
@@ -221,7 +206,7 @@ export async function proposeReschedule(
   const now = input.now ?? new Date();
   const reason = requiredText(input.reason, "Rationale", MAX_RESCHEDULE_REASON_LENGTH);
 
-  return runTransaction(db, async (tx) => {
+  return db.$transaction(async (tx) => {
     const match = await tx.match.findUnique({
       where: { id: input.matchId },
       include: { report: { select: { id: true } }, homeTeam: true, awayTeam: true },
@@ -310,7 +295,7 @@ export async function proposeReschedule(
       requestId: request.id,
     });
     await writeAudit(tx, {
-      actor: actorForAudit(input.actor, "captain"),
+      actor: toAuditActor(input.actor, "captain"),
       action: "reschedule.propose",
       entity: "RescheduleRequest",
       entityId: request.id,
@@ -342,7 +327,7 @@ export async function reviseReschedule(
 ): Promise<RescheduleRequest> {
   const now = input.now ?? new Date();
   const reason = requiredText(input.reason, "Rationale", MAX_RESCHEDULE_REASON_LENGTH);
-  return runTransaction(db, async (tx) => {
+  return db.$transaction(async (tx) => {
     const request = await tx.rescheduleRequest.findUnique({
       where: { id: input.requestId },
       include: { match: { include: { homeTeam: true, awayTeam: true, report: true } } },
@@ -444,7 +429,7 @@ export async function reviseReschedule(
       requestId: request.id,
     });
     await writeAudit(tx, {
-      actor: actorForAudit(input.actor, "captain"),
+      actor: toAuditActor(input.actor, "captain"),
       action: "reschedule.revise",
       entity: "RescheduleRequest",
       entityId: request.id,
@@ -470,7 +455,7 @@ export async function cancelReschedule(
   db: PrismaClient,
   input: { requestId: string; actor: RescheduleActor },
 ): Promise<RescheduleRequest> {
-  return runTransaction(db, async (tx) => {
+  return db.$transaction(async (tx) => {
     const request = await tx.rescheduleRequest.findUnique({
       where: { id: input.requestId },
       include: { match: { include: { homeTeam: true, awayTeam: true } } },
@@ -521,7 +506,7 @@ export async function cancelReschedule(
       requestId: request.id,
     });
     await writeAudit(tx, {
-      actor: actorForAudit(input.actor, "captain"),
+      actor: toAuditActor(input.actor, "captain"),
       action: "reschedule.cancel",
       entity: "RescheduleRequest",
       entityId: request.id,
@@ -543,7 +528,7 @@ export async function respondToReschedule(
 ): Promise<RescheduleRequest> {
   const responseNote = optionalText(input.responseNote, MAX_RESCHEDULE_NOTE_LENGTH);
   const now = input.now ?? new Date();
-  return runTransaction(db, async (tx) => {
+  return db.$transaction(async (tx) => {
     const request = await tx.rescheduleRequest.findUnique({
       where: { id: input.requestId },
       include: { match: { include: { homeTeam: true, awayTeam: true } } },
@@ -636,7 +621,7 @@ export async function respondToReschedule(
       requestId: request.id,
     });
     await writeAudit(tx, {
-      actor: actorForAudit(input.actor, "captain"),
+      actor: toAuditActor(input.actor, "captain"),
       action: input.approve ? "reschedule.opponent_approve" : "reschedule.opponent_reject",
       entity: "RescheduleRequest",
       entityId: request.id,
@@ -661,7 +646,7 @@ export async function reviewRescheduleAsAdmin(
   }
   const reviewNote = optionalText(input.reviewNote, MAX_RESCHEDULE_NOTE_LENGTH);
   const now = input.now ?? new Date();
-  return runTransaction(db, async (tx) => {
+  return db.$transaction(async (tx) => {
     const request = await tx.rescheduleRequest.findUnique({
       where: { id: input.requestId },
       include: {
@@ -804,7 +789,7 @@ export async function reviewRescheduleAsAdmin(
       requestId: request.id,
     });
     await writeAudit(tx, {
-      actor: actorForAudit(input.actor, "admin"),
+      actor: toAuditActor(input.actor, "admin"),
       action: input.approve ? "reschedule.admin_approve" : "reschedule.admin_reject",
       entity: "RescheduleRequest",
       entityId: request.id,

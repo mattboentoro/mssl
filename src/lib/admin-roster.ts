@@ -1,6 +1,6 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 
-import { writeAudit } from "@/lib/audit";
+import { toAuditActor, writeAudit } from "@/lib/audit";
 import { ensureProvisionalIdentity, normalizeEmail } from "@/lib/rbac";
 
 export class AdminRosterError extends Error {
@@ -156,12 +156,7 @@ export async function relinkCaptainIdentity(
         }
         const updated = await tx.teamCaptain.findUniqueOrThrow({ where: { id: captain.id } });
         await writeAudit(tx, {
-          actor: {
-            id: input.actor.appUserId,
-            email: input.actor.email,
-            name: input.actor.name,
-            role: "admin",
-          },
+          actor: toAuditActor(input.actor, "admin"),
           action: "captain.identity_relink",
           entity: "TeamCaptain",
           entityId: captain.id,

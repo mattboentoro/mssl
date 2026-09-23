@@ -18,6 +18,13 @@ export interface AuditEntry {
   metadata?: unknown;
 }
 
+export function toAuditActor(
+  actor: { appUserId: string; email?: string | null; name?: string | null },
+  role: string,
+): AuditActor {
+  return { id: actor.appUserId, email: actor.email, name: actor.name, role };
+}
+
 /**
  * Append an audit row. `metadata` is JSON-encoded into a text column so the
  * schema stays portable between SQLite and PostgreSQL.

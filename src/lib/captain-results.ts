@@ -1,7 +1,8 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 
-import { writeAudit } from "@/lib/audit";
+import { toAuditActor, writeAudit } from "@/lib/audit";
 import { createOfficialGameReport, MatchError } from "@/lib/matches";
+import { createNotifications } from "@/lib/notifications";
 import { captainResultSchema } from "@/lib/validation";
 
 type Transaction = Prisma.TransactionClient;
@@ -45,13 +46,6 @@ export interface CaptainResultInput {
   notes?: string | null;
 }
 
-const actorForAudit = (actor: CaptainResultActor, role: "captain" | "admin") => ({
-  id: actor.appUserId,
-  email: actor.email,
-  name: actor.name,
-  role,
-});
-
 async function activeCaptain(tx: Transaction, userId: string, teamId: string, seasonId: string) {
   return tx.teamCaptain.findFirst({
     where: {
@@ -71,16 +65,11 @@ async function notifyUsers(
   userIds: string[],
   input: { type: string; title: string; body: string; matchId: string },
 ) {
-  const unique = [...new Set(userIds)];
-  if (!unique.length) return;
-  await tx.notification.createMany({
-    data: unique.map((userId) => ({
-      userId,
-      type: input.type,
-      title: input.title,
-      body: input.body,
-      href: `/captain/results/${encodeURIComponent(input.matchId)}`,
-    })),
+  await createNotifications(tx, userIds, {
+    type: input.type,
+    title: input.title,
+    body: input.body,
+    href: `/captain/results/${encodeURIComponent(input.matchId)}`,
   });
 }
 
@@ -215,7 +204,7 @@ export async function submitCaptainResult(
         matchId: match.id,
       });
       await writeAudit(tx, {
-        actor: actorForAudit(input.actor, "captain"),
+        actor: toAuditActor(input.actor, "captain"),
         action: "captain_result.submit",
         entity: "CaptainResultProposal",
         entityId: proposal.id,
@@ -309,7 +298,7 @@ export async function respondToCaptainResult(
       matchId: match.id,
     });
     await writeAudit(tx, {
-      actor: actorForAudit(input.actor, "captain"),
+      actor: toAuditActor(input.actor, "captain"),
       action: input.approve ? "captain_result.confirm" : "captain_result.reject_opponent",
       entity: "CaptainResultProposal",
       entityId: proposal.id,
@@ -374,7 +363,7 @@ export async function reviewCaptainResult(
           matchId: match.id,
           expectedVersion: match.version,
           requireUnassigned: true,
-          actor: { ...actorForAudit(input.actor, "admin"), isAdmin: true },
+          actor: { ...toAuditActor(input.actor, "admin"), isAdmin: true },
           reason: "Approved Captain-submitted result",
           homeScore: proposal.homeScore,
           awayScore: proposal.awayScore,
@@ -414,7 +403,7 @@ export async function reviewCaptainResult(
       matchId: match.id,
     });
     await writeAudit(tx, {
-      actor: actorForAudit(input.actor, "admin"),
+      actor: toAuditActor(input.actor, "admin"),
       action: input.approve ? "captain_result.approve" : "captain_result.reject_admin",
       entity: "CaptainResultProposal",
       entityId: proposal.id,

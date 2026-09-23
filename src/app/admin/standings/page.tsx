@@ -4,6 +4,7 @@ import { ActionForm, FieldError, SubmitButton } from "@/components/admin-forms";
 import { CloseOnSuccess, Dialog, DialogCancel } from "@/components/form-dialog";
 import { StandingsTable } from "@/components/match-display";
 import { PointsTeamPicker } from "@/components/points-team-picker";
+import { SeasonTabs } from "@/components/season-tabs";
 import { Alert, Card, EmptyState, Field, inputClass, outlineButtonClass } from "@/components/ui";
 import { createPointsAdjustmentAction, deletePointsAdjustmentAction } from "@/app/admin/actions";
 import { formatDate } from "@/lib/dates";
@@ -65,24 +66,7 @@ export default async function AdminStandingsPage({
 
   return (
     <div className="space-y-8">
-      {seasons.length > 1 ? (
-        <nav aria-label="Season" className="flex flex-wrap gap-2">
-          {seasons.map((s) => (
-            <Link
-              key={s.id}
-              href={`/admin/standings?season=${s.slug}`}
-              aria-current={s.id === season.id ? "page" : undefined}
-              className={
-                s.id === season.id
-                  ? "bg-brand text-brand-contrast rounded-full px-3 py-1.5 text-sm font-medium"
-                  : "border-subtle hover:bg-surface-muted rounded-full border px-3 py-1.5 text-sm"
-              }
-            >
-              {s.name}
-            </Link>
-          ))}
-        </nav>
-      ) : null}
+      <SeasonTabs seasons={seasons} currentSeasonId={season.id} basePath="/admin/standings" />
 
       <section aria-labelledby="adjust-list">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

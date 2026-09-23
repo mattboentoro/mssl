@@ -1,7 +1,8 @@
 import { Prisma, type PrismaClient, type ScoreAppeal } from "@prisma/client";
 
-import { writeAudit } from "@/lib/audit";
+import { toAuditActor, writeAudit } from "@/lib/audit";
 import { MatchError, overrideGameReport } from "@/lib/matches";
+import { createNotifications as notifyUsers } from "@/lib/notifications";
 
 export const MAX_APPEAL_REASON_LENGTH = 2_000;
 export const MAX_APPEAL_DECISION_NOTE_LENGTH = 2_000;
@@ -182,17 +183,6 @@ async function participantRecipientIds(
   ];
 }
 
-async function notifyUsers(
-  tx: Prisma.TransactionClient,
-  userIds: string[],
-  input: { type: string; title: string; body: string },
-) {
-  if (!userIds.length) return;
-  await tx.notification.createMany({
-    data: userIds.map((userId) => ({ userId, ...input, href: "/schedule" })),
-  });
-}
-
 export async function submitScoreAppeal(
   db: PrismaClient,
   input: SubmitScoreAppealInput,
@@ -253,12 +243,7 @@ export async function submitScoreAppeal(
         },
       });
       await writeAudit(tx, {
-        actor: {
-          id: input.actor.appUserId,
-          email: input.actor.email,
-          name: input.actor.name,
-          role: "captain",
-        },
+        actor: toAuditActor(input.actor, "captain"),
         action: "score_appeal.submit",
         entity: "ScoreAppeal",
         entityId: appeal.id,
@@ -284,6 +269,7 @@ export async function submitScoreAppeal(
         type: "SCORE_APPEAL_SUBMITTED",
         title: "Score appeal submitted",
         body: `${match.homeTeam.name} v ${match.awayTeam.name} has a new score appeal.`,
+        href: "/schedule",
       });
       return appeal;
     });
@@ -320,12 +306,7 @@ export async function cancelScoreAppeal(
       throw new ScoreAppealError("Only a pending appeal can be cancelled.", 409, "ALREADY_DECIDED");
     }
     await writeAudit(tx, {
-      actor: {
-        id: input.actor.appUserId,
-        email: input.actor.email,
-        name: input.actor.name,
-        role: "captain",
-      },
+      actor: toAuditActor(input.actor, "captain"),
       action: "score_appeal.cancel",
       entity: "ScoreAppeal",
       entityId: appeal.id,
@@ -373,12 +354,7 @@ export async function rejectScoreAppeal(
       throw new ScoreAppealError("This appeal is no longer pending.", 409, "ALREADY_DECIDED");
     }
     await writeAudit(tx, {
-      actor: {
-        id: input.actor.appUserId,
-        email: input.actor.email,
-        name: input.actor.name,
-        role: "admin",
-      },
+      actor: toAuditActor(input.actor, "admin"),
       action: "score_appeal.reject",
       entity: "ScoreAppeal",
       entityId: appeal.id,
@@ -388,6 +364,7 @@ export async function rejectScoreAppeal(
       type: "SCORE_APPEAL_REJECTED",
       title: "Score appeal rejected",
       body: `The appeal for ${appeal.match.homeTeam.name} v ${appeal.match.awayTeam.name} was rejected: ${note}`,
+      href: "/schedule",
     });
   });
 }
@@ -457,13 +434,7 @@ export async function acceptScoreAppeal(
     try {
       await overrideGameReport(tx, {
         matchId: appeal.matchId,
-        actor: {
-          id: input.actor.appUserId,
-          email: input.actor.email,
-          name: input.actor.name,
-          role: "admin",
-          isAdmin: true,
-        },
+        actor: { ...toAuditActor(input.actor, "admin"), isAdmin: true },
         reason: `Accepted score appeal ${appeal.id}: ${note}`,
         homeScore: appeal.requestedHomeScore,
         awayScore: appeal.requestedAwayScore,
@@ -484,12 +455,7 @@ export async function acceptScoreAppeal(
       throw error;
     }
     await writeAudit(tx, {
-      actor: {
-        id: input.actor.appUserId,
-        email: input.actor.email,
-        name: input.actor.name,
-        role: "admin",
-      },
+      actor: toAuditActor(input.actor, "admin"),
       action: "score_appeal.accept",
       entity: "ScoreAppeal",
       entityId: appeal.id,
@@ -509,6 +475,7 @@ export async function acceptScoreAppeal(
       type: "SCORE_APPEAL_ACCEPTED",
       title: "Score appeal accepted",
       body: `The result for ${appeal.match.homeTeam.name} v ${appeal.match.awayTeam.name} was corrected: ${note}`,
+      href: "/schedule",
     });
   });
 }

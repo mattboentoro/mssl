@@ -1,6 +1,7 @@
 import { Prisma, type AppUser, type PrismaClient } from "@prisma/client";
 
 import { writeAudit } from "@/lib/audit";
+import { createNotifications as notify } from "@/lib/notifications";
 import { normalizeEmail } from "@/lib/rbac";
 
 type Transaction = Prisma.TransactionClient;
@@ -87,18 +88,6 @@ async function assertManager(tx: Transaction, actor: Actor, input: TeamSeasonInp
   if (!captain) {
     throw new RosterError("Captain access for this team and season is required.", 403, "FORBIDDEN");
   }
-}
-
-async function notify(
-  tx: Transaction,
-  userIds: Array<string | null | undefined>,
-  data: { type: string; title: string; body: string; href?: string },
-) {
-  const uniqueIds = [...new Set(userIds.filter((id): id is string => Boolean(id)))];
-  if (!uniqueIds.length) return;
-  await tx.notification.createMany({
-    data: uniqueIds.map((userId) => ({ userId, ...data })),
-  });
 }
 
 async function captainIds(tx: Transaction, input: TeamSeasonInput): Promise<string[]> {

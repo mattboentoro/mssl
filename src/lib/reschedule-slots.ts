@@ -1,6 +1,6 @@
 import { Prisma, type PrismaClient, type RescheduleSlot } from "@prisma/client";
 
-import { writeAudit } from "@/lib/audit";
+import { toAuditActor, writeAudit } from "@/lib/audit";
 
 export const RESCHEDULE_SLOT_STATUSES = ["AVAILABLE", "RESERVED", "DISABLED", "USED"] as const;
 export type RescheduleSlotStatus = (typeof RESCHEDULE_SLOT_STATUSES)[number];
@@ -41,10 +41,6 @@ function validateSlot(kickoffAt: Date, venueName: string, now: Date) {
   return venue;
 }
 
-function actor(actor: AdminActor) {
-  return { id: actor.appUserId, email: actor.email, name: actor.name, role: "admin" };
-}
-
 export async function createRescheduleSlot(
   db: PrismaClient,
   input: { kickoffAt: Date; venueName: string; actor: AdminActor; now?: Date },
@@ -61,7 +57,7 @@ export async function createRescheduleSlot(
         },
       });
       await writeAudit(tx, {
-        actor: actor(input.actor),
+        actor: toAuditActor(input.actor, "admin"),
         action: "reschedule_slot.create",
         entity: "RescheduleSlot",
         entityId: slot.id,
@@ -115,7 +111,7 @@ export async function updateRescheduleSlot(
         );
       }
       await writeAudit(tx, {
-        actor: actor(input.actor),
+        actor: toAuditActor(input.actor, "admin"),
         action: "reschedule_slot.update",
         entity: "RescheduleSlot",
         entityId: slot.id,
@@ -172,7 +168,7 @@ export async function setRescheduleSlotAvailability(
     }
     const updated = await tx.rescheduleSlot.findUniqueOrThrow({ where: { id: slot.id } });
     await writeAudit(tx, {
-      actor: actor(input.actor),
+      actor: toAuditActor(input.actor, "admin"),
       action: input.available ? "reschedule_slot.enable" : "reschedule_slot.disable",
       entity: "RescheduleSlot",
       entityId: slot.id,
