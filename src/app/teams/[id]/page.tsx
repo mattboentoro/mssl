@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { AddToCalendarButton } from "@/components/add-to-calendar-button";
 import { CalendarViewToggle, FixtureCalendar, parseView } from "@/components/fixture-calendar";
 import { MatchList } from "@/components/match-display";
 import { TeamLogo } from "@/components/team-logo";
@@ -161,6 +162,15 @@ export default async function TeamPage({
         }),
       )
     : undefined;
+  const upcomingActions = Object.fromEntries(
+    upcoming.map((match) => [
+      match.id,
+      <div key={match.id} className="flex flex-col gap-2">
+        <AddToCalendarButton matchId={match.id} />
+        {rescheduleActions?.[match.id]}
+      </div>,
+    ]),
+  );
 
   const view = parseView(viewParam);
   // The calendar shows every fixture in the month, played or not, because a
@@ -307,7 +317,7 @@ export default async function TeamPage({
             ) : upcoming.length === 0 ? (
               <EmptyState title="No fixtures scheduled" />
             ) : (
-              <MatchList matches={upcoming} actions={rescheduleActions} />
+              <MatchList matches={upcoming} actions={upcomingActions} />
             )}
           </section>
         </div>

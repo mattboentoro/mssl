@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { forbidden, redirect } from "next/navigation";
 
+import { AddToCalendarButton } from "@/components/add-to-calendar-button";
 import { ClaimMatchCard } from "@/components/claim-match-card";
 import { ActionButton } from "@/components/match-actions";
 import { CalendarViewToggle, FixtureCalendar, parseView } from "@/components/fixture-calendar";
@@ -235,6 +236,7 @@ export default async function RefereePage({
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    <AddToCalendarButton matchId={match.id} />
                     {match.status === "ASSIGNED" ? (
                       <ActionButton
                         url={`/api/matches/${match.id}/unassign`}

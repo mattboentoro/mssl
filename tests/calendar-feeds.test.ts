@@ -3,6 +3,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { auth } from "@/auth";
 import { GET as getPersonalCalendar } from "@/app/calendar.ics/route";
+import { GET as getMatchCalendar } from "@/app/matches/[id]/calendar.ics/route";
 import { GET as getTeamCalendar } from "@/app/teams/[id]/calendar.ics/route";
 import { foldIcalLine, serializeCalendar, type CalendarMatch } from "@/lib/ical";
 
@@ -237,5 +238,31 @@ describe("calendar routes", () => {
       { params: Promise.resolve({ id: teams[0].slug }) },
     );
     expect(missingSeason.status).toBe(404);
+  });
+
+  it("returns one public fixture for an individual match download", async () => {
+    const { teams, makeMatch } = await fixture();
+    await makeMatch("single-match", teams[0].id, teams[1].id);
+    await makeMatch("other-match", teams[2].id, teams[3].id);
+
+    const response = await getMatchCalendar(
+      new Request("http://localhost/matches/single-match/calendar.ics"),
+      { params: Promise.resolve({ id: "single-match" }) },
+    );
+    const body = await response.text();
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-disposition")).toContain(
+      'filename="mssl-match-single-match.ics"',
+    );
+    expect(response.headers.get("cache-control")).toBe("public, max-age=0, must-revalidate");
+    expect(body).toContain("UID:single-match@mssl");
+    expect(body).not.toContain("UID:other-match@mssl");
+    expect(body.match(/BEGIN:VEVENT/g)).toHaveLength(1);
+
+    const missing = await getMatchCalendar(
+      new Request("http://localhost/matches/missing/calendar.ics"),
+      { params: Promise.resolve({ id: "missing" }) },
+    );
+    expect(missing.status).toBe(404);
   });
 });
