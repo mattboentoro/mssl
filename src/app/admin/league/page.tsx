@@ -25,7 +25,13 @@ export default async function AdminLeaguePage() {
       orderBy: { name: "asc" },
       include: {
         division: { select: { name: true } },
-        captains: { orderBy: { sortOrder: "asc" } },
+        captains: {
+          where: {
+            revokedAt: null,
+            OR: [{ season: { is: { isActive: true } } }, { seasonId: null }],
+          },
+          orderBy: { sortOrder: "asc" },
+        },
       },
     }),
   ]);

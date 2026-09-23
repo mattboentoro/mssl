@@ -79,6 +79,28 @@ export const gameReportSchema = z
 
 export type GameReportPayload = z.infer<typeof gameReportSchema>;
 
+export const captainResultSchema = z
+  .object({
+    homeScore: scoreSchema,
+    awayScore: scoreSchema,
+    homeForfeit: z.boolean().default(false),
+    awayForfeit: z.boolean().default(false),
+    notes: optionalText(4000).nullable().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (
+      value.homeForfeit &&
+      value.awayForfeit &&
+      (value.homeScore !== 0 || value.awayScore !== 0)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["homeScore"],
+        message: "A double forfeit must be recorded as 0-0.",
+      });
+    }
+  });
+
 /** A league-issued sanction added by an admin outside any single fixture. */
 export const disciplinaryActionSchema = z.object({
   seasonId: z.string().min(1, "Pick a season."),
@@ -207,13 +229,19 @@ export const teamSchema = z.object({
   shortName: trimmed(24).min(1),
   colorPrimary: hexColor("#0f766e"),
   colorAlternate: hexColor("#ffffff"),
-  captains: z
-    .array(teamCaptainSchema)
-    .min(1, "A team must have at least 1 captain.")
-    .max(5, "A team can have at most 5 captains."),
+  captains: z.array(teamCaptainSchema).max(5, "A team can have at most 5 captains."),
 });
 
 export const updateTeamSchema = teamSchema.extend({ teamId: z.string().min(1) });
+
+export const teamProfileSchema = teamSchema
+  .pick({
+    name: true,
+    shortName: true,
+    colorPrimary: true,
+    colorAlternate: true,
+  })
+  .extend({ teamId: z.string().min(1) });
 
 /**
  * Deleting a season or a team is irreversible, so the admin has to retype the

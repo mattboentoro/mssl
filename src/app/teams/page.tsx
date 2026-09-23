@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { TeamColorBar } from "@/components/team-colors";
+import { TeamLogo } from "@/components/team-logo";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { getTeams } from "@/lib/queries";
 
@@ -49,6 +50,12 @@ export default async function TeamsPage() {
                   <Card key={team.id} as="li" className="hover:border-brand transition-colors">
                     <Link href={`/teams/${team.slug}`} className="block p-4">
                       <div className="flex items-center gap-3">
+                        <TeamLogo
+                          teamId={team.id}
+                          name={team.name}
+                          hasLogo={Boolean(team.logoBlobName)}
+                          size={44}
+                        />
                         <TeamColorBar team={team} size="lg" />
                         <div className="min-w-0">
                           <p className="truncate font-semibold">{team.name}</p>

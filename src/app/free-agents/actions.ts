@@ -8,6 +8,10 @@ import { writeAudit } from "@/lib/audit";
 import { AuthzError, requireUser } from "@/lib/authz";
 import type { SessionUser } from "@/lib/authz";
 import { OPEN_FREE_AGENT_STATUSES, type FreeAgentStatus } from "@/lib/enums";
+import {
+  FreeAgentEligibilityError,
+  requireFreeAgentEligibility,
+} from "@/lib/free-agent-eligibility";
 import { prisma } from "@/lib/prisma";
 import { flattenZodError, freeAgentRequestSchema } from "@/lib/validation";
 
@@ -59,6 +63,14 @@ export async function submitFreeAgentRequest(
   const email = contactEmail(user);
   if (!email) {
     return { error: "Your account has no e-mail address, so the league has no way to reply." };
+  }
+  try {
+    await requireFreeAgentEligibility(prisma, user.appUserId);
+  } catch (error) {
+    if (error instanceof FreeAgentEligibilityError) {
+      return { error: error.message };
+    }
+    throw error;
   }
 
   const parsed = freeAgentRequestSchema.safeParse({

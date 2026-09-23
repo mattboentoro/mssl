@@ -10,8 +10,8 @@ export const runtime = "nodejs";
  * Referee self-assignment.
  *
  * Authorization is re-checked server-side on every call: `requireReferee()`
- * re-reads the signed session and, if the cached Graph decision has expired,
- * re-queries `msslrefs` membership. A client that fakes a role gets a 403 here.
+ * re-reads the signed session and reloads the explicit Referee role and linked
+ * active referee record from the database. A client that fakes a role gets 403.
  *
  * Returns 409 ALREADY_ASSIGNED when another referee won the race.
  */

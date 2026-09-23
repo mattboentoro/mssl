@@ -3,10 +3,16 @@ import { notFound } from "next/navigation";
 
 import { ActionForm, SubmitButton } from "@/components/admin-forms";
 import { AdminMatchForms } from "@/components/admin-match-forms";
+import { AdminWorkflowReview } from "@/components/admin-workflow-review";
 import { ActionButton } from "@/components/match-actions";
 import { KitSwatch } from "@/components/team-colors";
-import { Alert, Badge, Card, MatchStatusBadge } from "@/components/ui";
+import { Alert, BackLink, Badge, Card, MatchStatusBadge } from "@/components/ui";
 import { deleteMatchAction } from "@/app/admin/actions";
+import {
+  reviewCaptainResultAdminAction,
+  reviewRescheduleAction,
+  reviewScoreAppealAction,
+} from "@/app/admin/workflows/actions";
 import { formatDateTime } from "@/lib/dates";
 import { CARD_LABELS, type CardType, type KitChoice } from "@/lib/enums";
 import { isForfeit } from "@/lib/match-status";
@@ -39,6 +45,27 @@ export default async function AdminMatchDetailPage({
             },
           },
         },
+        rescheduleRequests: {
+          where: { status: "PENDING_ADMIN" },
+          orderBy: { createdAt: "desc" },
+          include: {
+            requestingTeam: { select: { name: true } },
+            requestedBy: { select: { displayName: true } },
+          },
+        },
+        resultProposal: {
+          include: {
+            submittedTeam: { select: { name: true } },
+            submittedBy: { select: { displayName: true } },
+          },
+        },
+        scoreAppeals: {
+          where: { status: "PENDING" },
+          include: {
+            team: { select: { name: true } },
+            submittedBy: { select: { displayName: true } },
+          },
+        },
       },
     }),
     prisma.referee.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
@@ -65,11 +92,7 @@ export default async function AdminMatchDetailPage({
 
   return (
     <div className="space-y-8">
-      <p>
-        <Link href="/admin/matches" className="text-muted text-sm hover:underline">
-          &larr; All fixtures
-        </Link>
-      </p>
+      <BackLink href="/admin/matches">All fixtures</BackLink>
 
       <Card className="p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -92,6 +115,105 @@ export default async function AdminMatchDetailPage({
           <MatchStatusBadge match={match} />
         </div>
       </Card>
+
+      {match.rescheduleRequests.length ||
+      match.resultProposal?.status === "PENDING_ADMIN" ||
+      match.scoreAppeals.length ? (
+        <Alert tone="warning" title="This fixture has pending Admin workflow reviews">
+          <ul className="mt-1 list-disc pl-5">
+            {match.rescheduleRequests.length ? (
+              <li>{match.rescheduleRequests.length} agreed reschedule request(s)</li>
+            ) : null}
+            {match.resultProposal?.status === "PENDING_ADMIN" ? (
+              <li>Captain no-referee result proposal</li>
+            ) : null}
+            {match.scoreAppeals.map((appeal) => (
+              <li key={appeal.id}>Score appeal from {appeal.team.name}</li>
+            ))}
+          </ul>
+          <Link href="/admin/workflows" className="mt-2 inline-block font-semibold underline">
+            Open review controls
+          </Link>
+        </Alert>
+      ) : null}
+
+      {match.rescheduleRequests.map((request) => (
+        <AdminWorkflowReview
+          key={request.id}
+          title="Review agreed reschedule"
+          matchId={match.id}
+          action={reviewRescheduleAction}
+          idName="requestId"
+          idValue={request.id}
+          noteName="reviewNote"
+        >
+          <p className="text-sm">
+            <span className="text-muted">Current fixture:</span> {formatDateTime(match.kickoffAt)} ·{" "}
+            {match.venueName || "TBD"}
+          </p>
+          <p className="text-sm">
+            <span className="text-muted">Original snapshot:</span>{" "}
+            {request.originalKickoffAt ? formatDateTime(request.originalKickoffAt) : "Unavailable"}{" "}
+            · {request.originalVenueName || "TBD"}
+          </p>
+          <p className="text-sm">
+            <span className="text-muted">Requested:</span>{" "}
+            {request.proposedKickoffAt ? formatDateTime(request.proposedKickoffAt) : "Unavailable"}{" "}
+            · {request.proposedVenueName || request.originalVenueName || "TBD"}
+          </p>
+          <p className="mt-2 text-sm">
+            {request.requestedBy.displayName} ({request.requestingTeam.name}): {request.reason}
+          </p>
+        </AdminWorkflowReview>
+      ))}
+
+      {match.resultProposal?.status === "PENDING_ADMIN" ? (
+        <AdminWorkflowReview
+          title="Review Captain no-referee result"
+          matchId={match.id}
+          action={reviewCaptainResultAdminAction}
+          idName="proposalId"
+          idValue={match.resultProposal.id}
+          noteName="reviewNote"
+        >
+          <p className="text-lg font-semibold">
+            {match.homeTeam.name} {match.resultProposal.homeScore}&ndash;
+            {match.resultProposal.awayScore} {match.awayTeam.name}
+          </p>
+          <p className="text-muted text-sm">
+            Submitted by {match.resultProposal.submittedBy.displayName} (
+            {match.resultProposal.submittedTeam.name})
+          </p>
+          {match.resultProposal.notes ? (
+            <p className="mt-2 text-sm whitespace-pre-wrap">{match.resultProposal.notes}</p>
+          ) : null}
+        </AdminWorkflowReview>
+      ) : null}
+
+      {match.scoreAppeals.map((appeal) => (
+        <AdminWorkflowReview
+          key={appeal.id}
+          title={`Review score appeal from ${appeal.team.name}`}
+          matchId={match.id}
+          action={reviewScoreAppealAction}
+          idName="appealId"
+          idValue={appeal.id}
+          noteName="resolutionNote"
+          noteRequired
+        >
+          <p className="text-sm">
+            <span className="text-muted">Original:</span> {appeal.originalHomeScore}&ndash;
+            {appeal.originalAwayScore} · <span className="text-muted">Current:</span>{" "}
+            {match.report
+              ? `${match.report.homeScore}–${match.report.awayScore}`
+              : "report removed"}{" "}
+            · <span className="text-muted">Requested:</span> {appeal.requestedHomeScore}&ndash;
+            {appeal.requestedAwayScore}
+          </p>
+          <p className="text-muted mt-1 text-sm">Submitted by {appeal.submittedBy.displayName}</p>
+          <p className="mt-2 text-sm whitespace-pre-wrap">{appeal.reason}</p>
+        </AdminWorkflowReview>
+      ))}
 
       {match.report ? (
         <section aria-labelledby="report-review">

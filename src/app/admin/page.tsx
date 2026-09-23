@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminOverviewPage() {
   const season = await getActiveSeason();
 
-  const [pending, counts, recentAudit, unassigned] = await Promise.all([
+  const [pending, counts, recentAudit, unassigned, workflowCounts] = await Promise.all([
     prisma.match.findMany({
       where: { status: "REPORT_SUBMITTED" },
       orderBy: { kickoffAt: "asc" },
@@ -41,6 +41,11 @@ export default async function AdminOverviewPage() {
     ]),
     prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 8 }),
     prisma.match.count({ where: { refereeId: null, status: "SCHEDULED" } }),
+    Promise.all([
+      prisma.rescheduleRequest.count({ where: { status: "PENDING_ADMIN" } }),
+      prisma.captainResultProposal.count({ where: { status: "PENDING_ADMIN" } }),
+      prisma.scoreAppeal.count({ where: { status: "PENDING" } }),
+    ]),
   ]);
 
   const [seasons, teams, cards, matches, reports, referees] = counts;
@@ -110,6 +115,38 @@ export default async function AdminOverviewPage() {
             ))}
           </Card>
         )}
+      </section>
+
+      <section aria-labelledby="workflow-queues">
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="workflow-queues" className="text-lg font-semibold">
+            RBAC workflow queues
+          </h2>
+          <Link href="/admin/workflows" className="text-brand text-sm hover:underline">
+            Review all
+          </Link>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {[
+            { label: "Agreed reschedules", count: workflowCounts[0] },
+            { label: "Captain results", count: workflowCounts[1] },
+            { label: "Score appeals", count: workflowCounts[2] },
+          ].map((queue) => (
+            <Link key={queue.label} href="/admin/workflows">
+              <Card className="hover:bg-surface-muted p-4">
+                <p className="text-2xl font-bold tabular-nums">{queue.count}</p>
+                <p className="text-muted text-sm">{queue.label}</p>
+              </Card>
+            </Link>
+          ))}
+        </div>
+        <p className="text-muted mt-3 text-sm">
+          Participant updates are delivered through{" "}
+          <Link href="/notifications" className="text-brand hover:underline">
+            Notifications
+          </Link>
+          .
+        </p>
       </section>
 
       <section aria-labelledby="recent-audit">

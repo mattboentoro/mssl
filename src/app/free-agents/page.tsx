@@ -10,6 +10,7 @@ import {
   type PlayerPosition,
 } from "@/lib/enums";
 import { formatDate } from "@/lib/dates";
+import { getActiveTeamAssociation } from "@/lib/free-agent-eligibility";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -37,12 +38,15 @@ export default async function FreeAgentsPage() {
   });
 
   const email = user?.email?.trim().toLowerCase();
-  const existing = email
-    ? await prisma.freeAgentRequest.findUnique({
-        where: { submittedByEmail: email },
-        include: { preferredDivision: { select: { name: true } } },
-      })
-    : null;
+  const [existing, activeTeam] = await Promise.all([
+    email
+      ? prisma.freeAgentRequest.findUnique({
+          where: { submittedByEmail: email },
+          include: { preferredDivision: { select: { name: true } } },
+        })
+      : null,
+    user?.appUserId ? getActiveTeamAssociation(prisma, user.appUserId) : Promise.resolve(null),
+  ]);
 
   return (
     <div>
@@ -66,28 +70,42 @@ export default async function FreeAgentsPage() {
       ) : (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start">
           <Card className="p-6">
-            <h2 className="text-lg font-semibold tracking-tight">
-              {existing ? "Your request" : "About you"}
-            </h2>
-            <p className="text-muted mt-1 mb-5 text-sm">
-              Filed as <span className="text-foreground font-medium">{user.name ?? email}</span>{" "}
-              &middot; {email}
-            </p>
+            {activeTeam ? (
+              <>
+                <h2 className="text-lg font-semibold tracking-tight">
+                  Already associated with a team
+                </h2>
+                <Alert className="mt-4" tone="info">
+                  You are currently associated with {activeTeam.name}. You can sign up as a free
+                  agent after leaving your team.
+                </Alert>
+              </>
+            ) : (
+              <>
+                <h2 className="text-lg font-semibold tracking-tight">
+                  {existing ? "Your request" : "About you"}
+                </h2>
+                <p className="text-muted mt-1 mb-5 text-sm">
+                  Filed as <span className="text-foreground font-medium">{user.name ?? email}</span>{" "}
+                  &middot; {email}
+                </p>
 
-            <FreeAgentForm
-              defaults={
-                existing
-                  ? {
-                      yearsExperience: existing.yearsExperience,
-                      preferredPosition: existing.preferredPosition,
-                      preferredDivisionId: existing.preferredDivisionId,
-                      notes: existing.notes,
-                    }
-                  : null
-              }
-              divisions={divisions}
-              isUpdate={existing !== null}
-            />
+                <FreeAgentForm
+                  defaults={
+                    existing
+                      ? {
+                          yearsExperience: existing.yearsExperience,
+                          preferredPosition: existing.preferredPosition,
+                          preferredDivisionId: existing.preferredDivisionId,
+                          notes: existing.notes,
+                        }
+                      : null
+                  }
+                  divisions={divisions}
+                  isUpdate={existing !== null}
+                />
+              </>
+            )}
           </Card>
 
           <div className="grid gap-4">

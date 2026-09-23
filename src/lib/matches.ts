@@ -51,6 +51,17 @@ async function loadMatch(db: DbClient, matchId: string) {
   return match;
 }
 
+async function closeOpenCaptainResultProposal(
+  db: DbClient,
+  matchId: string,
+  reason: string,
+): Promise<void> {
+  await db.captainResultProposal.updateMany({
+    where: { matchId, status: { in: ["PENDING_OPPONENT", "PENDING_ADMIN"] } },
+    data: { status: "REJECTED_ADMIN", reviewedAt: new Date(), reviewNote: reason },
+  });
+}
+
 /* -------------------------------------------------------------------------- */
 /* Self-assignment                                                            */
 /* -------------------------------------------------------------------------- */
@@ -130,6 +141,12 @@ export async function assignRefereeToMatch(
     }
     throw new MatchError("Another referee already claimed this match.", 409, "ALREADY_ASSIGNED");
   }
+
+  await closeOpenCaptainResultProposal(
+    db,
+    matchId,
+    "Closed automatically because a referee was assigned.",
+  );
 
   await writeAudit(db, {
     actor,
@@ -220,6 +237,93 @@ export interface GameReportInput {
   cards?: ReportCardInput[];
 }
 
+export interface OfficialResultInput {
+  matchId: string;
+  actor: ActorContext;
+  reason: string;
+  homeScore: number;
+  awayScore: number;
+  homeForfeit?: boolean;
+  awayForfeit?: boolean;
+  notes?: string | null;
+}
+
+/**
+ * Create an official result on an unreported fixture.
+ *
+ * Callers that approve a pending workflow pass the version they reviewed.
+ * The guarded match update happens before the report insert so referee
+ * assignment, fixture edits, reopening, and another result writer all cause
+ * the surrounding transaction to roll back rather than publish stale data.
+ */
+export async function createOfficialGameReport(
+  db: DbClient,
+  params: OfficialResultInput & {
+    expectedVersion: number;
+    requireUnassigned?: boolean;
+  },
+): Promise<{ reportId: string }> {
+  const match = await db.match.findUnique({
+    where: { id: params.matchId },
+    select: {
+      id: true,
+      refereeId: true,
+      status: true,
+      version: true,
+      report: { select: { id: true } },
+    },
+  });
+  if (!match) throw new MatchError("Match not found.", 404, "NOT_FOUND");
+  if (match.report) {
+    throw new MatchError("A report has already been filed for this match.", 409, "REPORT_EXISTS");
+  }
+  if (match.version !== params.expectedVersion) {
+    throw new MatchError("The fixture changed. Refresh and try again.", 409, "VERSION_CONFLICT");
+  }
+  if (params.requireUnassigned && match.refereeId) {
+    throw new MatchError("A referee is now assigned to this match.", 409, "ALREADY_ASSIGNED");
+  }
+  if (match.status !== "SCHEDULED") {
+    throw new MatchError(
+      `A match in state ${match.status} cannot accept this result.`,
+      409,
+      "INVALID_STATE",
+    );
+  }
+
+  const updated = await db.match.updateMany({
+    where: {
+      id: params.matchId,
+      version: params.expectedVersion,
+      status: "SCHEDULED",
+      ...(params.requireUnassigned ? { refereeId: null } : {}),
+      report: { is: null },
+    },
+    data: { status: "CONFIRMED", version: { increment: 1 } },
+  });
+  if (updated.count !== 1) {
+    throw new MatchError("The fixture changed. Refresh and try again.", 409, "VERSION_CONFLICT");
+  }
+
+  const report = await db.gameReport.create({
+    data: {
+      matchId: params.matchId,
+      refereeId: match.refereeId,
+      homeScore: params.homeScore,
+      awayScore: params.awayScore,
+      homeForfeit: params.homeForfeit ?? false,
+      awayForfeit: params.awayForfeit ?? false,
+      notes: params.notes ?? null,
+      overrideReason: params.reason,
+      status: "CONFIRMED",
+      confirmedAt: new Date(),
+      confirmedById: params.actor.id ?? null,
+    },
+    select: { id: true },
+  });
+  return { reportId: report.id };
+}
+
 /**
  * File the referee's report. The match must be assigned to the caller.
  * On success the match moves to REPORT_SUBMITTED and the report becomes
@@ -234,6 +338,9 @@ export async function submitGameReport(
     input: GameReportInput;
   },
 ): Promise<{ reportId: string }> {
+  if ("$transaction" in db) {
+    return db.$transaction((tx) => submitGameReport(tx, params));
+  }
   const { matchId, refereeId, actor, input } = params;
 
   const match = await db.match.findUnique({
@@ -330,6 +437,12 @@ export async function submitGameReport(
     throw new MatchError("The fixture changed while filing. Try again.", 409, "VERSION_CONFLICT");
   }
 
+  await closeOpenCaptainResultProposal(
+    db,
+    matchId,
+    "Closed automatically because an official referee report was filed.",
+  );
+
   await writeAudit(db, {
     actor,
     action: "report.submit",
@@ -375,7 +488,6 @@ export async function confirmGameReport(
     where: { id: matchId },
     data: { status: "CONFIRMED", version: { increment: 1 } },
   });
-
   await writeAudit(db, {
     actor,
     action: "report.confirm",
@@ -404,7 +516,6 @@ export async function disputeGameReport(
     where: { id: matchId },
     data: { status: "ASSIGNED", version: { increment: 1 } },
   });
-
   await writeAudit(db, {
     actor,
     action: "report.dispute",
@@ -425,6 +536,9 @@ export async function reopenGameReport(
   db: DbClient,
   params: { matchId: string; actor: ActorContext; reason: string },
 ): Promise<void> {
+  if ("$transaction" in db) {
+    return db.$transaction((tx) => reopenGameReport(tx, params));
+  }
   const { matchId, actor, reason } = params;
   if (!actor.isAdmin) throw new MatchError("Admin only.", 403, "NOT_YOUR_MATCH");
 
@@ -449,6 +563,11 @@ export async function reopenGameReport(
       version: { increment: 1 },
     },
   });
+  await closeOpenCaptainResultProposal(
+    db,
+    matchId,
+    "Closed automatically when the official report was reopened.",
+  );
 
   await writeAudit(db, {
     actor,
@@ -491,8 +610,14 @@ export async function overrideGameReport(
     awayScore: number;
     homeForfeit?: boolean;
     awayForfeit?: boolean;
+    expectedMatchVersion?: number;
+    expectedReportId?: string;
+    expectedReportUpdatedAt?: Date;
   },
 ): Promise<void> {
+  if ("$transaction" in db) {
+    return db.$transaction((tx) => overrideGameReport(tx, params));
+  }
   const { matchId, actor, reason } = params;
   if (!actor.isAdmin) throw new MatchError("Admin only.", 403, "NOT_YOUR_MATCH");
 
@@ -524,16 +649,55 @@ export async function overrideGameReport(
     confirmedById: actor.id ?? null,
   };
 
-  const saved = report
-    ? await db.gameReport.update({ where: { id: report.id }, data: result })
-    : await db.gameReport.create({
-        data: { ...result, matchId, refereeId: match.refereeId ?? null },
-      });
+  let saved: { id: string };
+  if (params.expectedReportId) {
+    const updated = await db.gameReport.updateMany({
+      where: {
+        id: params.expectedReportId,
+        matchId,
+        ...(params.expectedReportUpdatedAt ? { updatedAt: params.expectedReportUpdatedAt } : {}),
+      },
+      data: result,
+    });
+    if (!updated.count) {
+      throw new MatchError(
+        "The report changed while applying the override.",
+        409,
+        "VERSION_CONFLICT",
+      );
+    }
+    saved = { id: params.expectedReportId };
+  } else {
+    saved = report
+      ? await db.gameReport.update({ where: { id: report.id }, data: result })
+      : await db.gameReport.create({
+          data: { ...result, matchId, refereeId: match.refereeId ?? null },
+        });
+  }
 
-  await db.match.update({
-    where: { id: matchId },
-    data: { status: "CONFIRMED", version: { increment: 1 } },
-  });
+  if (params.expectedMatchVersion === undefined) {
+    await db.match.update({
+      where: { id: matchId },
+      data: { status: "CONFIRMED", version: { increment: 1 } },
+    });
+  } else {
+    const updated = await db.match.updateMany({
+      where: { id: matchId, version: params.expectedMatchVersion },
+      data: { status: "CONFIRMED", version: { increment: 1 } },
+    });
+    if (!updated.count) {
+      throw new MatchError(
+        "The fixture changed while applying the override.",
+        409,
+        "VERSION_CONFLICT",
+      );
+    }
+  }
+  await closeOpenCaptainResultProposal(
+    db,
+    matchId,
+    "Closed automatically because an Admin entered an official result.",
+  );
 
   await writeAudit(db, {
     actor,
@@ -653,6 +817,9 @@ export async function adminAssignReferee(
   db: DbClient,
   params: { matchId: string; refereeId: string | null; actor: ActorContext; reason?: string },
 ): Promise<void> {
+  if ("$transaction" in db) {
+    return db.$transaction((tx) => adminAssignReferee(tx, params));
+  }
   const { matchId, refereeId, actor } = params;
   if (!actor.isAdmin) throw new MatchError("Admin only.", 403, "NOT_YOUR_MATCH");
 
@@ -667,6 +834,13 @@ export async function adminAssignReferee(
       version: { increment: 1 },
     },
   });
+  if (refereeId) {
+    await closeOpenCaptainResultProposal(
+      db,
+      matchId,
+      "Closed automatically because a referee was assigned.",
+    );
+  }
 
   await writeAudit(db, {
     actor,

@@ -1,7 +1,6 @@
-import Link from "next/link";
-
 import { ActionForm, FieldError, SubmitButton } from "@/components/admin-forms";
 import { CloseOnSuccess, Dialog, DialogCancel } from "@/components/form-dialog";
+import { SeasonTabs } from "@/components/season-tabs";
 import { Badge, Card, EmptyState, Field, inputClass, outlineButtonClass } from "@/components/ui";
 import {
   createDisciplinaryAction,
@@ -79,24 +78,7 @@ export default async function AdminDisciplinePage({
 
   return (
     <div className="space-y-8">
-      {seasons.length > 1 ? (
-        <nav aria-label="Season" className="flex flex-wrap gap-2">
-          {seasons.map((s) => (
-            <Link
-              key={s.id}
-              href={`/admin/discipline?season=${s.slug}`}
-              aria-current={s.id === season.id ? "page" : undefined}
-              className={
-                s.id === season.id
-                  ? "bg-brand text-brand-contrast rounded-full px-3 py-1.5 text-sm font-medium"
-                  : "border-subtle hover:bg-surface-muted rounded-full border px-3 py-1.5 text-sm"
-              }
-            >
-              {s.name}
-            </Link>
-          ))}
-        </nav>
-      ) : null}
+      <SeasonTabs seasons={seasons} currentSeasonId={season.id} basePath="/admin/discipline" />
 
       {pending.length > 0 ? (
         <section aria-labelledby="discipline-review">

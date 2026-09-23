@@ -533,7 +533,13 @@ export async function getTeams() {
   return prisma.team.findMany({
     include: {
       division: { select: { id: true, name: true, slug: true } },
-      captains: { orderBy: { sortOrder: "asc" } },
+      captains: {
+        where: {
+          revokedAt: null,
+          OR: [{ season: { is: { isActive: true } } }, { seasonId: null }],
+        },
+        orderBy: { sortOrder: "asc" },
+      },
     },
     orderBy: [{ division: { sortOrder: "asc" } }, { name: "asc" }],
   });
@@ -550,7 +556,13 @@ export async function getTeamDetail(slugOrId: string) {
     where: { OR: [{ slug: slugOrId }, { id: slugOrId }] },
     include: {
       division: { select: { id: true, name: true } },
-      captains: { orderBy: { sortOrder: "asc" } },
+      captains: {
+        where: {
+          revokedAt: null,
+          OR: [{ season: { is: { isActive: true } } }, { seasonId: null }],
+        },
+        orderBy: { sortOrder: "asc" },
+      },
     },
   });
 }

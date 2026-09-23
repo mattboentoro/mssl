@@ -68,13 +68,9 @@ export default async function RefereeMatchPage({ params }: { params: Promise<{ i
 
   return (
     <div className="mx-auto max-w-3xl">
-      <p className="mb-4">
-        <Link href="/referee" className="text-muted text-sm hover:underline">
-          &larr; Referee Control
-        </Link>
-      </p>
-
       <PageHeader
+        backHref="/referee"
+        backLabel="Referee Control"
         eyebrow={`${match.division.name} \u00b7 Matchweek ${match.matchweek}`}
         title={`${match.homeTeam.name} v ${match.awayTeam.name}`}
         description={

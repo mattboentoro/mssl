@@ -39,11 +39,15 @@ model Season {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  matches       Match[]
-  announcements Announcement[]
-  discipline    DisciplinaryAction[]
-  adjustments   PointsAdjustment[]
-  teamEntries   SeasonTeam[]
+  matches            Match[]
+  announcements      Announcement[]
+  discipline         DisciplinaryAction[]
+  adjustments        PointsAdjustment[]
+  teamEntries        SeasonTeam[]
+  memberships        TeamMembership[]
+  captains           TeamCaptain[]
+  rosterInvitations  RosterInvitation[]
+  rosterJoinRequests RosterJoinRequest[]
 }
 
 /// Which division a club played in for one particular season.
@@ -97,42 +101,215 @@ model Division {
 }
 
 model Team {
-  id             String   @id @default(cuid())
-  divisionId     String
-  name           String
-  slug           String   @unique
-  shortName      String
+  id              String    @id @default(cuid())
+  divisionId      String
+  name            String
+  slug            String    @unique
+  shortName       String
   /// Home/first-choice kit colour as a `#rrggbb` hex string.
-  colorPrimary   String   @default("#0f766e")
+  colorPrimary    String    @default("#0f766e")
   /// Change/alternate kit colour, worn when the two sides would otherwise clash.
-  colorAlternate String   @default("#ffffff")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  colorAlternate  String    @default("#ffffff")
+  logoBlobName    String?
+  logoContainer   String?
+  logoContentType String?
+  logoEtag        String?
+  logoUpdatedAt   DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  division    Division             @relation(fields: [divisionId], references: [id], onDelete: Cascade)
-  captains    TeamCaptain[]
-  homeMatches Match[]              @relation("HomeTeam")
-  awayMatches Match[]              @relation("AwayTeam")
-  discipline  DisciplinaryAction[]
-  adjustments PointsAdjustment[]
-  seasons     SeasonTeam[]
+  division           Division                @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+  captains           TeamCaptain[]
+  homeMatches        Match[]                 @relation("HomeTeam")
+  awayMatches        Match[]                 @relation("AwayTeam")
+  discipline         DisciplinaryAction[]
+  adjustments        PointsAdjustment[]
+  seasons            SeasonTeam[]
+  memberships        TeamMembership[]
+  rosterInvitations  RosterInvitation[]
+  rosterJoinRequests RosterJoinRequest[]
+  rescheduleRequests RescheduleRequest[]
+  resultProposals    CaptainResultProposal[]
+  scoreAppeals       ScoreAppeal[]
+  refereeRatings     RefereeRating[]
 
   @@index([divisionId])
 }
 
 model TeamCaptain {
-  id        String   @id @default(cuid())
-  teamId    String
-  name      String
-  email     String?
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String    @id @default(cuid())
+  teamId          String
+  seasonId        String?
+  userId          String?
+  name            String
+  email           String?
+  normalizedEmail String?
+  sortOrder       Int       @default(0)
+  status          String    @default("PENDING")
+  assignedById    String?
+  assignedAt      DateTime  @default(now())
+  activatedAt     DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  team       Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  season     Season?  @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  user       AppUser? @relation("CaptainUser", fields: [userId], references: [id], onDelete: SetNull)
+  assignedBy AppUser? @relation("CaptainAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
 
-  @@unique([teamId, sortOrder])
+  @@unique([seasonId, teamId, sortOrder])
   @@index([teamId])
+  @@index([seasonId, teamId])
+  @@index([userId])
+  @@index([normalizedEmail])
+}
+
+/// An application identity. Entra authenticates the person, while this row and
+/// its relations are the sole authority for application access.
+model AppUser {
+  id              String    @id @default(cuid())
+  entraObjectId   String?   @unique
+  email           String
+  normalizedEmail String    @unique
+  displayName     String
+  status          String    @default("PROVISIONAL")
+  claimedAt       DateTime?
+  lastSignInAt    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  rolesAssigned               GlobalRoleAssignment[]  @relation("RoleSubject")
+  rolesGranted                GlobalRoleAssignment[]  @relation("RoleActor")
+  rolesRevoked                GlobalRoleAssignment[]  @relation("RoleRevoker")
+  memberships                 TeamMembership[]        @relation("MembershipUser")
+  membershipsGranted          TeamMembership[]        @relation("MembershipActor")
+  captainAssignments          TeamCaptain[]           @relation("CaptainUser")
+  captainAssignmentsGranted   TeamCaptain[]           @relation("CaptainAssignedBy")
+  notifications               Notification[]
+  rosterInvitationsSent       RosterInvitation[]      @relation("RosterInvitationSender")
+  rosterInvitationsReceived   RosterInvitation[]      @relation("RosterInvitationRecipient")
+  rosterJoinRequests          RosterJoinRequest[]     @relation("RosterJoinRequester")
+  rosterJoinRequestsDecided   RosterJoinRequest[]     @relation("RosterJoinDecider")
+  rescheduleRequests          RescheduleRequest[]     @relation("RescheduleRequester")
+  rescheduleResponses         RescheduleRequest[]     @relation("RescheduleResponder")
+  rescheduleAdminReviews      RescheduleRequest[]     @relation("RescheduleAdminReviewer")
+  rescheduleSlotsCreated      RescheduleSlot[]        @relation("RescheduleSlotCreator")
+  resultProposals             CaptainResultProposal[] @relation("ResultProposer")
+  resultProposalConfirmations CaptainResultProposal[] @relation("ResultConfirmer")
+  scoreAppeals                ScoreAppeal[]           @relation("AppealSubmitter")
+  scoreAppealDecisions        ScoreAppeal[]           @relation("AppealDecider")
+  refereeRatings              RefereeRating[]
+  referee                     Referee?
+}
+
+model GlobalRoleAssignment {
+  id           String    @id @default(cuid())
+  userId       String
+  role         String
+  assignedById String?
+  assignedAt   DateTime  @default(now())
+  revokedById  String?
+  revokedAt    DateTime?
+
+  user       AppUser  @relation("RoleSubject", fields: [userId], references: [id], onDelete: Cascade)
+  assignedBy AppUser? @relation("RoleActor", fields: [assignedById], references: [id], onDelete: SetNull)
+  revokedBy  AppUser? @relation("RoleRevoker", fields: [revokedById], references: [id], onDelete: SetNull)
+
+  @@unique([userId, role])
+  @@index([role])
+  @@index([assignedById])
+  @@index([revokedById])
+}
+
+/// A portable serialization point for cross-row authorization invariants.
+model AuthorizationInvariant {
+  id        String   @id
+  version   Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model TeamMembership {
+  id           String    @id @default(cuid())
+  seasonId     String
+  teamId       String
+  userId       String
+  status       String    @default("ACTIVE")
+  assignedById String?
+  joinedAt     DateTime  @default(now())
+  endedAt      DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  season     Season   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  team       Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user       AppUser  @relation("MembershipUser", fields: [userId], references: [id], onDelete: Cascade)
+  assignedBy AppUser? @relation("MembershipActor", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  /// A membership is updated when a player changes teams, enforcing one team
+  /// per person per season without provider-specific partial indexes.
+  @@unique([seasonId, userId])
+  @@index([seasonId, teamId, status])
+  @@index([teamId])
+}
+
+model RosterInvitation {
+  id              String    @id @default(cuid())
+  seasonId        String
+  teamId          String
+  invitedById     String
+  invitedUserId   String?
+  email           String
+  normalizedEmail String
+  status          String    @default("PENDING")
+  message         String?
+  respondedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  season      Season   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  invitedBy   AppUser  @relation("RosterInvitationSender", fields: [invitedById], references: [id], onDelete: Cascade)
+  invitedUser AppUser? @relation("RosterInvitationRecipient", fields: [invitedUserId], references: [id], onDelete: SetNull)
+
+  @@index([seasonId, teamId, status])
+  @@index([normalizedEmail, status])
+}
+
+model RosterJoinRequest {
+  id          String    @id @default(cuid())
+  seasonId    String
+  teamId      String
+  requesterId String
+  status      String    @default("PENDING")
+  message     String?
+  decidedById String?
+  decidedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  season    Season   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  requester AppUser  @relation("RosterJoinRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  decidedBy AppUser? @relation("RosterJoinDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@unique([seasonId, teamId, requesterId])
+  @@index([seasonId, teamId, status])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  body      String
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
 }
 
 /// An administrative change to a team's points total, almost always a deduction
@@ -171,6 +348,7 @@ model Referee {
   name          String
   email         String   @unique
   entraObjectId String?  @unique
+  userId        String?  @unique
   phone         String?
   certification String?
   active        Boolean  @default(true)
@@ -179,6 +357,8 @@ model Referee {
 
   matches Match[]
   reports GameReport[]
+  user    AppUser?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  ratings RefereeRating[]
 }
 
 /// A fixture. `status` is one of the MatchStatus values in `src/lib/enums.ts`.
@@ -219,19 +399,158 @@ model Match {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  season     Season               @relation(fields: [seasonId], references: [id], onDelete: Cascade)
-  division   Division             @relation(fields: [divisionId], references: [id], onDelete: Cascade)
-  homeTeam   Team                 @relation("HomeTeam", fields: [homeTeamId], references: [id], onDelete: Cascade)
-  awayTeam   Team                 @relation("AwayTeam", fields: [awayTeamId], references: [id], onDelete: Cascade)
-  referee    Referee?             @relation(fields: [refereeId], references: [id], onDelete: SetNull)
-  report     GameReport?
-  discipline DisciplinaryAction[]
+  season             Season                 @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  division           Division               @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+  homeTeam           Team                   @relation("HomeTeam", fields: [homeTeamId], references: [id], onDelete: Cascade)
+  awayTeam           Team                   @relation("AwayTeam", fields: [awayTeamId], references: [id], onDelete: Cascade)
+  referee            Referee?               @relation(fields: [refereeId], references: [id], onDelete: SetNull)
+  report             GameReport?
+  discipline         DisciplinaryAction[]
+  rescheduleRequests RescheduleRequest[]
+  resultProposal     CaptainResultProposal?
+  scoreAppeals       ScoreAppeal[]
+  refereeRatings     RefereeRating[]
 
   @@index([seasonId])
   @@index([divisionId])
   @@index([refereeId])
   @@index([kickoffAt])
   @@index([status])
+}
+
+model RescheduleRequest {
+  id                   String    @id @default(cuid())
+  matchId              String
+  requestingTeamId     String
+  requestedById        String
+  slotId               String?
+  activeSlotKey        String?   @unique
+  legacySlotExempt     Boolean   @default(false)
+  proposedKickoffAt    DateTime?
+  proposedVenueName    String?
+  reason               String
+  originalKickoffAt    DateTime?
+  originalVenueName    String?
+  expectedMatchVersion Int?
+  openMatchKey         String?   @unique
+  status               String    @default("PENDING_OPPONENT")
+  respondedById        String?
+  responseNote         String?
+  respondedAt          DateTime?
+  adminReviewedById    String?
+  adminReviewNote      String?
+  adminReviewedAt      DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  match           Match           @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  requestingTeam  Team            @relation(fields: [requestingTeamId], references: [id], onDelete: Cascade)
+  requestedBy     AppUser         @relation("RescheduleRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+  slot            RescheduleSlot? @relation(fields: [slotId], references: [id], onDelete: SetNull)
+  respondedBy     AppUser?        @relation("RescheduleResponder", fields: [respondedById], references: [id], onDelete: SetNull)
+  adminReviewedBy AppUser?        @relation("RescheduleAdminReviewer", fields: [adminReviewedById], references: [id], onDelete: SetNull)
+
+  @@index([matchId, status])
+  @@index([requestingTeamId, status])
+  @@index([slotId])
+  @@index([adminReviewedById])
+}
+
+model RescheduleSlot {
+  id          String    @id @default(cuid())
+  kickoffAt   DateTime
+  venueName   String
+  status      String    @default("AVAILABLE")
+  createdById String?
+  disabledAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  createdBy AppUser?            @relation("RescheduleSlotCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  requests  RescheduleRequest[]
+
+  @@unique([kickoffAt, venueName])
+  @@index([status, kickoffAt])
+  @@index([createdById])
+}
+
+model CaptainResultProposal {
+  id              String    @id @default(cuid())
+  matchId         String    @unique
+  submittedById   String
+  submittedTeamId String
+  homeScore       Int
+  awayScore       Int
+  homeForfeit     Boolean   @default(false)
+  awayForfeit     Boolean   @default(false)
+  notes           String?
+  status          String    @default("PENDING_OPPONENT")
+  confirmedById   String?
+  confirmedAt     DateTime?
+  reviewedAt      DateTime?
+  reviewNote      String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  match         Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  submittedBy   AppUser  @relation("ResultProposer", fields: [submittedById], references: [id], onDelete: Cascade)
+  submittedTeam Team     @relation(fields: [submittedTeamId], references: [id], onDelete: Cascade)
+  confirmedBy   AppUser? @relation("ResultConfirmer", fields: [confirmedById], references: [id], onDelete: SetNull)
+}
+
+model ScoreAppeal {
+  id                      String    @id @default(cuid())
+  matchId                 String
+  teamId                  String
+  submittedById           String
+  reason                  String
+  originalReportId        String
+  originalMatchVersion    Int
+  originalMatchStatus     String
+  originalReportUpdatedAt DateTime
+  originalHomeScore       Int
+  originalAwayScore       Int
+  originalHomeForfeit     Boolean
+  originalAwayForfeit     Boolean
+  requestedHomeScore      Int
+  requestedAwayScore      Int
+  requestedHomeForfeit    Boolean
+  requestedAwayForfeit    Boolean
+  status                  String    @default("PENDING")
+  openKey                 String?   @unique
+  decidedById             String?
+  decisionNote            String?
+  decidedAt               DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  match       Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  submittedBy AppUser  @relation("AppealSubmitter", fields: [submittedById], references: [id], onDelete: Cascade)
+  decidedBy   AppUser? @relation("AppealDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@index([matchId, teamId])
+  @@index([status])
+}
+
+model RefereeRating {
+  id        String   @id @default(cuid())
+  matchId   String
+  refereeId String
+  teamId    String
+  ratedById String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  match   Match   @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  referee Referee @relation(fields: [refereeId], references: [id], onDelete: Cascade)
+  team    Team    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  ratedBy AppUser @relation(fields: [ratedById], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, teamId])
+  @@index([refereeId])
 }
 
 /// The referee's official record of a match. One per match.

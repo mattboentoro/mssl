@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { StandingsTable } from "@/components/match-display";
+import { SeasonTabs } from "@/components/season-tabs";
 import { Alert, Card, EmptyState, PageHeader } from "@/components/ui";
 import { config } from "@/lib/config";
 import { getSeasons, getStandingsForSeason, resolveSeason } from "@/lib/queries";
@@ -40,24 +40,12 @@ export default async function StandingsPage({
         description="Every number below is derived from referee game reports. Nothing here is typed in by hand."
       />
 
-      {seasons.length > 1 ? (
-        <nav aria-label="Season" className="mb-6 flex flex-wrap gap-2">
-          {seasons.map((s) => (
-            <Link
-              key={s.id}
-              href={`/standings?season=${s.slug}`}
-              aria-current={s.id === season.id ? "page" : undefined}
-              className={
-                s.id === season.id
-                  ? "bg-brand text-brand-contrast rounded-full px-3 py-1.5 text-sm font-medium"
-                  : "border-subtle hover:bg-surface-muted rounded-full border px-3 py-1.5 text-sm"
-              }
-            >
-              {s.name}
-            </Link>
-          ))}
-        </nav>
-      ) : null}
+      <SeasonTabs
+        seasons={seasons}
+        currentSeasonId={season.id}
+        basePath="/standings"
+        className="mb-6"
+      />
 
       <Alert tone="info" title="How these tables are built">
         <ul className="mt-1 list-inside list-disc space-y-0.5">

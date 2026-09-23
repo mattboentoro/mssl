@@ -1,13 +1,17 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { AddToCalendarButton } from "@/components/add-to-calendar-button";
 import { CalendarViewToggle, FixtureCalendar, parseView } from "@/components/fixture-calendar";
 import { MatchList } from "@/components/match-display";
-import { Card, EmptyState, PageHeader } from "@/components/ui";
+import { TeamLogo } from "@/components/team-logo";
+import { BackLink, buttonClass, ButtonLink, Card, EmptyState, PageHeader } from "@/components/ui";
+import { getCurrentUser } from "@/lib/authz";
 import { CARD_LABELS, type CardType } from "@/lib/enums";
 import { formatDate, parseMonthValue, shiftMonth } from "@/lib/dates";
 import { zonedToUtc } from "@/lib/timezone";
 import { kitColorName, resolveKit } from "@/lib/kits";
+import { prisma } from "@/lib/prisma";
 import {
   getActiveSeason,
   getDisciplinaryRecords,
@@ -16,6 +20,7 @@ import {
   getTeamMatches,
   splitTeamMatches,
 } from "@/lib/queries";
+import { isRescheduleCutoffReached, OPEN_RESCHEDULE_STATUSES } from "@/lib/reschedules";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +49,13 @@ export default async function TeamPage({
 
   // A club belongs to the league, not to a season, so its form and discipline
   // are shown for whichever season is currently running.
-  const season = await getActiveSeason();
+  const [season, currentUser] = await Promise.all([getActiveSeason(), getCurrentUser()]);
+  const captainContext = currentUser?.teamContexts.find(
+    (context) =>
+      context.role === "captain" &&
+      context.teamId === team.id &&
+      (!season || context.seasonId === season.id),
+  );
 
   const [matches, standings, discipline] = await Promise.all([
     getTeamMatches(team.id),
@@ -58,6 +69,108 @@ export default async function TeamPage({
 
   const { played, upcoming } = splitTeamMatches(matches);
   const teamCards = discipline.filter((d) => d.teamId === team.id);
+  const now = new Date();
+  const [openReschedules, availableSlot] = captainContext
+    ? await Promise.all([
+        prisma.rescheduleRequest.findMany({
+          where: {
+            matchId: { in: upcoming.map((match) => match.id) },
+            status: { in: [...OPEN_RESCHEDULE_STATUSES] },
+          },
+          select: { id: true, matchId: true },
+        }),
+        prisma.rescheduleSlot.findFirst({
+          where: {
+            status: "AVAILABLE",
+            kickoffAt: { gt: now },
+            requests: { none: { activeSlotKey: { not: null } } },
+          },
+          select: { id: true },
+        }),
+      ])
+    : [[], null];
+  const openRescheduleByMatch = new Map(
+    openReschedules.map((request) => [request.matchId, request.id]),
+  );
+  const rescheduleActions = captainContext
+    ? Object.fromEntries(
+        upcoming.flatMap((match) => {
+          if (
+            match.seasonId !== captainContext.seasonId ||
+            !["SCHEDULED", "ASSIGNED"].includes(match.status) ||
+            match.report
+          ) {
+            return [];
+          }
+          const openRequestId = openRescheduleByMatch.get(match.id);
+          if (openRequestId) {
+            return [
+              [
+                match.id,
+                <ButtonLink
+                  key={match.id}
+                  href={`/captain/reschedules#request-${encodeURIComponent(openRequestId)}`}
+                  variant="secondary"
+                >
+                  View request
+                </ButtonLink>,
+              ],
+            ];
+          }
+          if (isRescheduleCutoffReached(match.kickoffAt, now)) {
+            return [
+              [
+                match.id,
+                <span
+                  key={match.id}
+                  aria-disabled="true"
+                  title="Rescheduling closes 48 hours before kickoff."
+                  className={buttonClass("secondary")}
+                >
+                  Reschedule locked
+                </span>,
+              ],
+            ];
+          }
+          if (!availableSlot) {
+            return [
+              [
+                match.id,
+                <span
+                  key={match.id}
+                  aria-disabled="true"
+                  title="No league-provided reschedule slots are available."
+                  className={buttonClass("secondary")}
+                >
+                  No slots
+                </span>,
+              ],
+            ];
+          }
+          return [
+            [
+              match.id,
+              <ButtonLink
+                key={match.id}
+                href={`/captain/reschedules?match=${encodeURIComponent(match.id)}&team=${encodeURIComponent(team.id)}`}
+                variant="secondary"
+              >
+                Reschedule
+              </ButtonLink>,
+            ],
+          ];
+        }),
+      )
+    : undefined;
+  const upcomingActions = Object.fromEntries(
+    upcoming.map((match) => [
+      match.id,
+      <div key={match.id} className="flex flex-col gap-2">
+        <AddToCalendarButton matchId={match.id} />
+        {rescheduleActions?.[match.id]}
+      </div>,
+    ]),
+  );
 
   const view = parseView(viewParam);
   // The calendar shows every fixture in the month, played or not, because a
@@ -87,11 +200,22 @@ export default async function TeamPage({
 
   return (
     <div>
-      <PageHeader
-        eyebrow={team.division.name}
-        title={team.name}
-        description={team.shortName ? `Also known as ${team.shortName}.` : undefined}
-      />
+      <div className="mb-4">
+        <BackLink href="/teams">All teams</BackLink>
+      </div>
+      <div className="flex items-start gap-4">
+        <TeamLogo
+          teamId={team.id}
+          name={team.name}
+          hasLogo={Boolean(team.logoBlobName)}
+          size={72}
+        />
+        <PageHeader
+          eyebrow={team.division.name}
+          title={team.name}
+          description={team.shortName ? `Also known as ${team.shortName}.` : undefined}
+        />
+      </div>
 
       {team.captains.length > 0 ? (
         <section
@@ -193,7 +317,7 @@ export default async function TeamPage({
             ) : upcoming.length === 0 ? (
               <EmptyState title="No fixtures scheduled" />
             ) : (
-              <MatchList matches={upcoming} />
+              <MatchList matches={upcoming} actions={upcomingActions} />
             )}
           </section>
         </div>
