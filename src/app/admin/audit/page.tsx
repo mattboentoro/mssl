@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { Badge, ButtonLink, Card, EmptyState, inputClass } from "@/components/ui";
+import { Badge, buttonClass, ButtonLink, Card, EmptyState, inputClass } from "@/components/ui";
 import { parseAuditMetadata } from "@/lib/audit";
 import { formatDateTime, relativeTime } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
@@ -100,7 +100,7 @@ export default async function AdminAuditPage({
             />
           </label>
           <div className="flex items-end gap-2">
-            <button type="submit" className="btn-primary">
+            <button type="submit" className={buttonClass("primary")}>
               Filter
             </button>
             <Link href="/admin/audit" className="text-muted self-center text-sm underline">

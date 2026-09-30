@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { deleteFreeAgentRequest, reviewFreeAgentRequest } from "@/app/admin/actions";
 import { ActionForm, SubmitButton } from "@/components/admin-forms";
-import { Badge, Card, EmptyState, inputClass } from "@/components/ui";
+import { Badge, buttonClass, Card, EmptyState, inputClass } from "@/components/ui";
 import { formatDate, relativeTime } from "@/lib/dates";
 import {
   FREE_AGENT_STATUSES,
@@ -90,7 +90,7 @@ export default async function AdminFreeAgentsPage({
           </label>
           <div />
           <div className="flex items-end gap-2">
-            <button type="submit" className="btn-primary">
+            <button type="submit" className={buttonClass("primary")}>
               Filter
             </button>
             <Link href="/admin/free-agents" className="text-muted self-center text-sm underline">

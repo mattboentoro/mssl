@@ -45,7 +45,7 @@ export function ThemeToggle() {
       aria-pressed={isDark}
       aria-label={label}
       title={label}
-      className="hover:bg-surface-muted border-subtle inline-flex h-9 w-9 items-center justify-center rounded-lg border text-base"
+      className="bg-surface-muted hover:bg-brand/10 active:bg-brand/20 border-subtle inline-flex h-9 w-9 items-center justify-center rounded-lg border text-base shadow-sm"
     >
       <span aria-hidden>{isDark ? "\u2600\ufe0f" : "\ud83c\udf19"}</span>
     </button>

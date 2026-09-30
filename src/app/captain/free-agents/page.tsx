@@ -4,7 +4,7 @@ import { forbidden, redirect } from "next/navigation";
 
 import { placeFreeAgentAction } from "@/app/captain/free-agents/actions";
 import { RosterActionForm } from "@/components/roster-action-form";
-import { Badge, Card, EmptyState, PageHeader, inputClass } from "@/components/ui";
+import { Badge, buttonClass, Card, EmptyState, PageHeader, inputClass } from "@/components/ui";
 import { AuthzError, requireCaptain } from "@/lib/authz";
 import {
   CaptainFreeAgentError,
@@ -98,7 +98,7 @@ export default async function CaptainFreeAgentsPage({
             </select>
           </label>
           <div className="flex items-end gap-3">
-            <button className="btn-primary" type="submit">
+            <button className={buttonClass("primary")} type="submit">
               Filter
             </button>
             <Link className="text-muted pb-2 text-sm underline" href="/captain/free-agents">

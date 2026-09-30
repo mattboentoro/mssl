@@ -106,7 +106,7 @@ export function SiteHeader({ user }: { user: HeaderUser | null }) {
           <AccountChip user={user} />
           <button
             type="button"
-            className="border-subtle hover:bg-surface-muted inline-flex h-9 w-9 items-center justify-center rounded-lg border lg:hidden"
+            className="bg-surface-muted border-subtle hover:bg-brand/10 active:bg-brand/20 inline-flex h-9 w-9 items-center justify-center rounded-lg border shadow-sm lg:hidden"
             aria-expanded={open}
             aria-controls="mobile-nav"
             aria-label="Toggle navigation"

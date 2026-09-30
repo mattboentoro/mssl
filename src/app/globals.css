@@ -80,6 +80,30 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/*
+ * Every native button gets the same pointer and pressed feedback, including
+ * small icon controls that do not use the shared Button component.
+ */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+button:not(:disabled) {
+  transition:
+    color 150ms ease,
+    background-color 150ms ease,
+    border-color 150ms ease,
+    opacity 150ms ease,
+    filter 100ms ease,
+    transform 100ms ease;
+}
+
+button:not(:disabled):active {
+  filter: brightness(0.86);
+  transform: translateY(1px);
+}
+
 /* Visible focus for keyboard users on every interactive element. */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 2px solid var(--accent);
