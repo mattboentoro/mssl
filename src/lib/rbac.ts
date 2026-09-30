@@ -199,9 +199,8 @@ export async function loadAuthorization(
   const roles = new Set<Role>(["viewer"]);
   for (const assignment of user.rolesAssigned) {
     const role = assignment.role.toLowerCase();
-    if (role === "admin" || role === "referee" || role === "captain" || role === "player") {
+    if (role === "admin" || role === "referee" || role === "player") {
       roles.add(role);
-      if (role === "captain") roles.add("player");
     }
   }
   if (user.memberships.length) roles.add("player");

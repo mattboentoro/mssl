@@ -311,6 +311,34 @@ describe("Captain RBAC foundation", () => {
     expect(snapshot.teamContexts.some((context) => context.teamId === away.id)).toBe(false);
   });
 
+  it("does not retain Captain access from a stale global role after assignments end", async () => {
+    const { season, home } = await fixture();
+    const user = await prisma.appUser.create({
+      data: {
+        entraObjectId: "former-captain",
+        email: "former-captain@example.com",
+        normalizedEmail: "former-captain@example.com",
+        displayName: "Former Captain",
+        status: "ACTIVE",
+        rolesAssigned: { create: { role: "CAPTAIN" } },
+      },
+    });
+    await prisma.teamCaptain.create({
+      data: {
+        seasonId: season.id,
+        teamId: home.id,
+        userId: user.id,
+        name: user.displayName,
+        status: "REVOKED",
+        revokedAt: new Date(),
+      },
+    });
+
+    const snapshot = await loadAuthorization(prisma, user.id);
+    expect(snapshot.roles).not.toContain("captain");
+    expect(snapshot.teamContexts).toEqual([]);
+  });
+
   it("enforces one active team per user per season by moving the membership", async () => {
     const { season, home, away } = await fixture();
     const user = await prisma.appUser.create({

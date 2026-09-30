@@ -93,7 +93,7 @@ export const DOCUMENT_CATEGORY_LABELS: Record<DocumentCategory, string> = {
 export const ROLES = ["public", "viewer", "player", "captain", "referee", "admin"] as const;
 export type Role = (typeof ROLES)[number];
 
-export const ASSIGNABLE_ROLES = ["PLAYER", "CAPTAIN", "REFEREE", "ADMIN"] as const;
+export const ASSIGNABLE_ROLES = ["PLAYER", "REFEREE", "ADMIN"] as const;
 export type AssignableRole = (typeof ASSIGNABLE_ROLES)[number];
 export const assignableRoleSchema = z.enum(ASSIGNABLE_ROLES);
 
