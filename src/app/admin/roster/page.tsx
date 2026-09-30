@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { relinkCaptainAction } from "@/app/admin/roster/actions";
-import { ActionForm, SubmitButton } from "@/components/admin-forms";
 import {
   Alert,
   Badge,
@@ -14,19 +12,16 @@ import {
   PageHeader,
   inputClass,
 } from "@/components/ui";
-import { isActiveCaptainForSeason } from "@/lib/admin-roster";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = { title: "Roster & Captain administration" };
 export const dynamic = "force-dynamic";
 
-type RosterState = "attention" | "all" | "captainless" | "unclaimed" | "ready";
+type RosterState = "attention" | "all" | "captainless" | "ready";
 type PlayerState = "all" | "empty" | "has-players";
 
 function rosterState(value: string | undefined): RosterState {
-  return value === "all" || value === "captainless" || value === "unclaimed" || value === "ready"
-    ? value
-    : "attention";
+  return value === "all" || value === "captainless" || value === "ready" ? value : "attention";
 }
 
 function playerState(value: string | undefined): PlayerState {
@@ -80,8 +75,9 @@ export default async function AdminRosterPage({
           },
           captains: {
             where: {
+              seasonId: selectedSeason.id,
+              status: "ACTIVE",
               revokedAt: null,
-              OR: [{ seasonId: selectedSeason.id }, { seasonId: null }],
             },
             include: {
               user: {
@@ -99,26 +95,17 @@ export default async function AdminRosterPage({
   const selectedTeamId = teamOptions.some((team) => team.id === params.team) ? params.team : "";
   const summaries = teams.map((entry) => {
     const captains = entry.team.captains;
-    const activeCaptains = captains.filter((captain) =>
-      isActiveCaptainForSeason(captain, entry.seasonId),
-    );
-    const hasUnclaimedIdentity = captains.some(
-      (captain) => captain.seasonId === null || !captain.user?.entraObjectId,
-    );
     return {
       entry,
       captains,
-      activeCaptains,
       memberships: entry.team.memberships,
-      hasUnclaimedIdentity,
-      needsAttention: activeCaptains.length === 0 || hasUnclaimedIdentity,
+      needsAttention: captains.length === 0,
     };
   });
   const visible = summaries
     .filter(({ entry }) => !selectedTeamId || entry.teamId === selectedTeamId)
-    .filter(({ activeCaptains, hasUnclaimedIdentity, needsAttention }) => {
-      if (selectedState === "captainless") return activeCaptains.length === 0;
-      if (selectedState === "unclaimed") return hasUnclaimedIdentity;
+    .filter(({ captains, needsAttention }) => {
+      if (selectedState === "captainless") return captains.length === 0;
       if (selectedState === "ready") return !needsAttention;
       if (selectedState === "attention") return needsAttention;
       return true;
@@ -138,7 +125,7 @@ export default async function AdminRosterPage({
     <div>
       <PageHeader
         title="Roster & Captain administration"
-        description="The active season and teams needing attention are shown by default. Expand the filters to review healthy or historical rosters."
+        description="A read-only overview sourced from the same records as Manage roster. The active season and Captainless teams are shown by default."
       />
       <Card className="mb-5 p-4">
         <form method="get" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -182,8 +169,7 @@ export default async function AdminRosterPage({
               <option value="attention">Needs attention</option>
               <option value="all">All Captain statuses</option>
               <option value="captainless">Captainless</option>
-              <option value="unclaimed">Unclaimed identities</option>
-              <option value="ready">Captain access ready</option>
+              <option value="ready">Has a Captain</option>
             </select>
           </Field>
           <Field label="Player roster" htmlFor="roster-players">
@@ -218,86 +204,63 @@ export default async function AdminRosterPage({
         requests or invitations.
       </Alert>
       <div className="grid gap-4">
-        {visible.map(({ entry, captains, activeCaptains, memberships }) => {
+        {visible.map(({ entry, captains, memberships }) => {
           return (
-            <Card key={entry.id} className={`p-5 ${activeCaptains.length ? "" : "border-danger"}`}>
+            <Card key={entry.id} className={`p-5 ${captains.length ? "" : "border-danger"}`}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h2 className="font-semibold">{entry.team.name}</h2>
                   <p className="text-muted text-sm">{selectedSeason.name}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {!activeCaptains.length ? <Badge tone="danger">Captainless</Badge> : null}
+                  {!captains.length ? <Badge tone="danger">Captainless</Badge> : null}
+                  {captains.length ? (
+                    <Badge tone="brand">
+                      {captains.length} Captain{captains.length === 1 ? "" : "s"}
+                    </Badge>
+                  ) : null}
                   <Badge>{memberships.length} active player(s)</Badge>
                   <Link
                     href={`/captain/roster?seasonId=${entry.seasonId}&teamId=${entry.teamId}`}
-                    className="text-brand text-sm hover:underline"
+                    className={buttonClass("secondary", "px-3 py-1.5")}
                   >
                     Manage roster
                   </Link>
                 </div>
               </div>
               {captains.length ? (
-                <div className="mt-4 grid gap-3">
+                <ul className="mt-4 grid gap-2">
                   {captains.map((captain) => (
-                    <div key={captain.id} className="border-subtle rounded-lg border p-4">
-                      <div className="mb-3 flex flex-wrap items-center gap-2">
-                        <strong>{captain.user?.displayName ?? captain.name}</strong>
-                        <Badge tone={captain.status === "ACTIVE" ? "brand" : "warning"}>
-                          {captain.seasonId ? captain.status.toLowerCase() : "legacy · unbound"}
-                        </Badge>
-                        <span className="text-muted text-xs">
-                          {captain.user?.entraObjectId ? "Entra linked" : "awaiting account claim"}
-                        </span>
+                    <li
+                      key={captain.id}
+                      className="bg-surface-muted border-subtle flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold">
+                          {captain.user?.displayName ?? captain.name}
+                        </p>
+                        <p className="text-muted truncate text-sm">
+                          {captain.user?.email ?? captain.email ?? "No account e-mail"}
+                        </p>
                       </div>
-                      <ActionForm
-                        action={relinkCaptainAction}
-                        className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]"
-                      >
-                        <input type="hidden" name="captainId" value={captain.id} />
-                        <input type="hidden" name="seasonId" value={entry.seasonId} />
-                        <input
-                          type="hidden"
-                          name="expectedUpdatedAt"
-                          value={captain.updatedAt.toISOString()}
-                        />
-                        <Field label="Captain name" htmlFor={`${captain.id}-name`}>
-                          <input
-                            id={`${captain.id}-name`}
-                            name="name"
-                            defaultValue={captain.name}
-                            required
-                            maxLength={120}
-                            className={inputClass}
-                          />
-                        </Field>
-                        <Field label="Identity e-mail" htmlFor={`${captain.id}-email`}>
-                          <input
-                            id={`${captain.id}-email`}
-                            name="email"
-                            type="email"
-                            defaultValue={captain.email ?? ""}
-                            required
-                            className={inputClass}
-                          />
-                        </Field>
-                        <div className="self-end">
-                          <SubmitButton
-                            variant="secondary"
-                            confirm="Relink this Captain record to the account matching the entered e-mail? This changes Captain access but does not add anyone to the player roster."
-                          >
-                            Save identity
-                          </SubmitButton>
-                        </div>
-                      </ActionForm>
-                    </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge tone="brand">Captain</Badge>
+                        <Badge tone={captain.user?.entraObjectId ? "success" : "neutral"}>
+                          {captain.user?.entraObjectId
+                            ? "Entra linked"
+                            : captain.user?.status === "ACTIVE"
+                              ? "Account active"
+                              : "Awaiting sign-in"}
+                        </Badge>
+                      </div>
+                    </li>
                   ))}
-                </div>
+                </ul>
               ) : (
                 <div className="mt-4">
                   <EmptyState
                     title="This team is Captainless"
-                    hint="Use Manage roster to promote an active player, or League setup to add a pending Captain contact."
+                    hint="Open Manage roster to promote an active player."
                   />
                 </div>
               )}
