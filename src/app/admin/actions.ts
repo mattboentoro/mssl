@@ -30,7 +30,6 @@ import {
   documentSchema,
   deleteFreeAgentRequestSchema,
   flattenZodError,
-  freeAgentReviewSchema,
   matchCreateSchema,
   pointsAdjustmentSchema,
   seasonSchema,
@@ -1640,49 +1639,6 @@ export async function importScheduleAction(
 // Free agents
 // ---------------------------------------------------------------------------
 
-export async function reviewFreeAgentRequest(
-  _prev: ActionState,
-  form: FormData,
-): Promise<ActionState> {
-  return run(
-    freeAgentReviewSchema,
-    {
-      requestId: str(form, "requestId"),
-      status: str(form, "status"),
-      reviewNote: optional(form, "reviewNote"),
-    },
-    async (data, actor) => {
-      const request = await prisma.freeAgentRequest.findUnique({
-        where: { id: data.requestId },
-      });
-      if (!request) throw new Error("That request no longer exists.");
-
-      await prisma.$transaction(async (tx) => {
-        await tx.freeAgentRequest.update({
-          where: { id: request.id },
-          data: {
-            status: data.status,
-            reviewNote: data.reviewNote,
-            reviewedAt: new Date(),
-            reviewedByEmail: actor.email ?? null,
-          },
-        });
-        await writeAudit(tx, {
-          actor: actorFrom(actor),
-          action: "free_agent.review",
-          entity: "FreeAgentRequest",
-          entityId: request.id,
-          metadata: { from: request.status, to: data.status },
-        });
-      });
-
-      refreshAdmin();
-      revalidatePath("/free-agents");
-      return `Updated ${request.submittedByName}'s request.`;
-    },
-  );
-}
-
 export async function deleteFreeAgentRequest(
   _prev: ActionState,
   form: FormData,
@@ -1709,6 +1665,7 @@ export async function deleteFreeAgentRequest(
 
       refreshAdmin();
       revalidatePath("/free-agents");
+      revalidatePath("/captain/free-agents");
       return `Removed ${request.submittedByName}'s request.`;
     },
   );

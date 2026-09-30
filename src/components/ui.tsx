@@ -71,7 +71,7 @@ export function Card({
 }: {
   children: ReactNode;
   className?: string;
-  as?: "div" | "section" | "article" | "li";
+  as?: "div" | "section" | "article" | "li" | "details";
 }) {
   return (
     <As className={cn("bg-surface border-subtle rounded-xl border shadow-sm", className)}>

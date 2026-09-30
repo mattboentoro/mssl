@@ -3,7 +3,6 @@ import { z } from "zod";
 import {
   CARD_TYPES,
   DOCUMENT_CATEGORIES,
-  FREE_AGENT_STATUSES,
   KIT_CHOICES,
   MATCH_STATUSES,
   PLAYER_POSITIONS,
@@ -398,17 +397,6 @@ export const freeAgentRequestSchema = z.object({
 });
 
 export type FreeAgentRequestInput = z.infer<typeof freeAgentRequestSchema>;
-
-/** An administrator recording what the league did about a request. */
-export const freeAgentReviewSchema = z.object({
-  requestId: trimmed(60).min(1, "Missing request."),
-  status: z.enum(FREE_AGENT_STATUSES, {
-    errorMap: () => ({ message: "Pick a status." }),
-  }),
-  reviewNote: optionalText(500)
-    .nullable()
-    .transform((v) => v ?? null),
-});
 
 export const deleteFreeAgentRequestSchema = z.object({
   requestId: trimmed(60).min(1, "Missing request."),

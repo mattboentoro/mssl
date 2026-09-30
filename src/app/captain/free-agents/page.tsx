@@ -3,33 +3,20 @@ import Link from "next/link";
 import { forbidden, redirect } from "next/navigation";
 
 import { placeFreeAgentAction } from "@/app/captain/free-agents/actions";
+import { FreeAgentDisclosure } from "@/components/free-agent-disclosure";
 import { RosterActionForm } from "@/components/roster-action-form";
-import { Badge, buttonClass, Card, EmptyState, PageHeader, inputClass } from "@/components/ui";
+import { buttonClass, Card, EmptyState, PageHeader, inputClass } from "@/components/ui";
 import { AuthzError, requireCaptain } from "@/lib/authz";
 import {
   CaptainFreeAgentError,
   isFreeAgentStatus,
   listCaptainFreeAgents,
 } from "@/lib/captain-free-agents";
-import {
-  FREE_AGENT_STATUSES,
-  FREE_AGENT_STATUS_LABELS,
-  OPEN_FREE_AGENT_STATUSES,
-  PLAYER_POSITION_LABELS,
-  type FreeAgentStatus,
-  type PlayerPosition,
-} from "@/lib/enums";
+import { FREE_AGENT_STATUSES, FREE_AGENT_STATUS_LABELS } from "@/lib/enums";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = { title: "Free agents" };
 export const dynamic = "force-dynamic";
-
-const STATUS_TONES: Record<FreeAgentStatus, "warning" | "accent" | "success" | "neutral"> = {
-  PENDING: "warning",
-  CONTACTED: "accent",
-  PLACED: "success",
-  DECLINED: "neutral",
-};
 
 export default async function CaptainFreeAgentsPage({
   searchParams,
@@ -46,7 +33,7 @@ export default async function CaptainFreeAgentsPage({
     forbidden();
   }
   const params = await searchParams;
-  const status = params.status === "all" || isFreeAgentStatus(params.status) ? params.status : "";
+  const status = isFreeAgentStatus(params.status) ? params.status : "";
 
   let data;
   try {
@@ -70,15 +57,14 @@ export default async function CaptainFreeAgentsPage({
         backLabel="Captain dashboard"
         eyebrow="Captain"
         title="Free agents"
-        description="Contact details are restricted to active Captains and access is audited. Placement sends an invitation; the player joins only after accepting it."
+        description="Contact details are restricted to active Captains. Sending an invitation automatically records your team as having contacted the player."
       />
       <Card className="mb-6 p-4">
         <form className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]" method="get">
           <label className="text-sm">
             <span className="text-muted mb-1 block text-xs font-medium uppercase">Status</span>
             <select className={inputClass} defaultValue={status} name="status">
-              <option value="">Open requests</option>
-              <option value="all">All</option>
+              <option value="">All statuses</option>
               {FREE_AGENT_STATUSES.map((item) => (
                 <option key={item} value={item}>
                   {FREE_AGENT_STATUS_LABELS[item]}
@@ -109,87 +95,51 @@ export default async function CaptainFreeAgentsPage({
       </Card>
 
       {data.requests.length ? (
-        <div className="grid gap-4">
-          {data.requests.map((request) => {
-            const requestStatus = request.status as FreeAgentStatus;
-            const open = OPEN_FREE_AGENT_STATUSES.includes(requestStatus);
-            return (
-              <Card as="article" className="p-5" key={request.id}>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <h2 className="font-semibold">{request.submittedByName}</h2>
-                    <a
-                      className="text-muted text-sm hover:underline"
-                      href={`mailto:${request.submittedByEmail}`}
+        <div className="grid gap-2">
+          {data.requests.map((request) => (
+            <FreeAgentDisclosure key={request.id} request={request}>
+              <p className="text-muted mb-2 text-xs font-medium uppercase">
+                Send a roster invitation
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {data.assignments.map((assignment) => {
+                  if (!assignment.seasonId) return null;
+                  const hasOpenInvitation = request.invitations.some(
+                    (invitation) =>
+                      invitation.seasonId === assignment.seasonId &&
+                      invitation.teamId === assignment.teamId &&
+                      invitation.status === "PENDING",
+                  );
+                  return hasOpenInvitation ? (
+                    <span
+                      className="bg-surface-muted border-subtle rounded-lg border px-3 py-2 text-sm"
+                      key={assignment.id}
                     >
-                      {request.submittedByEmail}
-                    </a>
-                  </div>
-                  <Badge tone={STATUS_TONES[requestStatus]}>
-                    {FREE_AGENT_STATUS_LABELS[requestStatus]}
-                  </Badge>
-                </div>
-                <dl className="text-muted mt-4 grid gap-3 text-sm sm:grid-cols-3">
-                  <div>
-                    <dt className="text-xs font-medium uppercase">Experience</dt>
-                    <dd className="text-foreground">
-                      {request.yearsExperience} year{request.yearsExperience === 1 ? "" : "s"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-medium uppercase">Position</dt>
-                    <dd className="text-foreground">
-                      {PLAYER_POSITION_LABELS[request.preferredPosition as PlayerPosition] ??
-                        request.preferredPosition}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-medium uppercase">Preferred division</dt>
-                    <dd className="text-foreground">
-                      {request.preferredDivision?.name ?? "No preference"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-medium uppercase">Submitted</dt>
-                    <dd className="text-foreground">{request.createdAt.toLocaleDateString()}</dd>
-                  </div>
-                </dl>
-                <div className="mt-4">
-                  <p className="text-muted text-xs font-medium uppercase">Player notes</p>
-                  <p className="mt-1 text-sm whitespace-pre-line">
-                    {request.notes ?? "No additional notes."}
-                  </p>
-                </div>
-                {open ? (
-                  <div className="border-subtle mt-4 border-t pt-4">
-                    <p className="text-muted mb-2 text-xs font-medium uppercase">
-                      Send a roster invitation
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {data.assignments.map((assignment) =>
-                        assignment.seasonId ? (
-                          <RosterActionForm
-                            action={placeFreeAgentAction}
-                            key={assignment.id}
-                            submitLabel={`${assignment.team.name} · ${assignment.season?.name}`}
-                            variant="secondary"
-                          >
-                            <input name="requestId" type="hidden" value={request.id} />
-                            <input name="seasonId" type="hidden" value={assignment.seasonId} />
-                            <input name="teamId" type="hidden" value={assignment.teamId} />
-                          </RosterActionForm>
-                        ) : null,
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-              </Card>
-            );
-          })}
+                      {assignment.team.name} · invitation pending
+                    </span>
+                  ) : (
+                    <RosterActionForm
+                      action={placeFreeAgentAction}
+                      key={assignment.id}
+                      submitLabel={`${assignment.team.name} · ${assignment.season?.name}`}
+                      variant="secondary"
+                    >
+                      <input name="requestId" type="hidden" value={request.id} />
+                      <input name="seasonId" type="hidden" value={assignment.seasonId} />
+                      <input name="teamId" type="hidden" value={assignment.teamId} />
+                    </RosterActionForm>
+                  );
+                })}
+              </div>
+            </FreeAgentDisclosure>
+          ))}
         </div>
       ) : (
         <Card className="p-6">
-          <EmptyState title="No free-agent requests match these filters." />
+          <EmptyState
+            title="No free agents match these filters"
+            hint="Players disappear from this list automatically when they join a team."
+          />
         </Card>
       )}
     </div>

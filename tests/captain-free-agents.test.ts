@@ -177,6 +177,7 @@ describe("Captain free-agent access", () => {
       preferredDivisionId: fx.preferredDivision.id,
       notes: "Available Tuesdays and Thursdays.",
       status: "PENDING",
+      systemStatus: "PENDING",
       preferredDivision: { name: "Premier" },
     });
     const audit = await prisma.auditLog.findFirstOrThrow({
@@ -191,29 +192,25 @@ describe("Captain free-agent access", () => {
 
   it("filters requests by status and preferred division", async () => {
     const fx = await fixture();
-    await prisma.freeAgentRequest.create({
-      data: {
-        submittedByName: "Placed Player",
-        submittedByEmail: "placed@example.com",
-        yearsExperience: 1,
-        preferredPosition: "ANY",
-        preferredDivisionId: fx.otherDivision.id,
-        status: "PLACED",
-      },
+    await placeFreeAgent(prisma, {
+      actorId: fx.captain.id,
+      requestId: fx.request.id,
+      seasonId: fx.season.id,
+      teamId: fx.home.id,
     });
     expect(
       (
         await listCaptainFreeAgents(prisma, {
           actorId: fx.captain.id,
-          filters: { status: "PLACED", divisionId: fx.otherDivision.id },
+          filters: { status: "CONTACTED", divisionId: fx.preferredDivision.id },
         })
       ).requests.map(({ submittedByName }) => submittedByName),
-    ).toEqual(["Placed Player"]);
+    ).toEqual(["Free Player"]);
   });
 });
 
 describe("Captain free-agent placement", () => {
-  it("hands placement off as an invitation and marks PLACED only on acceptance", async () => {
+  it("marks an invitation as contacted and removes the player from the pool on acceptance", async () => {
     const fx = await fixture();
     const invitation = await placeFreeAgent(prisma, {
       actorId: fx.captain.id,
@@ -224,7 +221,24 @@ describe("Captain free-agent placement", () => {
     expect(await prisma.teamMembership.count()).toBe(0);
     await expect(
       prisma.freeAgentRequest.findUniqueOrThrow({ where: { id: fx.request.id } }),
-    ).resolves.toMatchObject({ status: "PENDING" });
+    ).resolves.toMatchObject({ status: "CONTACTED" });
+    expect(
+      (
+        await listCaptainFreeAgents(prisma, {
+          actorId: fx.captain.id,
+          filters: { status: "CONTACTED" },
+        })
+      ).requests[0],
+    ).toMatchObject({
+      id: fx.request.id,
+      systemStatus: "CONTACTED",
+      invitations: [
+        expect.objectContaining({
+          teamId: fx.home.id,
+          freeAgentRequestId: fx.request.id,
+        }),
+      ],
+    });
     expect(
       await prisma.notification.count({
         where: { userId: fx.player.id, type: "ROSTER_INVITATION" },
@@ -243,7 +257,10 @@ describe("Captain free-agent placement", () => {
     });
     await expect(
       prisma.freeAgentRequest.findUniqueOrThrow({ where: { id: fx.request.id } }),
-    ).resolves.toMatchObject({ status: "PLACED", reviewedByEmail: fx.captain.email });
+    ).resolves.toMatchObject({ status: "CONTACTED" });
+    expect((await listCaptainFreeAgents(prisma, { actorId: fx.captain.id })).requests).toHaveLength(
+      0,
+    );
     expect(
       await prisma.teamMembership.count({
         where: { userId: fx.player.id, teamId: fx.home.id, status: "ACTIVE" },
@@ -288,6 +305,9 @@ describe("Captain free-agent placement", () => {
         assignedById: fx.awayCaptain.id,
       },
     });
+    expect((await listCaptainFreeAgents(prisma, { actorId: fx.captain.id })).requests).toHaveLength(
+      0,
+    );
     await expect(
       placeFreeAgent(prisma, {
         actorId: fx.captain.id,
@@ -298,7 +318,7 @@ describe("Captain free-agent placement", () => {
     ).rejects.toMatchObject({ code: "ALREADY_ROSTERED" } satisfies Partial<RosterError>);
   });
 
-  it("keeps one accepted team and one PLACED transition across competing invitations", async () => {
+  it("keeps one accepted team across competing invitations", async () => {
     const fx = await fixture();
     const homeInvitation = await placeFreeAgent(prisma, {
       actorId: fx.captain.id,

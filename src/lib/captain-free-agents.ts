@@ -1,7 +1,8 @@
 import type { PrismaClient } from "@prisma/client";
 
 import { writeAudit } from "@/lib/audit";
-import { FREE_AGENT_STATUSES, OPEN_FREE_AGENT_STATUSES, type FreeAgentStatus } from "@/lib/enums";
+import { FREE_AGENT_STATUSES, type FreeAgentStatus } from "@/lib/enums";
+import { listAvailableFreeAgents } from "@/lib/free-agents";
 import { createRosterInvitation, RosterError } from "@/lib/roster";
 
 export class CaptainFreeAgentError extends Error {
@@ -62,20 +63,12 @@ export async function listCaptainFreeAgents(
   ) {
     throw new CaptainFreeAgentError("That status filter is not valid.", 400, "INVALID_FILTER");
   }
-  const statusWhere =
-    requestedStatus === "all"
-      ? {}
-      : requestedStatus
-        ? { status: requestedStatus }
-        : { status: { in: [...OPEN_FREE_AGENT_STATUSES] } };
-  const where = {
-    ...statusWhere,
-    ...(input.filters?.divisionId ? { preferredDivisionId: input.filters.divisionId } : {}),
-  };
-  const requests = await db.freeAgentRequest.findMany({
-    where,
-    include: { preferredDivision: { select: { name: true } } },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+  const requests = await listAvailableFreeAgents(db, {
+    status:
+      requestedStatus && requestedStatus !== "all"
+        ? (requestedStatus as FreeAgentStatus)
+        : undefined,
+    divisionId: input.filters?.divisionId,
   });
 
   await writeAudit(db, {
@@ -99,7 +92,6 @@ export async function placeFreeAgent(
     requestId: string;
     seasonId: string;
     teamId: string;
-    message?: string | null;
   },
 ) {
   if (!input.requestId || !input.seasonId || !input.teamId) {
@@ -115,7 +107,6 @@ export async function placeFreeAgent(
       seasonId: input.seasonId,
       teamId: input.teamId,
       freeAgentRequestId: input.requestId,
-      message: input.message,
     });
   } catch (error) {
     if (error instanceof RosterError) throw error;
