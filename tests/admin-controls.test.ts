@@ -132,7 +132,12 @@ describe("Admin RBAC operational controls", () => {
         "season-1",
       ),
     ).toBe(false);
-    expect(source("src/app/admin/roster/page.tsx")).toContain("Captainless");
+    const page = source("src/app/admin/roster/page.tsx");
+    expect(page).toContain("Captainless");
+    expect(page).toContain("season.isActive");
+    expect(page).toContain('name="team"');
+    expect(page).toContain('name="state"');
+    expect(page).toContain('name="players"');
   });
 
   it("rejects a stale relink after revocation without reactivating the Captain", async () => {
