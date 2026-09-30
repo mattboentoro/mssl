@@ -21,7 +21,7 @@ type RosterState = "attention" | "all" | "captainless" | "ready";
 type PlayerState = "all" | "empty" | "has-players";
 
 function rosterState(value: string | undefined): RosterState {
-  return value === "all" || value === "captainless" || value === "ready" ? value : "attention";
+  return value === "attention" || value === "captainless" || value === "ready" ? value : "all";
 }
 
 function playerState(value: string | undefined): PlayerState {
@@ -75,9 +75,8 @@ export default async function AdminRosterPage({
           },
           captains: {
             where: {
-              seasonId: selectedSeason.id,
-              status: "ACTIVE",
               revokedAt: null,
+              OR: [{ seasonId: selectedSeason.id }, { seasonId: null }],
             },
             include: {
               user: {
@@ -95,17 +94,24 @@ export default async function AdminRosterPage({
   const selectedTeamId = teamOptions.some((team) => team.id === params.team) ? params.team : "";
   const summaries = teams.map((entry) => {
     const captains = entry.team.captains;
+    const activeCaptains = captains.filter(
+      (captain) =>
+        captain.seasonId === selectedSeason.id &&
+        captain.status === "ACTIVE" &&
+        captain.user?.status === "ACTIVE",
+    );
     return {
       entry,
       captains,
+      activeCaptains,
       memberships: entry.team.memberships,
-      needsAttention: captains.length === 0,
+      needsAttention: activeCaptains.length === 0,
     };
   });
   const visible = summaries
     .filter(({ entry }) => !selectedTeamId || entry.teamId === selectedTeamId)
-    .filter(({ captains, needsAttention }) => {
-      if (selectedState === "captainless") return captains.length === 0;
+    .filter(({ activeCaptains, needsAttention }) => {
+      if (selectedState === "captainless") return activeCaptains.length === 0;
       if (selectedState === "ready") return !needsAttention;
       if (selectedState === "attention") return needsAttention;
       return true;
@@ -125,7 +131,7 @@ export default async function AdminRosterPage({
     <div>
       <PageHeader
         title="Roster & Captain administration"
-        description="A read-only overview sourced from the same records as Manage roster. The active season and Captainless teams are shown by default."
+        description="A read-only overview of registered players, Captain assignments, and team contacts. The active season and all teams are shown by default."
       />
       <Card className="mb-5 p-4">
         <form method="get" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -204,19 +210,22 @@ export default async function AdminRosterPage({
         requests or invitations.
       </Alert>
       <div className="grid gap-4">
-        {visible.map(({ entry, captains, memberships }) => {
+        {visible.map(({ entry, captains, activeCaptains, memberships }) => {
+          const activeCaptainUserIds = new Set(
+            activeCaptains.flatMap(({ userId }) => (userId ? [userId] : [])),
+          );
           return (
-            <Card key={entry.id} className={`p-5 ${captains.length ? "" : "border-danger"}`}>
+            <Card key={entry.id} className={`p-5 ${activeCaptains.length ? "" : "border-danger"}`}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h2 className="font-semibold">{entry.team.name}</h2>
                   <p className="text-muted text-sm">{selectedSeason.name}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {!captains.length ? <Badge tone="danger">Captainless</Badge> : null}
-                  {captains.length ? (
+                  {!activeCaptains.length ? <Badge tone="danger">Captainless</Badge> : null}
+                  {activeCaptains.length ? (
                     <Badge tone="brand">
-                      {captains.length} Captain{captains.length === 1 ? "" : "s"}
+                      {activeCaptains.length} Captain{activeCaptains.length === 1 ? "" : "s"}
                     </Badge>
                   ) : null}
                   <Badge>{memberships.length} active player(s)</Badge>
@@ -228,42 +237,78 @@ export default async function AdminRosterPage({
                   </Link>
                 </div>
               </div>
-              {captains.length ? (
-                <ul className="mt-4 grid gap-2">
-                  {captains.map((captain) => (
-                    <li
-                      key={captain.id}
-                      className="bg-surface-muted border-subtle flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold">
-                          {captain.user?.displayName ?? captain.name}
-                        </p>
-                        <p className="text-muted truncate text-sm">
-                          {captain.user?.email ?? captain.email ?? "No account e-mail"}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge tone="brand">Captain</Badge>
-                        <Badge tone={captain.user?.entraObjectId ? "success" : "neutral"}>
-                          {captain.user?.entraObjectId
-                            ? "Entra linked"
-                            : captain.user?.status === "ACTIVE"
-                              ? "Account active"
-                              : "Awaiting sign-in"}
-                        </Badge>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="mt-4">
-                  <EmptyState
-                    title="This team is Captainless"
-                    hint="Open Manage roster to promote an active player."
-                  />
+              <div className="mt-5 grid gap-5 xl:grid-cols-2">
+                <div>
+                  <h3 className="text-sm font-semibold">Active players</h3>
+                  {memberships.length ? (
+                    <ul className="mt-2 grid gap-2">
+                      {memberships.map((membership) => (
+                        <li
+                          key={membership.id}
+                          className="bg-surface-muted border-subtle flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold">{membership.user.displayName}</p>
+                            <p className="text-muted truncate text-sm">{membership.user.email}</p>
+                          </div>
+                          <Badge
+                            tone={activeCaptainUserIds.has(membership.userId) ? "brand" : "neutral"}
+                          >
+                            {activeCaptainUserIds.has(membership.userId) ? "Captain" : "Player"}
+                          </Badge>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-muted mt-2 text-sm">No active players in this season.</p>
+                  )}
                 </div>
-              )}
+                <div>
+                  <h3 className="text-sm font-semibold">Registered Captains and team contacts</h3>
+                  {captains.length ? (
+                    <ul className="mt-2 grid gap-2">
+                      {captains.map((captain) => {
+                        const isActiveCaptain = activeCaptains.some(({ id }) => id === captain.id);
+                        return (
+                          <li
+                            key={captain.id}
+                            className="bg-surface-muted border-subtle flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold">
+                                {captain.user?.displayName ?? captain.name}
+                              </p>
+                              <p className="text-muted truncate text-sm">
+                                {captain.user?.email ?? captain.email ?? "No account e-mail"}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge tone={isActiveCaptain ? "brand" : "warning"}>
+                                {isActiveCaptain
+                                  ? "Captain"
+                                  : captain.seasonId
+                                    ? "Pending Captain"
+                                    : "Team contact"}
+                              </Badge>
+                              <Badge tone={captain.user?.entraObjectId ? "success" : "neutral"}>
+                                {captain.user?.entraObjectId
+                                  ? "Entra linked"
+                                  : captain.user?.status === "ACTIVE"
+                                    ? "Account active"
+                                    : "Awaiting sign-in"}
+                              </Badge>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="text-muted mt-2 text-sm">
+                      No Captain assignment or team contact is registered.
+                    </p>
+                  )}
+                </div>
+              </div>
             </Card>
           );
         })}
