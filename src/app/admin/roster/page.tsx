@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { MatchDisclosureStack } from "@/components/match-display";
+import { MatchDisclosureHint, MatchDisclosureStack } from "@/components/match-display";
 import {
   Alert,
   Badge,
@@ -240,7 +240,7 @@ export default async function AdminRosterPage({
                 as="details"
                 className={`group overflow-hidden ${activeCaptains.length ? "" : "border-danger"}`}
               >
-                <summary className="hover:bg-surface-muted cursor-pointer list-none px-4 py-3 transition">
+                <summary className="hover:bg-surface-muted relative cursor-pointer list-none px-4 py-3 transition">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="min-w-0">
                       <h2 className="truncate font-semibold">{entry.team.name}</h2>
@@ -267,6 +267,10 @@ export default async function AdminRosterPage({
                       </Link>
                     </div>
                   </div>
+                  <MatchDisclosureHint
+                    className="text-muted absolute bottom-1 left-1/2 mt-0 -translate-x-1/2"
+                    label="Expand roster details"
+                  />
                 </summary>
                 <div className="border-subtle grid gap-5 border-t p-4 xl:grid-cols-2">
                   <div>

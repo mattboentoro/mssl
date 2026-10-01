@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { KitSwatch, TeamColorBar } from "@/components/team-colors";
 import { Badge, Card, FormGuide, MatchStatusBadge } from "@/components/ui";
+import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/dates";
 import { kitColorName, resolveKit } from "@/lib/kits";
 import { displayedScore, type MatchListItem } from "@/lib/queries";
@@ -31,12 +32,21 @@ export function MatchDisclosureStack({ children }: { children: React.ReactNode }
   );
 }
 
-export function MatchDisclosureHint() {
+export function MatchDisclosureHint({
+  className,
+  label = "Expand match details",
+}: {
+  className?: string;
+  label?: string;
+} = {}) {
   return (
     <span
       role="img"
-      aria-label="Expand match details"
-      className="bg-surface-muted border-subtle text-foreground mx-auto mt-3 flex h-5 w-5 items-center justify-center rounded-full border shadow-sm transition-transform group-open:rotate-180"
+      aria-label={label}
+      className={cn(
+        "bg-surface-muted border-subtle text-foreground mx-auto mt-3 flex h-5 w-5 items-center justify-center rounded-full border shadow-sm transition-transform group-open:rotate-180",
+        className,
+      )}
     >
       <svg aria-hidden viewBox="0 0 20 20" className="h-3 w-3" fill="none">
         <path
