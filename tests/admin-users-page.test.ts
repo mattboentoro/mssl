@@ -23,6 +23,12 @@ describe("Admin users and roles", () => {
     expect(page).toContain("All teams");
     expect(page).toContain('"roles-asc"');
     expect(page).toContain('"roles-desc"');
+    expect(page).toContain(">name asc</option>");
+    expect(page).toContain(">name desc</option>");
+    expect(page).toContain(">roles asc</option>");
+    expect(page).toContain(">roles desc</option>");
+    expect(page).toContain('className="p-3"');
+    expect(page).toContain("items-center gap-2");
     expect(page).toContain('className="px-2 py-1 text-xs"');
     expect(page).toContain("role.toLowerCase()");
   });

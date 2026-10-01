@@ -169,10 +169,10 @@ export default async function UsersPage({
           </Field>
           <Field label="Sort" htmlFor="user-sort">
             <select className={inputClass} defaultValue={sort} id="user-sort" name="sort">
-              <option value="name-asc">name A–Z</option>
-              <option value="name-desc">name Z–A</option>
-              <option value="roles-asc">roles A–Z</option>
-              <option value="roles-desc">roles Z–A</option>
+              <option value="name-asc">name asc</option>
+              <option value="name-desc">name desc</option>
+              <option value="roles-asc">roles asc</option>
+              <option value="roles-desc">roles desc</option>
             </select>
           </Field>
           <div className="flex flex-wrap gap-2 md:col-span-2 xl:col-span-6">
@@ -193,35 +193,35 @@ export default async function UsersPage({
           {visibleUsers.map(({ user }) => {
             const assigned = new Set(user.rolesAssigned.map((item) => item.role));
             return (
-              <Card key={user.id} className="p-4">
-                <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <h2 className="font-semibold">{user.displayName}</h2>
+              <Card key={user.id} className="p-3">
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="font-semibold">{user.displayName}</h2>
+                      <Badge tone={user.status === "ACTIVE" ? "brand" : "warning"}>
+                        {user.status.toLowerCase()}
+                      </Badge>
+                    </div>
                     <p className="text-muted text-xs">{user.email}</p>
-                  </div>
-                  <Badge tone={user.status === "ACTIVE" ? "brand" : "warning"}>
-                    {user.status.toLowerCase()}
-                  </Badge>
-                </div>
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {user.memberships.map((membership) => (
-                      <Badge key={membership.id}>
-                        player · {membership.team.name} · {membership.season.name}
-                      </Badge>
-                    ))}
-                    {user.captainAssignments.map((captain) => (
-                      <Badge key={captain.id} tone="brand">
-                        captain · {captain.team.name} · {captain.season?.name ?? "all seasons"}
-                      </Badge>
-                    ))}
-                    {user.rolesAssigned
-                      .filter(({ role }) => role === "REFEREE" || role === "ADMIN")
-                      .map(({ id, role }) => (
-                        <Badge key={id} tone={role === "ADMIN" ? "accent" : "brand"}>
-                          {role.toLowerCase()}
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {user.memberships.map((membership) => (
+                        <Badge key={membership.id}>
+                          player · {membership.team.name} · {membership.season.name}
                         </Badge>
                       ))}
+                      {user.captainAssignments.map((captain) => (
+                        <Badge key={captain.id} tone="brand">
+                          captain · {captain.team.name} · {captain.season?.name ?? "all seasons"}
+                        </Badge>
+                      ))}
+                      {user.rolesAssigned
+                        .filter(({ role }) => role === "REFEREE" || role === "ADMIN")
+                        .map(({ id, role }) => (
+                          <Badge key={id} tone={role === "ADMIN" ? "accent" : "brand"}>
+                            {role.toLowerCase()}
+                          </Badge>
+                        ))}
+                    </div>
                   </div>
                   <div className="flex flex-wrap gap-2 lg:justify-end">
                     {ASSIGNABLE_ROLES.map((role) => {
@@ -249,10 +249,10 @@ export default async function UsersPage({
                                 : `Add the ${role} role to ${user.displayName} without changing their other roles?`
                             }
                           >
-                              {hasRole
-                                ? `Remove ${role.toLowerCase()}`
-                                : `Add ${role.toLowerCase()}`}
-                            </SubmitButton>
+                            {hasRole
+                              ? `Remove ${role.toLowerCase()}`
+                              : `Add ${role.toLowerCase()}`}
+                          </SubmitButton>
                         </ActionForm>
                       );
                     })}
