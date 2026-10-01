@@ -308,7 +308,7 @@ export default async function AccountPage() {
       </section>
 
       <form action={doSignOut} className="mt-6">
-        <Button type="submit" variant="secondary">
+        <Button type="submit" variant="danger">
           Sign out
         </Button>
       </form>
