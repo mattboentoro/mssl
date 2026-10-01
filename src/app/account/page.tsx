@@ -21,7 +21,7 @@ export default async function AccountPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/signin?callbackUrl=/account");
 
-  const [referee, memberships] = await Promise.all([
+  const [referee, memberships, captainAssignments] = await Promise.all([
     getRefereeForUser(user),
     prisma.teamMembership.findMany({
       where: { userId: user.appUserId },
@@ -31,35 +31,72 @@ export default async function AccountPage() {
       },
       orderBy: [{ season: { startsOn: "desc" } }, { team: { name: "asc" } }],
     }),
+    prisma.teamCaptain.findMany({
+      where: {
+        userId: user.appUserId,
+        status: "ACTIVE",
+        revokedAt: null,
+        seasonId: { not: null },
+      },
+      include: {
+        season: { select: { id: true, name: true, startsOn: true, endsOn: true } },
+        team: { select: { id: true, name: true } },
+      },
+    }),
   ]);
-  const membershipContexts = memberships.map((membership) => ({
-    seasonId: membership.seasonId,
-    teamId: membership.teamId,
-  }));
-  const normalizedName = user.name?.trim().replace(/\s+/g, " ").toLowerCase();
-  const discipline =
-    normalizedName && membershipContexts.length
-      ? (
-          await prisma.disciplinaryAction.findMany({
-            where: {
-              OR: membershipContexts.map(({ seasonId, teamId }) => ({ seasonId, teamId })),
+  const captainKeys = new Set(
+    captainAssignments.map((assignment) => `${assignment.seasonId}:${assignment.teamId}`),
+  );
+  const historyByTeam = new Map(
+    memberships.map((membership) => [
+      `${membership.seasonId}:${membership.teamId}`,
+      {
+        id: membership.id,
+        seasonId: membership.seasonId,
+        teamId: membership.teamId,
+        season: membership.season,
+        team: membership.team,
+        current: membership.status === "ACTIVE" && !membership.endedAt,
+        captain: captainKeys.has(`${membership.seasonId}:${membership.teamId}`),
+      },
+    ]),
+  );
+  for (const assignment of captainAssignments) {
+    if (!assignment.season) continue;
+    const key = `${assignment.seasonId}:${assignment.teamId}`;
+    if (!historyByTeam.has(key)) {
+      historyByTeam.set(key, {
+        id: `captain:${assignment.id}`,
+        seasonId: assignment.season.id,
+        teamId: assignment.teamId,
+        season: assignment.season,
+        team: assignment.team,
+        current: true,
+        captain: true,
+      });
+    }
+  }
+  const teamHistory = [...historyByTeam.values()].sort(
+    (left, right) =>
+      right.season.startsOn.getTime() - left.season.startsOn.getTime() ||
+      left.team.name.localeCompare(right.team.name),
+  );
+  const historyContexts = teamHistory.map(({ seasonId, teamId }) => ({ seasonId, teamId }));
+  const discipline = historyContexts.length
+    ? await prisma.disciplinaryAction.findMany({
+        where: { OR: historyContexts },
+        include: {
+          match: {
+            select: {
+              matchweek: true,
+              homeTeam: { select: { shortName: true } },
+              awayTeam: { select: { shortName: true } },
             },
-            include: {
-              match: {
-                select: {
-                  matchweek: true,
-                  homeTeam: { select: { shortName: true } },
-                  awayTeam: { select: { shortName: true } },
-                },
-              },
-            },
-            orderBy: { createdAt: "desc" },
-          })
-        ).filter(
-          (action) =>
-            action.playerName.trim().replace(/\s+/g, " ").toLowerCase() === normalizedName,
-        )
-      : [];
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      })
+    : [];
   const disciplineByMembership = new Map<string, typeof discipline>();
   for (const action of discipline) {
     const key = `${action.seasonId}:${action.teamId}`;
@@ -68,7 +105,7 @@ export default async function AccountPage() {
     else disciplineByMembership.set(key, [action]);
   }
   const seasons = [
-    ...new Map(memberships.map((membership) => [membership.seasonId, membership.season])).values(),
+    ...new Map(teamHistory.map((entry) => [entry.seasonId, entry.season])).values(),
   ];
   const visibleRoles = user.roles.filter((role) => role !== "viewer" && role !== "public");
 
@@ -150,8 +187,8 @@ export default async function AccountPage() {
         {seasons.length ? (
           <div className="space-y-3">
             {seasons.map((season) => {
-              const seasonMemberships = memberships.filter(
-                (membership) => membership.seasonId === season.id,
+              const seasonMemberships = teamHistory.filter(
+                (entry) => entry.seasonId === season.id,
               );
               const seasonDiscipline = seasonMemberships.flatMap(
                 (membership) =>
@@ -182,11 +219,12 @@ export default async function AccountPage() {
                         <section key={membership.id}>
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <h4 className="font-semibold">{membership.team.name}</h4>
-                            <Badge tone={membership.status === "ACTIVE" ? "success" : "neutral"}>
-                              {membership.status === "ACTIVE" && !membership.endedAt
-                                ? "Current roster"
-                                : "Former roster"}
-                            </Badge>
+                            <div className="flex flex-wrap gap-2">
+                              {membership.captain ? <Badge tone="brand">Captain</Badge> : null}
+                              <Badge tone={membership.current ? "success" : "neutral"}>
+                                {membership.current ? "Current team" : "Former roster"}
+                              </Badge>
+                            </div>
                           </div>
                           {records.length ? (
                             <ul className="mt-3 space-y-2">
@@ -196,6 +234,7 @@ export default async function AccountPage() {
                                   className="bg-surface-muted rounded-lg p-3 text-sm"
                                 >
                                   <div className="flex flex-wrap items-center gap-2">
+                                    <span className="font-semibold">{action.playerName}</span>
                                     <Badge tone={action.type === "RED" ? "danger" : "warning"}>
                                       {CARD_LABELS[action.type as CardType] ?? action.type}
                                     </Badge>
@@ -248,9 +287,9 @@ export default async function AccountPage() {
             />
           </Card>
         )}
-        {memberships.length && discipline.length === 0 ? (
+        {teamHistory.length ? (
           <p className="text-muted mt-3 text-xs">
-            Discipline is matched to records filed under your account name.
+            Discipline includes records filed for each team during that season.
           </p>
         ) : null}
       </section>

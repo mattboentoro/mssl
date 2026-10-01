@@ -22,8 +22,17 @@ describe("account player history", () => {
     expect(roster).toContain('backHref={user.isCaptain ? "/captain/roster" : "/account"}');
     expect(account).toContain("Seasons played");
     expect(account).toContain("prisma.teamMembership.findMany");
+    expect(account).toContain("prisma.teamCaptain.findMany");
     expect(account).toContain("prisma.disciplinaryAction.findMany");
+    expect(account).toContain("Discipline includes records filed for each team");
+    expect(account).toContain("{action.playerName}");
     expect(account).toContain("SUSPENSION_REASON_LABELS");
+    expect(roster).toContain("prisma.teamCaptain.findMany");
+    expect(roster).toContain("const yourTeams = [...currentTeams.values()]");
+    expect(roster).toContain("membership.membershipId ?");
+    expect(roster).toContain(
+      '.filter((entry) => !currentTeams.has(`${season.id}:${entry.team.id}`))',
+    );
     expect(account).toContain('role !== "viewer"');
     expect(account).not.toContain("Go to Player dashboard");
     expect(account).not.toContain("Go to Captain dashboard");
