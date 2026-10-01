@@ -1,4 +1,4 @@
-import readXlsxFile from "read-excel-file";
+import readXlsxFile from "read-excel-file/node";
 
 import type { ImportRescheduleSlotInput } from "@/lib/reschedule-slots";
 import { parseLeagueDateTime } from "@/lib/timezone";
@@ -11,7 +11,7 @@ type WorkbookCell = string | number | boolean | Date | null;
 export class RescheduleSlotImportError extends Error {}
 
 export async function parseRescheduleSlotWorkbook(
-  buffer: ArrayBuffer,
+  buffer: Buffer,
 ): Promise<ImportRescheduleSlotInput[]> {
   let rows: WorkbookCell[][];
   try {

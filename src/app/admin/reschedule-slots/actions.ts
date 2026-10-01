@@ -91,7 +91,7 @@ export async function importRescheduleSlotsAction(
       return { error: "The workbook must be 5 MB or smaller." };
     }
 
-    const slots = await parseRescheduleSlotWorkbook(await workbook.arrayBuffer());
+    const slots = await parseRescheduleSlotWorkbook(Buffer.from(await workbook.arrayBuffer()));
     const result = await createRescheduleSlots(prisma, {
       slots,
       actor: actor(user),

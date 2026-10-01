@@ -4,8 +4,8 @@ const nextConfig: NextConfig = {
   // Don't auto-generate AGENTS.md / CLAUDE.md into the repo root.
   agentRules: false,
 
-  // `@prisma/client` must stay a real Node require in server bundles.
-  serverExternalPackages: ["@prisma/client", "@prisma/engines"],
+  // These packages must stay real Node requires in server bundles.
+  serverExternalPackages: ["@prisma/client", "@prisma/engines", "read-excel-file"],
 
   experimental: {
     // Lets server components call `forbidden()` / `unauthorized()` so denied
