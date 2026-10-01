@@ -185,27 +185,40 @@ describe("Captain free-agent access", () => {
     });
     expect(audit.metadata).not.toContain(fx.player.email);
     expect(JSON.parse(audit.metadata ?? "{}")).toMatchObject({
-      status: "open",
       resultCount: 1,
     });
   });
 
-  it("filters requests by status and preferred division", async () => {
+  it("filters by division and reveals only the Captain's own team contacts", async () => {
     const fx = await fixture();
+    await placeFreeAgent(prisma, {
+      actorId: fx.awayCaptain.id,
+      requestId: fx.request.id,
+      seasonId: fx.season.id,
+      teamId: fx.away.id,
+    });
+    const beforeHomeContact = await listCaptainFreeAgents(prisma, {
+      actorId: fx.captain.id,
+      filters: { divisionId: fx.preferredDivision.id },
+    });
+    expect(beforeHomeContact.requests[0].invitations).toEqual([]);
+
     await placeFreeAgent(prisma, {
       actorId: fx.captain.id,
       requestId: fx.request.id,
       seasonId: fx.season.id,
       teamId: fx.home.id,
     });
-    expect(
-      (
-        await listCaptainFreeAgents(prisma, {
-          actorId: fx.captain.id,
-          filters: { status: "CONTACTED", divisionId: fx.preferredDivision.id },
-        })
-      ).requests.map(({ submittedByName }) => submittedByName),
-    ).toEqual(["Free Player"]);
+    const afterHomeContact = await listCaptainFreeAgents(prisma, {
+      actorId: fx.captain.id,
+      filters: { divisionId: fx.preferredDivision.id },
+    });
+    expect(afterHomeContact.requests.map(({ submittedByName }) => submittedByName)).toEqual([
+      "Free Player",
+    ]);
+    expect(afterHomeContact.requests[0].invitations).toEqual([
+      expect.objectContaining({ teamId: fx.home.id }),
+    ]);
   });
 });
 
@@ -226,7 +239,6 @@ describe("Captain free-agent placement", () => {
       (
         await listCaptainFreeAgents(prisma, {
           actorId: fx.captain.id,
-          filters: { status: "CONTACTED" },
         })
       ).requests[0],
     ).toMatchObject({

@@ -107,5 +107,9 @@ describe("free-agent list UI", () => {
     expect(adminPage).not.toContain('name="reviewNote"');
     expect(adminPage).not.toContain('name="status" value=');
     expect(captainPage).not.toContain('name="message"');
+    expect(captainPage).not.toContain('name="status"');
+    expect(captainPage).toContain("showStatus={false}");
+    expect(captainPage).toContain("showContactHistory={false}");
+    expect(captainPage).toContain('variant="primary"');
   });
 });

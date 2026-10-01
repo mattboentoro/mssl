@@ -7,12 +7,7 @@ import { FreeAgentDisclosure } from "@/components/free-agent-disclosure";
 import { RosterActionForm } from "@/components/roster-action-form";
 import { buttonClass, Card, EmptyState, PageHeader, inputClass } from "@/components/ui";
 import { AuthzError, requireCaptain } from "@/lib/authz";
-import {
-  CaptainFreeAgentError,
-  isFreeAgentStatus,
-  listCaptainFreeAgents,
-} from "@/lib/captain-free-agents";
-import { FREE_AGENT_STATUSES, FREE_AGENT_STATUS_LABELS } from "@/lib/enums";
+import { CaptainFreeAgentError, listCaptainFreeAgents } from "@/lib/captain-free-agents";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = { title: "Free agents" };
@@ -21,7 +16,7 @@ export const dynamic = "force-dynamic";
 export default async function CaptainFreeAgentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; division?: string }>;
+  searchParams: Promise<{ division?: string }>;
 }) {
   let user;
   try {
@@ -33,13 +28,12 @@ export default async function CaptainFreeAgentsPage({
     forbidden();
   }
   const params = await searchParams;
-  const status = isFreeAgentStatus(params.status) ? params.status : "";
 
   let data;
   try {
     data = await listCaptainFreeAgents(prisma, {
       actorId: user.appUserId,
-      filters: { status, divisionId: params.division },
+      filters: { divisionId: params.division },
     });
   } catch (error) {
     if (error instanceof CaptainFreeAgentError && error.status === 403) forbidden();
@@ -60,18 +54,7 @@ export default async function CaptainFreeAgentsPage({
         description="Contact details are restricted to active Captains. Sending an invitation automatically records your team as having contacted the player."
       />
       <Card className="mb-6 p-4">
-        <form className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]" method="get">
-          <label className="text-sm">
-            <span className="text-muted mb-1 block text-xs font-medium uppercase">Status</span>
-            <select className={inputClass} defaultValue={status} name="status">
-              <option value="">All statuses</option>
-              {FREE_AGENT_STATUSES.map((item) => (
-                <option key={item} value={item}>
-                  {FREE_AGENT_STATUS_LABELS[item]}
-                </option>
-              ))}
-            </select>
-          </label>
+        <form className="grid gap-3 sm:grid-cols-[1fr_auto]" method="get">
           <label className="text-sm">
             <span className="text-muted mb-1 block text-xs font-medium uppercase">Division</span>
             <select className={inputClass} defaultValue={params.division ?? ""} name="division">
@@ -97,7 +80,12 @@ export default async function CaptainFreeAgentsPage({
       {data.requests.length ? (
         <div className="grid gap-2">
           {data.requests.map((request) => (
-            <FreeAgentDisclosure key={request.id} request={request}>
+            <FreeAgentDisclosure
+              key={request.id}
+              request={request}
+              showStatus={false}
+              showContactHistory={false}
+            >
               <p className="text-muted mb-2 text-xs font-medium uppercase">
                 Send a roster invitation
               </p>
@@ -122,7 +110,7 @@ export default async function CaptainFreeAgentsPage({
                       action={placeFreeAgentAction}
                       key={assignment.id}
                       submitLabel={`${assignment.team.name} · ${assignment.season?.name}`}
-                      variant="secondary"
+                      variant="primary"
                     >
                       <input name="requestId" type="hidden" value={request.id} />
                       <input name="seasonId" type="hidden" value={assignment.seasonId} />
