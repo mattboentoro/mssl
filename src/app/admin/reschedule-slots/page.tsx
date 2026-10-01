@@ -8,6 +8,7 @@ import {
   ImportRescheduleSlotsForm,
   RescheduleSlotAvailabilityForm,
 } from "@/components/reschedule-slot-forms";
+import { ScrollableFilterSelect } from "@/components/scrollable-filter-select";
 import { Badge, buttonClass, Card, EmptyState, inputClass, PageHeader } from "@/components/ui";
 import {
   formatDateTime,
@@ -95,17 +96,16 @@ export default async function AdminRescheduleSlotsPage({
                 ))}
               </select>
             </label>
-            <label className="text-sm">
-              <span className="text-muted mb-1 block text-xs font-medium uppercase">Day</span>
-              <select name="day" defaultValue={selectedDay ?? ""} className={inputClass}>
-                <option value="">All days</option>
-                {[...days].map(([day, kickoffAt]) => (
-                  <option key={day} value={day}>
-                    {formatLongDate(kickoffAt)}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <ScrollableFilterSelect
+              label="Day"
+              name="day"
+              value={selectedDay ?? ""}
+              placeholder="All days"
+              options={[...days].map(([day, kickoffAt]) => ({
+                value: day,
+                label: formatLongDate(kickoffAt),
+              }))}
+            />
             <label className="text-sm">
               <span className="text-muted mb-1 block text-xs font-medium uppercase">Status</span>
               <select name="status" defaultValue={selectedStatus ?? ""} className={inputClass}>
