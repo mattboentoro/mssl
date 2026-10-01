@@ -16,5 +16,14 @@ describe("Admin users and roles", () => {
     expect(page).toContain("showSuccess={false}");
     expect(page).toContain("lg:grid-cols-[minmax(0,1fr)_auto]");
     expect(page).toContain('role === "REFEREE" || role === "ADMIN"');
+    expect(page).not.toContain("<Badge>viewer</Badge>");
+    expect(page).toContain('placeholder="Name, email, or role"');
+    expect(page).toContain("All roles");
+    expect(page).toContain("All statuses");
+    expect(page).toContain("All teams");
+    expect(page).toContain('"roles-asc"');
+    expect(page).toContain('"roles-desc"');
+    expect(page).toContain('className="px-2 py-1 text-xs"');
+    expect(page).toContain("role.toLowerCase()");
   });
 });
