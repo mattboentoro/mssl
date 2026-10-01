@@ -145,7 +145,6 @@ export default async function CaptainRosterPage({
         eyebrow={user.isAdmin ? "Admin fallback" : "Captain"}
         title={`${selected.team.name} roster`}
         description={`${selected.season.name}. Membership changes and role changes are audited.`}
-        actions={<ButtonLink href="#disciplinary-actions">Disciplinary actions</ButtonLink>}
       />
 
       {available.length > 1 ? (

@@ -40,7 +40,7 @@ describe("account player history", () => {
     expect(account).not.toContain("Go to Captain dashboard");
     expect(account).not.toContain("Go to Referee Control");
     expect(captainRoster).not.toContain('href="/roster">My roster');
-    expect(captainRoster).toContain('href="#disciplinary-actions"');
+    expect(captainRoster).not.toContain('href="#disciplinary-actions"');
     expect(captainRoster).toContain('id="disciplinary-actions"');
     expect(captainRoster).toContain("prisma.disciplinaryAction.findMany");
   });
