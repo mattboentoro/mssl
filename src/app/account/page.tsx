@@ -17,6 +17,16 @@ import { prisma } from "@/lib/prisma";
 export const metadata: Metadata = { title: "Your account" };
 export const dynamic = "force-dynamic";
 
+function normalizedPlayerName(value: string | null | undefined) {
+  return (
+    value
+      ?.replace(/\s*\(dev[^)]*\)\s*$/i, "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLowerCase() ?? ""
+  );
+}
+
 export default async function AccountPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/signin?callbackUrl=/account");
@@ -82,21 +92,25 @@ export default async function AccountPage() {
       left.team.name.localeCompare(right.team.name),
   );
   const historyContexts = teamHistory.map(({ seasonId, teamId }) => ({ seasonId, teamId }));
-  const discipline = historyContexts.length
-    ? await prisma.disciplinaryAction.findMany({
-        where: { OR: historyContexts },
-        include: {
-          match: {
-            select: {
-              matchweek: true,
-              homeTeam: { select: { shortName: true } },
-              awayTeam: { select: { shortName: true } },
+  const accountPlayerName = normalizedPlayerName(user.name);
+  const discipline =
+    accountPlayerName && historyContexts.length
+      ? (
+          await prisma.disciplinaryAction.findMany({
+            where: { OR: historyContexts },
+            include: {
+              match: {
+                select: {
+                  matchweek: true,
+                  homeTeam: { select: { shortName: true } },
+                  awayTeam: { select: { shortName: true } },
+                },
+              },
             },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      })
-    : [];
+            orderBy: { createdAt: "desc" },
+          })
+        ).filter((action) => normalizedPlayerName(action.playerName) === accountPlayerName)
+      : [];
   const disciplineByMembership = new Map<string, typeof discipline>();
   for (const action of discipline) {
     const key = `${action.seasonId}:${action.teamId}`;
@@ -119,7 +133,7 @@ export default async function AccountPage() {
       <PageHeader
         title="Your account"
         description="Your identity, league access, and playing history."
-        actions={<ButtonLink href="/roster">Roster requests</ButtonLink>}
+        actions={<ButtonLink href="/roster">My roster</ButtonLink>}
       />
 
       {user.isDevBypass ? (
@@ -234,7 +248,6 @@ export default async function AccountPage() {
                                   className="bg-surface-muted rounded-lg p-3 text-sm"
                                 >
                                   <div className="flex flex-wrap items-center gap-2">
-                                    <span className="font-semibold">{action.playerName}</span>
                                     <Badge tone={action.type === "RED" ? "danger" : "warning"}>
                                       {CARD_LABELS[action.type as CardType] ?? action.type}
                                     </Badge>
@@ -289,7 +302,7 @@ export default async function AccountPage() {
         )}
         {teamHistory.length ? (
           <p className="text-muted mt-3 text-xs">
-            Discipline includes records filed for each team during that season.
+            Discipline includes records filed under your player name during that season.
           </p>
         ) : null}
       </section>
