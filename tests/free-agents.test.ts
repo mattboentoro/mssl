@@ -99,6 +99,8 @@ describe("free-agent list UI", () => {
     const captainPage = source("src/app/captain/free-agents/page.tsx");
 
     expect(disclosure).toContain('as="details"');
+    expect(disclosure).toContain("<MatchDisclosureStack");
+    expect(disclosure).not.toContain("<MatchDisclosureHint");
     expect(disclosure).toContain("Experience");
     expect(disclosure).toContain("Position");
     expect(disclosure).toContain("Division");
