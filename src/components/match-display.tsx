@@ -80,12 +80,20 @@ export function MatchHeadToHead({
   home,
   away,
   center,
-  metadata,
+  topLeft,
+  topRight,
+  time,
+  status,
+  location,
 }: {
   home: HeadToHeadTeam;
   away: HeadToHeadTeam;
   center: React.ReactNode;
-  metadata?: React.ReactNode;
+  topLeft?: React.ReactNode;
+  topRight?: React.ReactNode;
+  time?: React.ReactNode;
+  status?: React.ReactNode;
+  location?: React.ReactNode;
 }) {
   const team = (side: HeadToHeadTeam, alignment: string) => {
     const content = (
@@ -107,12 +115,24 @@ export function MatchHeadToHead({
 
   return (
     <div>
+      {topLeft || topRight ? (
+        <div className="text-muted mb-3 flex items-center justify-between gap-3 text-xs font-semibold uppercase">
+          <span>{topLeft}</span>
+          <span>{topRight}</span>
+        </div>
+      ) : null}
       <div className="grid items-center gap-4 text-center sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-8">
         {team(home, "sm:text-right")}
         <div className="shrink-0">{center}</div>
         {team(away, "sm:text-left")}
       </div>
-      {metadata ? <div className="text-muted mt-3 text-center text-xs">{metadata}</div> : null}
+      {time || status || location ? (
+        <div className="text-muted mt-4 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 text-sm font-medium">
+          <span className="min-w-0 text-left">{time}</span>
+          <span className="flex justify-center">{status}</span>
+          <span className="min-w-0 text-right">{location}</span>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -145,18 +165,18 @@ export function MatchRow({ match, action }: { match: MatchListItem; action?: Rea
             />
           )
         }
-        metadata={
-          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
-            <span>{formatDateTime(match.kickoffAt)}</span>
-            <Badge tone="neutral">{match.division.name}</Badge>
-            <Badge tone="neutral">MW {match.matchweek}</Badge>
+        topLeft={match.division.name}
+        topRight={`MW ${match.matchweek}`}
+        time={formatDateTime(match.kickoffAt)}
+        status={
+          <span className="flex flex-wrap justify-center gap-1">
             {ASSIGNMENT_ONLY_STATUSES.includes(match.status) ? null : (
               <MatchStatusBadge match={match} />
             )}
             {match.report?.status === "DISPUTED" ? <Badge tone="danger">Disputed</Badge> : null}
-            <span>&#128205; {match.venueName ?? "TBD"}</span>
-          </div>
+          </span>
         }
+        location={<>&#128205; {match.venueName ?? "TBD"}</>}
       />
       {action ? <div className="mt-3 flex justify-center">{action}</div> : null}
     </Card>

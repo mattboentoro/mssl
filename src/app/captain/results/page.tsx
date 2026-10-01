@@ -72,16 +72,19 @@ export default async function CaptainResultsPage() {
                       />
                     )
                   }
-                  metadata={
-                    <span className="inline-flex flex-wrap items-center justify-center gap-2">
-                      <span>{formatDateTime(match.kickoffAt)}</span>
-                      {match.resultProposal ? (
-                        <Badge>
-                          {labels[match.resultProposal.status] ?? match.resultProposal.status}
-                        </Badge>
-                      ) : null}
-                    </span>
+                  topLeft={match.division.name}
+                  topRight={`MW ${match.matchweek}`}
+                  time={formatDateTime(match.kickoffAt)}
+                  status={
+                    match.resultProposal ? (
+                      <Badge>
+                        {labels[match.resultProposal.status] ?? match.resultProposal.status}
+                      </Badge>
+                    ) : match.report ? (
+                      <Badge tone="success">Official</Badge>
+                    ) : null
                   }
+                  location={<>&#128205; {match.venueName ?? "TBD"}</>}
                 />
                 <div className="mt-3 text-center">
                   {eligible ? (

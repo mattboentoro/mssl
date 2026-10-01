@@ -14,6 +14,7 @@ import {
 } from "@/components/match-display";
 import {
   Alert,
+  Badge,
   Card,
   EmptyState,
   PageHeader,
@@ -459,12 +460,15 @@ export default async function RefereePage({
                         />
                       )
                     }
-                    metadata={
-                      <>
-                        {formatDateTime(match.kickoffAt)} &middot; {match.division.name} &middot;{" "}
+                    topLeft={match.division.name}
+                    topRight={`MW ${match.matchweek}`}
+                    time={formatDateTime(match.kickoffAt)}
+                    status={
+                      <Badge tone="neutral">
                         {MATCH_STATUS_LABELS[match.status as MatchStatus]}
-                      </>
+                      </Badge>
                     }
+                    location={<>&#128205; {match.venueName ?? "TBD"}</>}
                   />
                 </Link>
               );

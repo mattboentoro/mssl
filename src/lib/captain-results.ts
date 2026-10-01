@@ -433,7 +433,13 @@ export async function listCaptainResultMatches(db: PrismaClient, appUserId: stri
       })),
       kickoffAt: { lte: new Date() },
     },
-    include: { homeTeam: true, awayTeam: true, report: true, resultProposal: true },
+    include: {
+      homeTeam: true,
+      awayTeam: true,
+      division: { select: { name: true } },
+      report: true,
+      resultProposal: true,
+    },
     orderBy: { kickoffAt: "desc" },
   });
   return matches.map((match) => ({

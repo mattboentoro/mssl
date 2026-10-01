@@ -500,6 +500,7 @@ export async function listScoreAppealsForCaptain(db: PrismaClient, appUserId: st
     include: {
       homeTeam: { select: { id: true, name: true } },
       awayTeam: { select: { id: true, name: true } },
+      division: { select: { name: true } },
       report: true,
       scoreAppeals: { where: { status: "PENDING" }, select: { teamId: true } },
     },
@@ -526,6 +527,7 @@ export async function listScoreAppealsForCaptain(db: PrismaClient, appUserId: st
         include: {
           homeTeam: { select: { name: true } },
           awayTeam: { select: { name: true } },
+          division: { select: { name: true } },
         },
       },
     },

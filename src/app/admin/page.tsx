@@ -105,16 +105,15 @@ export default async function AdminOverviewPage() {
                     home={{ name: match.homeTeam.name }}
                     away={{ name: match.awayTeam.name }}
                     center={<MatchScore home={score.home} away={score.away} />}
-                    metadata={
-                      <span className="inline-flex flex-wrap items-center justify-center gap-2">
-                        <span>
-                          {match.division.name} &middot; {formatDateTime(match.kickoffAt)} &middot;
-                          filed by {match.referee?.name ?? "unknown"}
-                        </span>
-                        <Badge tone="warning">Review</Badge>
-                      </span>
-                    }
+                    topLeft={match.division.name}
+                    topRight={`MW ${match.matchweek}`}
+                    time={formatDateTime(match.kickoffAt)}
+                    status={<Badge tone="warning">Review</Badge>}
+                    location={<>&#128205; {match.venueName ?? "TBD"}</>}
                   />
+                  <p className="text-muted mt-2 text-center text-xs">
+                    Filed by {match.referee?.name ?? "unknown"}
+                  </p>
                 </Link>
               );
             })}

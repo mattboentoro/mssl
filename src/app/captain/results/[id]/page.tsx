@@ -25,7 +25,13 @@ export default async function CaptainResultPage({ params }: { params: Promise<{ 
   }
   const match = await prisma.match.findUnique({
     where: { id },
-    include: { homeTeam: true, awayTeam: true, report: true, resultProposal: true },
+    include: {
+      homeTeam: true,
+      awayTeam: true,
+      division: { select: { name: true } },
+      report: true,
+      resultProposal: true,
+    },
   });
   if (!match) notFound();
   const proposal = match.resultProposal;
@@ -68,7 +74,11 @@ export default async function CaptainResultPage({ params }: { params: Promise<{ 
               />
             )
           }
-          metadata={proposal ? <Badge>{proposal.status.replaceAll("_", " ")}</Badge> : null}
+          topLeft={match.division.name}
+          topRight={`MW ${match.matchweek}`}
+          time={formatDateTime(match.kickoffAt)}
+          status={proposal ? <Badge>{proposal.status.replaceAll("_", " ")}</Badge> : undefined}
+          location={<>&#128205; {match.venueName ?? "TBD"}</>}
         />
         {proposal ? (
           <>

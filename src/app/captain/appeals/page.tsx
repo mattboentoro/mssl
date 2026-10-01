@@ -57,17 +57,22 @@ export default async function CaptainAppealsPage() {
                     home={{ name: match.homeTeam.name }}
                     away={{ name: match.awayTeam.name }}
                     center={<MatchScore home={report.homeScore} away={report.awayScore} />}
-                    metadata={
-                      <>
-                        {formatDateTime(match.kickoffAt)} &middot; Appealing as{" "}
-                        {match.teamId === match.homeTeam.id
-                          ? match.homeTeam.name
-                          : match.awayTeam.name}
-                      </>
-                    }
+                    topLeft={match.division.name}
+                    topRight={`MW ${match.matchweek}`}
+                    time={formatDateTime(match.kickoffAt)}
+                    status={<Badge tone="success">Official</Badge>}
+                    location={<>&#128205; {match.venueName ?? "TBD"}</>}
                   />
                 </summary>
                 <div className="border-subtle border-t p-5">
+                  <p className="text-muted mb-4 text-sm">
+                    Appealing as{" "}
+                    <strong>
+                      {match.teamId === match.homeTeam.id
+                        ? match.homeTeam.name
+                        : match.awayTeam.name}
+                    </strong>
+                  </p>
                   <ScoreAppealForm
                     matchId={match.id}
                     teamId={match.teamId}
@@ -94,49 +99,72 @@ export default async function CaptainAppealsPage() {
         <h2 className="text-xl font-semibold">Appeal history</h2>
         {appeals.length ? (
           appeals.map((appeal) => (
-            <Card key={appeal.id} className="p-5">
-              <MatchHeadToHead
-                home={{ name: appeal.match.homeTeam.name }}
-                away={{ name: appeal.match.awayTeam.name }}
-                center={
-                  <MatchScore
-                    home={appeal.requestedHomeScore}
-                    away={appeal.requestedAwayScore}
-                    label="Requested score"
-                  />
-                }
-                metadata={
-                  <span className="inline-flex flex-wrap items-center justify-center gap-2">
-                    <span>
-                      {formatDateTime(appeal.createdAt)} &middot; Appealed by {appeal.team.name}
-                    </span>
-                    <Badge tone={statusTone(appeal.status)}>{appeal.status}</Badge>
-                  </span>
-                }
-              />
-              <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                <div>
-                  <dt className="text-muted">Original</dt>
-                  <dd>
-                    {appeal.originalHomeScore}&ndash;{appeal.originalAwayScore}
-                    {appeal.originalHomeForfeit || appeal.originalAwayForfeit ? " (forfeit)" : ""}
-                  </dd>
+            <Card as="details" key={appeal.id} className="group overflow-hidden">
+              <summary className="hover:bg-surface-muted cursor-pointer list-none px-5 py-4 transition">
+                <MatchHeadToHead
+                  home={{ name: appeal.match.homeTeam.name }}
+                  away={{ name: appeal.match.awayTeam.name }}
+                  center={
+                    <MatchScore
+                      home={appeal.originalHomeScore}
+                      away={appeal.originalAwayScore}
+                      label="Original score"
+                    />
+                  }
+                  topLeft={appeal.match.division.name}
+                  topRight={`MW ${appeal.match.matchweek}`}
+                  time={formatDateTime(appeal.match.kickoffAt)}
+                  status={
+                    <Badge tone={statusTone(appeal.status)}>
+                      {appeal.status.replaceAll("_", " ")}
+                    </Badge>
+                  }
+                  location={<>&#128205; {appeal.match.venueName ?? "TBD"}</>}
+                />
+              </summary>
+              <div className="border-subtle border-t p-5">
+                <dl className="grid gap-4 text-sm sm:grid-cols-2">
+                  <div className="bg-surface-muted rounded-lg p-3">
+                    <dt className="text-muted">Original result</dt>
+                    <dd className="mt-1 text-lg font-semibold tabular-nums">
+                      {appeal.originalHomeScore}&ndash;{appeal.originalAwayScore}
+                      {appeal.originalHomeForfeit || appeal.originalAwayForfeit ? " (forfeit)" : ""}
+                    </dd>
+                  </div>
+                  <div className="bg-surface-muted rounded-lg p-3">
+                    <dt className="text-muted">Requested result</dt>
+                    <dd className="mt-1 text-lg font-semibold tabular-nums">
+                      {appeal.requestedHomeScore}&ndash;{appeal.requestedAwayScore}
+                      {appeal.requestedHomeForfeit || appeal.requestedAwayForfeit
+                        ? " (forfeit)"
+                        : ""}
+                    </dd>
+                  </div>
+                </dl>
+                <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                  <div>
+                    <dt className="text-muted">Appealed by</dt>
+                    <dd>{appeal.team.name}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted">Submitted</dt>
+                    <dd>{formatDateTime(appeal.createdAt)}</dd>
+                  </div>
+                </dl>
+                <div className="mt-4 text-sm">
+                  <p className="text-muted">Reason</p>
+                  <p className="mt-1 whitespace-pre-wrap">{appeal.reason}</p>
                 </div>
-                <div>
-                  <dt className="text-muted">Requested</dt>
-                  <dd>
-                    {appeal.requestedHomeScore}&ndash;{appeal.requestedAwayScore}
-                    {appeal.requestedHomeForfeit || appeal.requestedAwayForfeit ? " (forfeit)" : ""}
-                  </dd>
-                </div>
-              </dl>
-              <p className="mt-3 text-sm">{appeal.reason}</p>
-              {appeal.decisionNote ? (
-                <p className="text-muted mt-3 text-sm">
-                  <strong>Resolution:</strong> {appeal.decisionNote}
-                </p>
-              ) : null}
-              {appeal.status === "PENDING" ? <CancelScoreAppealForm appealId={appeal.id} /> : null}
+                {appeal.decisionNote ? (
+                  <div className="mt-4 text-sm">
+                    <p className="text-muted">Resolution</p>
+                    <p className="mt-1 whitespace-pre-wrap">{appeal.decisionNote}</p>
+                  </div>
+                ) : null}
+                {appeal.status === "PENDING" ? (
+                  <CancelScoreAppealForm appealId={appeal.id} />
+                ) : null}
+              </div>
             </Card>
           ))
         ) : (

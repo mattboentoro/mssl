@@ -202,10 +202,15 @@ describe("score appeal form UI", () => {
       "utf8",
     );
 
-    expect(page).toContain('as="details"');
+    expect(page.match(/as="details"/g)).toHaveLength(2);
     expect(page).toContain("<MatchHeadToHead");
     expect(page).toContain("<MatchScore");
+    expect(page).toContain("Original result");
+    expect(page).toContain("Requested result");
     expect(matchDisplay).toContain("sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]");
+    expect(matchDisplay).toContain("grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]");
+    expect(matchDisplay).toContain("topLeft={match.division.name}");
+    expect(matchDisplay).toContain("topRight={`MW ${match.matchweek}`}");
     expect(matchDisplay).toContain("<MatchKitColors");
     expect(results).toContain("<MatchHeadToHead");
     expect(form).toContain("disabled={pending || !ready}");
