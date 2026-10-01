@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { MatchDisclosureStack } from "@/components/match-display";
 import {
   Alert,
   Badge,
@@ -234,41 +235,41 @@ export default async function AdminRosterPage({
             activeCaptains.flatMap(({ userId }) => (userId ? [userId] : [])),
           );
           return (
-            <Card
-              as="details"
-              key={entry.id}
-              className={`group overflow-hidden ${activeCaptains.length ? "" : "border-danger"}`}
-            >
-              <summary className="hover:bg-surface-muted cursor-pointer px-4 py-3 transition">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <h2 className="truncate font-semibold">{entry.team.name}</h2>
-                    <p className="text-muted text-xs">{selectedSeason.name}</p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {!activeCaptains.length ? (
-                      <Badge tone="danger">Captainless</Badge>
-                    ) : (
-                      <Badge tone="brand">
-                        {activeCaptains.length} Captain{activeCaptains.length === 1 ? "" : "s"}
+            <MatchDisclosureStack key={entry.id}>
+              <Card
+                as="details"
+                className={`group overflow-hidden ${activeCaptains.length ? "" : "border-danger"}`}
+              >
+                <summary className="hover:bg-surface-muted cursor-pointer list-none px-4 py-3 transition">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <h2 className="truncate font-semibold">{entry.team.name}</h2>
+                      <p className="text-muted text-xs">{selectedSeason.name}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {!activeCaptains.length ? (
+                        <Badge tone="danger">Captainless</Badge>
+                      ) : (
+                        <Badge tone="brand">
+                          {activeCaptains.length} Captain{activeCaptains.length === 1 ? "" : "s"}
+                        </Badge>
+                      )}
+                      <Badge tone={memberships.length ? "neutral" : "warning"}>
+                        {memberships.length
+                          ? `${memberships.length} active player${memberships.length === 1 ? "" : "s"}`
+                          : "No active players"}
                       </Badge>
-                    )}
-                    <Badge tone={memberships.length ? "neutral" : "warning"}>
-                      {memberships.length
-                        ? `${memberships.length} active player${memberships.length === 1 ? "" : "s"}`
-                        : "No active players"}
-                    </Badge>
-                    <Link
-                      href={`/captain/roster?seasonId=${entry.seasonId}&teamId=${entry.teamId}`}
-                      className={buttonClass("secondary", "px-2 py-1 text-xs")}
-                    >
-                      Manage roster
-                    </Link>
+                      <Link
+                        href={`/captain/roster?seasonId=${entry.seasonId}&teamId=${entry.teamId}`}
+                        className={buttonClass("secondary", "px-2 py-1 text-xs")}
+                      >
+                        Manage roster
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              </summary>
-              <div className="border-subtle grid gap-5 border-t p-4 xl:grid-cols-2">
-                <div>
+                </summary>
+                <div className="border-subtle grid gap-5 border-t p-4 xl:grid-cols-2">
+                  <div>
                   <h3 className="text-sm font-semibold">Active players</h3>
                   {memberships.length ? (
                     <ul className="mt-2 grid gap-2">
@@ -292,8 +293,8 @@ export default async function AdminRosterPage({
                   ) : (
                     <p className="text-muted mt-2 text-sm">No active players in this season.</p>
                   )}
-                </div>
-                <div>
+                  </div>
+                  <div>
                   <h3 className="text-sm font-semibold">Registered Captains and team contacts</h3>
                   {captains.length ? (
                     <ul className="mt-2 grid gap-2">
@@ -337,9 +338,10 @@ export default async function AdminRosterPage({
                       No Captain assignment or team contact is registered.
                     </p>
                   )}
+                  </div>
                 </div>
-              </div>
-            </Card>
+              </Card>
+            </MatchDisclosureStack>
           );
         })}
         {!visible.length ? (
