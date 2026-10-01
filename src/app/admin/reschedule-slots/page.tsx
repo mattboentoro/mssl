@@ -9,7 +9,12 @@ import {
   RescheduleSlotAvailabilityForm,
 } from "@/components/reschedule-slot-forms";
 import { Badge, buttonClass, Card, EmptyState, inputClass, PageHeader } from "@/components/ui";
-import { formatDateTime, toDateTimeInputValue } from "@/lib/dates";
+import {
+  formatDateTime,
+  formatLongDate,
+  toDateInputValue,
+  toDateTimeInputValue,
+} from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
 import { RESCHEDULE_SLOT_STATUSES, type RescheduleSlotStatus } from "@/lib/reschedule-slots";
 
@@ -23,7 +28,7 @@ function statusFilter(value: string | undefined): RescheduleSlotStatus | undefin
 export default async function AdminRescheduleSlotsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ day?: string; status?: string; venue?: string }>;
 }) {
   const params = await searchParams;
   const selectedStatus = statusFilter(params.status);
@@ -36,9 +41,23 @@ export default async function AdminRescheduleSlotsPage({
     },
     orderBy: { kickoffAt: "asc" },
   });
+  const venues = [...new Set(slots.map((slot) => slot.venueName))].sort((left, right) =>
+    left.localeCompare(right),
+  );
+  const days = new Map<string, Date>();
+  for (const slot of slots) {
+    const key = toDateInputValue(slot.kickoffAt);
+    if (!days.has(key)) days.set(key, slot.kickoffAt);
+  }
+  const selectedVenue = venues.includes(params.venue ?? "") ? params.venue : undefined;
+  const selectedDay = days.has(params.day ?? "") ? params.day : undefined;
   const filteredSlots = slots.filter((slot) => {
     const effectiveStatus = slot.requests.length > 0 ? "RESERVED" : slot.status;
-    return !selectedStatus || effectiveStatus === selectedStatus;
+    return (
+      (!selectedVenue || slot.venueName === selectedVenue) &&
+      (!selectedDay || toDateInputValue(slot.kickoffAt) === selectedDay) &&
+      (!selectedStatus || effectiveStatus === selectedStatus)
+    );
   });
 
   return (
@@ -65,6 +84,28 @@ export default async function AdminRescheduleSlotsPage({
             </p>
           </div>
           <form method="get" className="flex flex-wrap items-end gap-2">
+            <label className="text-sm">
+              <span className="text-muted mb-1 block text-xs font-medium uppercase">Venue</span>
+              <select name="venue" defaultValue={selectedVenue ?? ""} className={inputClass}>
+                <option value="">All venues</option>
+                {venues.map((venue) => (
+                  <option key={venue} value={venue}>
+                    {venue}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm">
+              <span className="text-muted mb-1 block text-xs font-medium uppercase">Day</span>
+              <select name="day" defaultValue={selectedDay ?? ""} className={inputClass}>
+                <option value="">All days</option>
+                {[...days].map(([day, kickoffAt]) => (
+                  <option key={day} value={day}>
+                    {formatLongDate(kickoffAt)}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label className="text-sm">
               <span className="text-muted mb-1 block text-xs font-medium uppercase">Status</span>
               <select name="status" defaultValue={selectedStatus ?? ""} className={inputClass}>
