@@ -232,6 +232,8 @@ describe("Captain reschedule request UI", () => {
     expect(page.indexOf("<summary")).toBeLessThan(page.indexOf("Current kickoff"));
     expect(page).toContain("topLeft={request.match.division.name}");
     expect(page).toContain("status={status}");
+    expect(page).toContain('"Pending from my team"');
+    expect(page).toContain('request.status === "PENDING_OPPONENT" && canRespond');
     expect(forms).toContain("disabled={!ready}");
     expect(forms).toContain("revisedReason.trim() !== reason.trim()");
     expect(matchDisplay).toContain("absolute inset-x-3 top-3 bottom-0");
