@@ -37,6 +37,7 @@ export async function GET(request: Request) {
       homeTeam: { select: { name: true } },
       awayTeam: { select: { name: true } },
       referee: { select: { name: true } },
+      report: { select: { homeForfeit: true, awayForfeit: true } },
     },
   });
 
