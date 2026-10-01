@@ -122,9 +122,11 @@ export default async function CaptainReschedulesPage({
                 request.match.homeTeamId === request.requestingTeamId
                   ? request.match.awayTeamId
                   : request.match.homeTeamId;
+              const isOpponentCaptain = contextKeys.has(
+                `${request.match.seasonId}:${opponentId}`,
+              );
               const canRespond =
-                request.status === "PENDING_OPPONENT" &&
-                contextKeys.has(`${request.match.seasonId}:${opponentId}`);
+                request.status === "PENDING_OPPONENT" && isOpponentCaptain;
               const status = (
                 <Badge
                   tone={
@@ -137,6 +139,8 @@ export default async function CaptainReschedulesPage({
                 >
                   {request.status === "PENDING_OPPONENT" && canRespond
                     ? "Pending my team"
+                    : request.status === "REJECTED_OPPONENT" && isOpponentCaptain
+                      ? "Rejected by my team"
                     : (RESCHEDULE_STATUS_LABELS[request.status as RescheduleStatus] ??
                       request.status)}
                 </Badge>
