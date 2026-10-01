@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 
 import {
   createRescheduleSlotAction,
+  importRescheduleSlotsAction,
   setRescheduleSlotAvailabilityAction,
   updateRescheduleSlotAction,
   type RescheduleSlotActionState,
@@ -65,6 +66,41 @@ export function CreateRescheduleSlotForm() {
         />
       </div>
       <Submit>Add slot</Submit>
+    </form>
+  );
+}
+
+export function ImportRescheduleSlotsForm() {
+  const [state, action] = useActionState(importRescheduleSlotsAction, {});
+
+  return (
+    <form action={action} className="grid gap-3">
+      <div>
+        <h2 className="text-ink text-lg font-semibold">Import Excel workbook</h2>
+        <p className="text-muted mt-1 text-sm">
+          Upload an .xlsx file with date, time, and venue headers. Times are interpreted in Pacific
+          time. Up to 500 rows can be imported at once.
+        </p>
+      </div>
+      <label className={labelClass}>
+        Excel workbook
+        <input
+          className={`${inputClass} mt-1`}
+          type="file"
+          name="workbook"
+          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          required
+        />
+      </label>
+      <p className="text-muted text-xs">
+        Example: <span className="text-ink font-semibold">date</span> 8/12/2026,{" "}
+        <span className="text-ink font-semibold">time</span> 6:30 PM,{" "}
+        <span className="text-ink font-semibold">venue</span> Marymoor Park.
+      </p>
+      <div className="w-fit">
+        <Submit>Import availability</Submit>
+      </div>
+      <Feedback state={state} />
     </form>
   );
 }

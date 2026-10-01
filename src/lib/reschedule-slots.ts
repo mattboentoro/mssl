@@ -22,18 +22,25 @@ interface AdminActor {
   name?: string | null;
 }
 
-function validateSlot(kickoffAt: Date, venueName: string, now: Date) {
+export interface ImportRescheduleSlotInput {
+  kickoffAt: Date;
+  venueName: string;
+  rowNumber: number;
+}
+
+function validateSlot(kickoffAt: Date, venueName: string, now: Date, rowNumber?: number) {
+  const prefix = rowNumber === undefined ? "" : `Row ${rowNumber}: `;
   const venue = venueName.trim();
   if (Number.isNaN(kickoffAt.getTime()) || kickoffAt.getTime() <= now.getTime()) {
     throw new RescheduleSlotError(
-      "The slot must use a valid future date and time.",
+      `${prefix}the slot must use a valid future date and time.`,
       422,
       "VALIDATION_FAILED",
     );
   }
   if (!venue || venue.length > 300) {
     throw new RescheduleSlotError(
-      "Venue is required and must be 300 characters or fewer.",
+      `${prefix}venue is required and must be 300 characters or fewer.`,
       422,
       "VALIDATION_FAILED",
     );
@@ -71,6 +78,109 @@ export async function createRescheduleSlot(
     }
     throw error;
   }
+}
+
+export async function createRescheduleSlots(
+  db: PrismaClient,
+  input: {
+    slots: ImportRescheduleSlotInput[];
+    actor: AdminActor;
+    now?: Date;
+  },
+): Promise<{ count: number }> {
+  if (input.slots.length === 0) {
+    throw new RescheduleSlotError(
+      "The workbook does not contain any availability rows.",
+      422,
+      "VALIDATION_FAILED",
+    );
+  }
+  if (input.slots.length > 500) {
+    throw new RescheduleSlotError(
+      "A workbook can contain at most 500 availability rows.",
+      422,
+      "VALIDATION_FAILED",
+    );
+  }
+
+  const now = input.now ?? new Date();
+  const slots = input.slots.map((slot) => ({
+    ...slot,
+    venueName: validateSlot(slot.kickoffAt, slot.venueName, now, slot.rowNumber),
+  }));
+  const seen = new Map<string, number>();
+  for (const slot of slots) {
+    const key = slotKey(slot.kickoffAt, slot.venueName);
+    const duplicateRow = seen.get(key);
+    if (duplicateRow !== undefined) {
+      throw new RescheduleSlotError(
+        `Rows ${duplicateRow} and ${slot.rowNumber} contain the same date, time, and venue.`,
+        409,
+        "DUPLICATE",
+      );
+    }
+    seen.set(key, slot.rowNumber);
+  }
+
+  const existing = await db.rescheduleSlot.findMany({
+    where: {
+      OR: slots.map((slot) => ({
+        kickoffAt: slot.kickoffAt,
+        venueName: slot.venueName,
+      })),
+    },
+    select: { kickoffAt: true, venueName: true },
+  });
+  if (existing.length > 0) {
+    const existingKeys = new Set(existing.map((slot) => slotKey(slot.kickoffAt, slot.venueName)));
+    const duplicate = slots.find((slot) =>
+      existingKeys.has(slotKey(slot.kickoffAt, slot.venueName)),
+    );
+    throw new RescheduleSlotError(
+      `Row ${duplicate?.rowNumber ?? "unknown"} duplicates existing availability.`,
+      409,
+      "DUPLICATE",
+    );
+  }
+
+  try {
+    return await db.$transaction(async (tx) => {
+      for (const slotInput of slots) {
+        const slot = await tx.rescheduleSlot.create({
+          data: {
+            kickoffAt: slotInput.kickoffAt,
+            venueName: slotInput.venueName,
+            createdById: input.actor.appUserId,
+          },
+        });
+        await writeAudit(tx, {
+          actor: toAuditActor(input.actor, "admin"),
+          action: "reschedule_slot.create",
+          entity: "RescheduleSlot",
+          entityId: slot.id,
+          metadata: {
+            kickoffAt: slot.kickoffAt,
+            venueName: slot.venueName,
+            importedFromRow: slotInput.rowNumber,
+          },
+        });
+      }
+      return { count: slots.length };
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new RescheduleSlotError(
+        "One or more rows duplicate existing availability.",
+        409,
+        "DUPLICATE",
+      );
+    }
+    throw error;
+  }
+}
+
+function slotKey(kickoffAt: Date, venueName: string) {
+  return `${kickoffAt.toISOString()}\u0000${venueName.trim()}`;
 }
 
 export async function updateRescheduleSlot(

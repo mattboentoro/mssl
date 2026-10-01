@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import {
   CreateRescheduleSlotForm,
   EditRescheduleSlotForm,
+  ImportRescheduleSlotsForm,
   RescheduleSlotAvailabilityForm,
 } from "@/components/reschedule-slot-forms";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
@@ -32,6 +33,9 @@ export default async function AdminRescheduleSlotsPage() {
       <Card className="mb-8 p-5">
         <h2 className="mb-4 text-lg font-semibold">Add availability</h2>
         <CreateRescheduleSlotForm />
+        <div className="border-border mt-6 border-t pt-5">
+          <ImportRescheduleSlotsForm />
+        </div>
       </Card>
       <section aria-labelledby="reschedule-slot-list">
         <h2 id="reschedule-slot-list" className="mb-3 text-lg font-semibold">
