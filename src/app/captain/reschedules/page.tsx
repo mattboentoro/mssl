@@ -136,7 +136,7 @@ export default async function CaptainReschedulesPage({
                   }
                 >
                   {request.status === "PENDING_OPPONENT" && canRespond
-                    ? "Pending from my team"
+                    ? "Pending my team"
                     : (RESCHEDULE_STATUS_LABELS[request.status as RescheduleStatus] ??
                       request.status)}
                 </Badge>
