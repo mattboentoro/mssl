@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import {
   CreateRescheduleSlotForm,
@@ -7,14 +8,25 @@ import {
   ImportRescheduleSlotsForm,
   RescheduleSlotAvailabilityForm,
 } from "@/components/reschedule-slot-forms";
-import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
+import { Badge, buttonClass, Card, EmptyState, inputClass, PageHeader } from "@/components/ui";
 import { formatDateTime, toDateTimeInputValue } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
+import { RESCHEDULE_SLOT_STATUSES, type RescheduleSlotStatus } from "@/lib/reschedule-slots";
 
 export const metadata: Metadata = { title: "Reschedule slots" };
 export const dynamic = "force-dynamic";
 
-export default async function AdminRescheduleSlotsPage() {
+function statusFilter(value: string | undefined): RescheduleSlotStatus | undefined {
+  return RESCHEDULE_SLOT_STATUSES.find((status) => status === value);
+}
+
+export default async function AdminRescheduleSlotsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
+  const params = await searchParams;
+  const selectedStatus = statusFilter(params.status);
   const slots = await prisma.rescheduleSlot.findMany({
     include: {
       requests: {
@@ -24,6 +36,10 @@ export default async function AdminRescheduleSlotsPage() {
     },
     orderBy: { kickoffAt: "asc" },
   });
+  const filteredSlots = slots.filter((slot) => {
+    const effectiveStatus = slot.requests.length > 0 ? "RESERVED" : slot.status;
+    return !selectedStatus || effectiveStatus === selectedStatus;
+  });
 
   return (
     <div>
@@ -31,20 +47,49 @@ export default async function AdminRescheduleSlotsPage() {
         title="Reschedule slots"
         description="Captains can request only these league-provided date, time, and venue combinations."
       />
+      <Card className="mb-4 p-5">
+        <ImportRescheduleSlotsForm />
+      </Card>
       <Card className="mb-8 p-5">
         <h2 className="mb-4 text-lg font-semibold">Add availability</h2>
         <CreateRescheduleSlotForm />
-        <div className="border-border mt-6 border-t pt-5">
-          <ImportRescheduleSlotsForm />
-        </div>
       </Card>
       <section aria-labelledby="reschedule-slot-list">
-        <h2 id="reschedule-slot-list" className="mb-3 text-lg font-semibold">
-          Availability
-        </h2>
-        {slots.length ? (
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 id="reschedule-slot-list" className="text-lg font-semibold">
+              Availability
+            </h2>
+            <p className="text-muted text-sm">
+              Showing {filteredSlots.length} of {slots.length} slots
+            </p>
+          </div>
+          <form method="get" className="flex flex-wrap items-end gap-2">
+            <label className="text-sm">
+              <span className="text-muted mb-1 block text-xs font-medium uppercase">Status</span>
+              <select name="status" defaultValue={selectedStatus ?? ""} className={inputClass}>
+                <option value="">All statuses</option>
+                {RESCHEDULE_SLOT_STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {status.toLowerCase()}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="submit" className={buttonClass("primary")}>
+              Filter
+            </button>
+            <Link
+              href="/admin/reschedule-slots"
+              className="text-muted self-center text-sm underline"
+            >
+              Reset
+            </Link>
+          </form>
+        </div>
+        {filteredSlots.length ? (
           <div className="space-y-3">
-            {slots.map((slot) => {
+            {filteredSlots.map((slot) => {
               const reservation = slot.requests[0];
               const editable = slot.status === "AVAILABLE" && !reservation;
               return (
@@ -105,8 +150,12 @@ export default async function AdminRescheduleSlotsPage() {
           </div>
         ) : (
           <EmptyState
-            title="No reschedule slots"
-            hint="Add a future date, time, and venue before Captains can make requests."
+            title={slots.length ? "No slots match this filter" : "No reschedule slots"}
+            hint={
+              slots.length
+                ? "Choose another status or reset the filter."
+                : "Add a future date, time, and venue before Captains can make requests."
+            }
           />
         )}
       </section>
