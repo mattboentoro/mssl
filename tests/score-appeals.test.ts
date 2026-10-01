@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import path from "node:path";
+
 import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -180,6 +183,27 @@ async function appeal(
 beforeEach(resetDatabase);
 afterAll(async () => prisma.$disconnect());
 
+describe("score appeal form UI", () => {
+  it("uses compact disclosures, clear score spacing, and gated mutually exclusive forfeits", () => {
+    const page = fs.readFileSync(
+      path.join(process.cwd(), "src/app/captain/appeals/page.tsx"),
+      "utf8",
+    );
+    const form = fs.readFileSync(
+      path.join(process.cwd(), "src/components/score-appeal-form.tsx"),
+      "utf8",
+    );
+
+    expect(page).toContain('as="details"');
+    expect(page).toContain("mx-3");
+    expect(page).toContain("text-center");
+    expect(form).toContain("disabled={pending || !ready}");
+    expect(form).toContain("reason.trim().length >= 5");
+    expect(form).toContain("setRequestedAwayForfeit(false)");
+    expect(form).toContain("setRequestedHomeForfeit(false)");
+  });
+});
+
 describe("score appeals", () => {
   it("allows either participating Captain to appeal an old result in a closed season", async () => {
     const fx = await fixture();
@@ -234,8 +258,8 @@ describe("score appeals", () => {
     });
     await expect(
       appeal(fx, {
-        requestedHomeScore: 1,
-        requestedAwayScore: 1,
+        requestedHomeScore: 0,
+        requestedAwayScore: 0,
         requestedHomeForfeit: true,
         requestedAwayForfeit: true,
       }),

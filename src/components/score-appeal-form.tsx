@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import {
@@ -11,10 +11,17 @@ import {
 import { Alert, buttonClass, inputClass, labelClass } from "@/components/ui";
 import { MAX_APPEAL_REASON_LENGTH } from "@/lib/score-appeals";
 
-function SubmitButton() {
+function SubmitButton({ ready }: { ready: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" disabled={pending} className={buttonClass("primary")}>
+    <button
+      type="submit"
+      disabled={pending || !ready}
+      className={buttonClass(
+        "primary",
+        "disabled:bg-surface-muted disabled:text-muted disabled:border-subtle disabled:border",
+      )}
+    >
       {pending ? "Submitting\u2026" : "Submit appeal"}
     </button>
   );
@@ -52,8 +59,15 @@ export function ScoreAppealForm({
     submitScoreAppealAction,
     {},
   );
+  const [requestedHomeScore, setRequestedHomeScore] = useState("");
+  const [requestedAwayScore, setRequestedAwayScore] = useState("");
+  const [reason, setReason] = useState("");
+  const [requestedHomeForfeit, setRequestedHomeForfeit] = useState(homeForfeit);
+  const [requestedAwayForfeit, setRequestedAwayForfeit] = useState(!homeForfeit && awayForfeit);
+  const ready = requestedHomeScore !== "" && requestedAwayScore !== "" && reason.trim().length >= 5;
+
   return (
-    <form action={action} className="mt-4 space-y-4">
+    <form action={action} className="space-y-4">
       <input type="hidden" name="matchId" value={matchId} />
       <input type="hidden" name="teamId" value={teamId} />
       {state.error ? <Alert tone="danger">{state.error}</Alert> : null}
@@ -72,11 +86,21 @@ export function ScoreAppealForm({
             max={99}
             step={1}
             required
-            defaultValue={homeScore}
+            placeholder={String(homeScore)}
+            value={requestedHomeScore}
+            onChange={(event) => setRequestedHomeScore(event.target.value)}
           />
           <label className="text-muted mt-2 flex items-center gap-2 text-sm">
-            <input name="requestedHomeForfeit" type="checkbox" defaultChecked={homeForfeit} />
-            Home team forfeited
+            <input
+              name="requestedHomeForfeit"
+              type="checkbox"
+              checked={requestedHomeForfeit}
+              onChange={(event) => {
+                setRequestedHomeForfeit(event.target.checked);
+                if (event.target.checked) setRequestedAwayForfeit(false);
+              }}
+            />
+            {homeTeamName} forfeited
           </label>
         </div>
         <div>
@@ -92,11 +116,21 @@ export function ScoreAppealForm({
             max={99}
             step={1}
             required
-            defaultValue={awayScore}
+            placeholder={String(awayScore)}
+            value={requestedAwayScore}
+            onChange={(event) => setRequestedAwayScore(event.target.value)}
           />
           <label className="text-muted mt-2 flex items-center gap-2 text-sm">
-            <input name="requestedAwayForfeit" type="checkbox" defaultChecked={awayForfeit} />
-            Away team forfeited
+            <input
+              name="requestedAwayForfeit"
+              type="checkbox"
+              checked={requestedAwayForfeit}
+              onChange={(event) => {
+                setRequestedAwayForfeit(event.target.checked);
+                if (event.target.checked) setRequestedHomeForfeit(false);
+              }}
+            />
+            {awayTeamName} forfeited
           </label>
         </div>
       </div>
@@ -112,9 +146,11 @@ export function ScoreAppealForm({
           maxLength={MAX_APPEAL_REASON_LENGTH}
           required
           className={inputClass}
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
         />
       </div>
-      <SubmitButton />
+      <SubmitButton ready={ready} />
     </form>
   );
 }

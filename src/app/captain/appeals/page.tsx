@@ -46,25 +46,38 @@ export default async function CaptainAppealsPage() {
           eligible.map((match) => {
             const report = match.report!;
             return (
-              <Card key={`${match.id}-${match.teamId}`} className="p-5">
-                <p className="text-muted text-xs">
-                  {formatDateTime(match.kickoffAt)} &middot; Appealing as{" "}
-                  {match.teamId === match.homeTeam.id ? match.homeTeam.name : match.awayTeam.name}
-                </p>
-                <h3 className="mt-1 text-lg font-semibold">
-                  {match.homeTeam.name} {report.homeScore}&ndash;{report.awayScore}{" "}
-                  {match.awayTeam.name}
-                </h3>
-                <ScoreAppealForm
-                  matchId={match.id}
-                  teamId={match.teamId}
-                  homeTeamName={match.homeTeam.name}
-                  awayTeamName={match.awayTeam.name}
-                  homeScore={report.homeScore}
-                  awayScore={report.awayScore}
-                  homeForfeit={report.homeForfeit}
-                  awayForfeit={report.awayForfeit}
-                />
+              <Card
+                as="details"
+                key={`${match.id}-${match.teamId}`}
+                className="group overflow-hidden"
+              >
+                <summary className="hover:bg-surface-muted cursor-pointer list-none px-5 py-4 transition">
+                  <div className="grid items-center gap-4 text-center sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-8">
+                    <h3 className="font-semibold sm:text-right">{match.homeTeam.name}</h3>
+                    <div className="bg-surface-muted border-subtle rounded-lg border px-5 py-2 text-xl font-bold tabular-nums shadow-sm">
+                      {report.homeScore}
+                      <span className="text-muted mx-3">&ndash;</span>
+                      {report.awayScore}
+                    </div>
+                    <h3 className="font-semibold sm:text-left">{match.awayTeam.name}</h3>
+                  </div>
+                  <p className="text-muted mt-2 text-center text-xs">
+                    {formatDateTime(match.kickoffAt)} &middot; Appealing as{" "}
+                    {match.teamId === match.homeTeam.id ? match.homeTeam.name : match.awayTeam.name}
+                  </p>
+                </summary>
+                <div className="border-subtle border-t p-5">
+                  <ScoreAppealForm
+                    matchId={match.id}
+                    teamId={match.teamId}
+                    homeTeamName={match.homeTeam.name}
+                    awayTeamName={match.awayTeam.name}
+                    homeScore={report.homeScore}
+                    awayScore={report.awayScore}
+                    homeForfeit={report.homeForfeit}
+                    awayForfeit={report.awayForfeit}
+                  />
+                </div>
               </Card>
             );
           })
