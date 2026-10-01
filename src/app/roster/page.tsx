@@ -57,8 +57,8 @@ export default async function RosterPage() {
   return (
     <div>
       <PageHeader
-        backHref={user.isCaptain ? "/captain/roster" : "/player"}
-        backLabel={user.isCaptain ? "Manage rosters" : "Player dashboard"}
+        backHref={user.isCaptain ? "/captain/roster" : "/account"}
+        backLabel={user.isCaptain ? "Manage rosters" : "Your account"}
         eyebrow="Players"
         title="Roster"
         description="Accept team invitations, request to join a team, or leave your current squad."

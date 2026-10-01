@@ -20,6 +20,6 @@ export default async function AfterSignInPage() {
   if (isAdmin) redirect("/admin");
   if (isReferee) redirect("/referee");
   if (isCaptain) redirect("/captain");
-  if (isPlayer) redirect("/player");
+  if (isPlayer) redirect("/account");
   redirect("/");
 }

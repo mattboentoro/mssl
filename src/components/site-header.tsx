@@ -48,7 +48,6 @@ export function SiteHeader({ user }: { user: HeaderUser | null }) {
   if (user?.canSignUpAsFreeAgent) {
     links.push({ href: "/free-agents", label: "Sign up as free agent" });
   }
-  if (user?.isPlayer) links.push({ href: "/player", label: "Player" });
   if (user?.isCaptain) links.push({ href: "/captain", label: "Captain" });
   if (user?.isReferee) links.push({ href: "/referee", label: "Referee" });
   if (user?.isAdmin) links.push({ href: "/admin/matches", label: "Admin" });
@@ -172,7 +171,7 @@ function AccountChip({ user }: { user: HeaderUser | null }) {
       user.isPlayer ? "Player" : null,
     ]
       .filter(Boolean)
-      .join(" + ") || "Viewer";
+      .join(" + ") || "Account";
 
   return (
     <Link
