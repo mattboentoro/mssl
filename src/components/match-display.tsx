@@ -21,10 +21,10 @@ type HeadToHeadTeam = {
 
 export function MatchDisclosureStack({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative pb-2">
+    <div className="match-disclosure-stack relative pb-2">
       <div
         aria-hidden
-        className="bg-surface-muted border-subtle absolute inset-x-3 top-3 bottom-0 rounded-xl border shadow-sm"
+        className="match-disclosure-underlay bg-surface-muted border-subtle absolute inset-x-3 top-3 bottom-0 rounded-xl border shadow-sm"
       />
       <div className="relative z-[1]">{children}</div>
     </div>

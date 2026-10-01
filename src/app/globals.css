@@ -104,6 +104,14 @@ button:not(:disabled):active {
   transform: translateY(1px);
 }
 
+.match-disclosure-stack:has(details[open]) {
+  padding-bottom: 0;
+}
+
+.match-disclosure-stack:has(details[open]) > .match-disclosure-underlay {
+  display: none;
+}
+
 /* Visible focus for keyboard users on every interactive element. */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 2px solid var(--accent);

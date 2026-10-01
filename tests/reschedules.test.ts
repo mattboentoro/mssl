@@ -222,6 +222,7 @@ describe("Captain reschedule request UI", () => {
       path.join(process.cwd(), "src/components/match-display.tsx"),
       "utf8",
     );
+    const styles = fs.readFileSync(path.join(process.cwd(), "src/app/globals.css"), "utf8");
 
     expect(page).toContain('as="details"');
     expect(page).toContain("<MatchDisclosureStack");
@@ -238,6 +239,9 @@ describe("Captain reschedule request UI", () => {
     expect(matchDisplay).toContain("h-5 w-5");
     expect(matchDisplay).not.toContain("View details");
     expect(matchDisplay).not.toContain("&#8964;");
+    expect(styles).toContain(".match-disclosure-stack:has(details[open])");
+    expect(styles).toContain("> .match-disclosure-underlay");
+    expect(styles).toContain("display: none");
   });
 });
 
