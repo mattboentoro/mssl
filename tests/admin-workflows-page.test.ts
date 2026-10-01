@@ -19,5 +19,9 @@ describe("Admin workflow reviews", () => {
     expect(page).toContain("border-success/40 bg-success/10");
     expect(page).toContain("text-2xl font-bold tabular-nums");
     expect(page).toContain("grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]");
+    expect(page).toContain("summary={");
+    expect(page).toContain("Score appeal");
+    expect(page).toContain("appeal.match.matchweek");
+    expect(page).toContain("appeal.match.venueName");
   });
 });

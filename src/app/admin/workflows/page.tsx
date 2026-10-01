@@ -278,6 +278,29 @@ export default async function AdminWorkflowsPage() {
                 idValue={appeal.id}
                 noteName="resolutionNote"
                 noteRequired
+                summary={
+                  <div>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h3 className="font-semibold">
+                          {appeal.match.homeTeam.name} v {appeal.match.awayTeam.name}
+                        </h3>
+                        <p className="text-muted mt-1 text-sm">
+                          MW {appeal.match.matchweek} · {formatDateTime(appeal.match.kickoffAt)} ·{" "}
+                          {appeal.match.venueName || "TBD"}
+                        </p>
+                      </div>
+                      <Badge tone="warning">Score appeal</Badge>
+                    </div>
+                    <p className="text-muted mt-3 text-sm">
+                      Appealed by{" "}
+                      <span className="text-foreground font-medium">
+                        {appeal.submittedBy.displayName}
+                      </span>{" "}
+                      ({appeal.team.name})
+                    </p>
+                  </div>
+                }
               >
                 <div className="grid gap-3 sm:grid-cols-3">
                   {appeal.match.report ? (
@@ -320,9 +343,6 @@ export default async function AdminWorkflowsPage() {
                     awayForfeit={appeal.requestedAwayForfeit}
                   />
                 </div>
-                <p className="text-muted mt-2 text-sm">
-                  Appealed by {appeal.submittedBy.displayName} ({appeal.team.name})
-                </p>
                 <p className="mt-2 text-sm whitespace-pre-wrap">
                   <span className="text-muted">Reason:</span> {appeal.reason}
                 </p>
