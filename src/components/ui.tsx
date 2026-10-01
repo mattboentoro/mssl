@@ -36,7 +36,7 @@ export function PageHeader({
           <p
             className={cn(
               "text-brand text-xs font-semibold tracking-[0.18em] uppercase",
-              backHref && "mt-5",
+              backHref && "mt-8",
             )}
           >
             {eyebrow}
@@ -45,7 +45,7 @@ export function PageHeader({
         <h1
           className={cn(
             "mt-1 text-3xl font-bold tracking-tight sm:text-4xl",
-            backHref && !eyebrow && "mt-5",
+            backHref && !eyebrow && "mt-8",
           )}
         >
           {title}
