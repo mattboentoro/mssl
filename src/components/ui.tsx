@@ -36,13 +36,20 @@ export function PageHeader({
           <p
             className={cn(
               "text-brand text-xs font-semibold tracking-[0.18em] uppercase",
-              backHref && "mt-3",
+              backHref && "mt-5",
             )}
           >
             {eyebrow}
           </p>
         ) : null}
-        <h1 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
+        <h1
+          className={cn(
+            "mt-1 text-3xl font-bold tracking-tight sm:text-4xl",
+            backHref && !eyebrow && "mt-5",
+          )}
+        >
+          {title}
+        </h1>
         {description ? (
           <div className="text-muted mt-2 text-sm sm:text-base">{description}</div>
         ) : null}
