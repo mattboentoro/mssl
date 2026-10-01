@@ -32,6 +32,7 @@ export default async function AdminRosterPage({
   searchParams,
 }: {
   searchParams: Promise<{
+    q?: string;
     season?: string;
     team?: string;
     state?: string;
@@ -39,6 +40,7 @@ export default async function AdminRosterPage({
   }>;
 }) {
   const params = await searchParams;
+  const query = params.q?.trim().toLowerCase() ?? "";
   const seasons = await prisma.season.findMany({
     orderBy: [{ isActive: "desc" }, { startsOn: "desc" }],
     select: { id: true, name: true, isActive: true },
@@ -109,6 +111,11 @@ export default async function AdminRosterPage({
     };
   });
   const visible = summaries
+    .filter(
+      ({ entry }) =>
+        !query ||
+        `${entry.team.name} ${entry.team.shortName}`.toLowerCase().includes(query),
+    )
     .filter(({ entry }) => !selectedTeamId || entry.teamId === selectedTeamId)
     .filter(({ activeCaptains, needsAttention }) => {
       if (selectedState === "captainless") return activeCaptains.length === 0;
@@ -134,7 +141,19 @@ export default async function AdminRosterPage({
         description="A read-only overview of registered players, Captain assignments, and team contacts. The active season and all teams are shown by default."
       />
       <Card className="mb-5 p-4">
-        <form method="get" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <form method="get" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          <div className="xl:col-span-2">
+            <Field label="Search teams" htmlFor="roster-search">
+              <input
+                id="roster-search"
+                name="q"
+                type="search"
+                defaultValue={params.q ?? ""}
+                placeholder="Team name"
+                className={inputClass}
+              />
+            </Field>
+          </div>
           <Field label="Season" htmlFor="roster-season">
             <select
               id="roster-season"
@@ -190,7 +209,7 @@ export default async function AdminRosterPage({
               <option value="has-players">Has active players</option>
             </select>
           </Field>
-          <div className="flex flex-wrap gap-2 sm:col-span-2 xl:col-span-4">
+          <div className="flex flex-wrap gap-2 sm:col-span-2 xl:col-span-6">
             <button type="submit" className={buttonClass("primary")}>
               Apply filters
             </button>
@@ -215,29 +234,40 @@ export default async function AdminRosterPage({
             activeCaptains.flatMap(({ userId }) => (userId ? [userId] : [])),
           );
           return (
-            <Card key={entry.id} className={`p-5 ${activeCaptains.length ? "" : "border-danger"}`}>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h2 className="font-semibold">{entry.team.name}</h2>
-                  <p className="text-muted text-sm">{selectedSeason.name}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {!activeCaptains.length ? <Badge tone="danger">Captainless</Badge> : null}
-                  {activeCaptains.length ? (
-                    <Badge tone="brand">
-                      {activeCaptains.length} Captain{activeCaptains.length === 1 ? "" : "s"}
+            <Card
+              as="details"
+              key={entry.id}
+              className={`group overflow-hidden ${activeCaptains.length ? "" : "border-danger"}`}
+            >
+              <summary className="hover:bg-surface-muted cursor-pointer px-4 py-3 transition">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="truncate font-semibold">{entry.team.name}</h2>
+                    <p className="text-muted text-xs">{selectedSeason.name}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {!activeCaptains.length ? (
+                      <Badge tone="danger">Captainless</Badge>
+                    ) : (
+                      <Badge tone="brand">
+                        {activeCaptains.length} Captain{activeCaptains.length === 1 ? "" : "s"}
+                      </Badge>
+                    )}
+                    <Badge tone={memberships.length ? "neutral" : "warning"}>
+                      {memberships.length
+                        ? `${memberships.length} active player${memberships.length === 1 ? "" : "s"}`
+                        : "No active players"}
                     </Badge>
-                  ) : null}
-                  <Badge>{memberships.length} active player(s)</Badge>
-                  <Link
-                    href={`/captain/roster?seasonId=${entry.seasonId}&teamId=${entry.teamId}`}
-                    className={buttonClass("secondary", "px-3 py-1.5")}
-                  >
-                    Manage roster
-                  </Link>
+                    <Link
+                      href={`/captain/roster?seasonId=${entry.seasonId}&teamId=${entry.teamId}`}
+                      className={buttonClass("secondary", "px-2 py-1 text-xs")}
+                    >
+                      Manage roster
+                    </Link>
+                  </div>
                 </div>
-              </div>
-              <div className="mt-5 grid gap-5 xl:grid-cols-2">
+              </summary>
+              <div className="border-subtle grid gap-5 border-t p-4 xl:grid-cols-2">
                 <div>
                   <h3 className="text-sm font-semibold">Active players</h3>
                   {memberships.length ? (
@@ -316,7 +346,7 @@ export default async function AdminRosterPage({
           <Card className="p-6">
             <EmptyState
               title="No rosters match these filters"
-              hint="Change the Captain or player filters to show more teams."
+              hint="Change the search, Captain status, or player filters to show more teams."
             />
           </Card>
         ) : null}
