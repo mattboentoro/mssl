@@ -33,11 +33,20 @@ export function MatchDisclosureStack({ children }: { children: React.ReactNode }
 
 export function MatchDisclosureHint() {
   return (
-    <span className="text-muted mt-3 flex items-center justify-center gap-1 text-xs font-semibold">
-      View details
-      <span aria-hidden className="inline-block transition-transform group-open:rotate-180">
-        &#8964;
-      </span>
+    <span
+      role="img"
+      aria-label="Expand match details"
+      className="bg-surface-muted border-subtle text-foreground mx-auto mt-3 flex h-5 w-5 items-center justify-center rounded-full border shadow-sm transition-transform group-open:rotate-180"
+    >
+      <svg aria-hidden viewBox="0 0 20 20" className="h-3 w-3" fill="none">
+        <path
+          d="m5 7.5 5 5 5-5"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
     </span>
   );
 }
