@@ -182,13 +182,14 @@ async function activeTeamUserIds(db: DbClient, seasonId: string, teamIds: string
 async function notify(
   db: DbClient,
   userIds: string[],
-  input: { type: string; title: string; body: string; requestId: string },
+  input: { type: string; title: string; body: string; requestId: string; href?: string },
 ) {
   await createNotifications(db, userIds, {
     type: input.type,
     title: input.title,
     body: input.body,
-    href: `/captain/reschedules#request-${encodeURIComponent(input.requestId)}`,
+    href:
+      input.href ?? `/captain/reschedules#request-${encodeURIComponent(input.requestId)}`,
   });
 }
 
@@ -619,6 +620,7 @@ export async function respondToReschedule(
       title: input.approve ? "Reschedule needs league review" : "Reschedule declined",
       body: `${request.match.homeTeam.name} v ${request.match.awayTeam.name}`,
       requestId: request.id,
+      href: input.approve ? `/admin/matches/${encodeURIComponent(request.matchId)}` : undefined,
     });
     await writeAudit(tx, {
       actor: toAuditActor(input.actor, "captain"),

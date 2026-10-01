@@ -43,6 +43,20 @@ export function isSafeInternalHref(href: string): boolean {
   );
 }
 
+export function notificationHrefForUser(
+  notification: { type: string; href: string | null },
+  user: { isAdmin: boolean },
+) {
+  if (
+    user.isAdmin &&
+    notification.type === "RESCHEDULE_AWAITING_ADMIN" &&
+    notification.href?.startsWith("/captain/reschedules")
+  ) {
+    return "/admin/workflows";
+  }
+  return notification.href;
+}
+
 function validatedText(value: string, label: string, maxLength: number): string {
   const trimmed = value.trim();
   if (!trimmed) {

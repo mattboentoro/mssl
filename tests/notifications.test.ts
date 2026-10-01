@@ -9,6 +9,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
   NotificationError,
+  notificationHrefForUser,
   unreadNotificationCount,
 } from "@/lib/notifications";
 
@@ -152,6 +153,21 @@ describe("in-app notifications", () => {
         href: "//attacker.example",
       }),
     ).rejects.toMatchObject({ code: "INVALID_NOTIFICATION" });
+  });
+
+  it("repairs legacy Admin reschedule links without changing Captain links", () => {
+    const legacy = {
+      type: "RESCHEDULE_AWAITING_ADMIN",
+      href: "/captain/reschedules#request-legacy",
+    };
+    expect(notificationHrefForUser(legacy, { isAdmin: true })).toBe("/admin/workflows");
+    expect(notificationHrefForUser(legacy, { isAdmin: false })).toBe(legacy.href);
+    expect(
+      notificationHrefForUser(
+        { type: "RESCHEDULE_AWAITING_ADMIN", href: "/admin/matches/match-1" },
+        { isAdmin: true },
+      ),
+    ).toBe("/admin/matches/match-1");
   });
 
   it("broadcasts only to active teammates and co-captains, deduplicates, and audits", async () => {

@@ -414,7 +414,7 @@ describe("Captain reschedule requests", () => {
       prisma.notification.findFirstOrThrow({
         where: { userId: fx.admin.id, type: "RESCHEDULE_AWAITING_ADMIN" },
       }),
-    ).resolves.toBeTruthy();
+    ).resolves.toMatchObject({ href: `/admin/matches/${fx.match.id}` });
   });
 
   it("records an opponent rejection and closes the request", async () => {
