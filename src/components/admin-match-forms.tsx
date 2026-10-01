@@ -82,6 +82,8 @@ export function AdminMatchForms({
   const [division, setDivision] = useState(divisionId);
   const [fixtureHome, setFixtureHome] = useState(homeTeamId);
   const [fixtureAway, setFixtureAway] = useState(awayTeamId);
+  const [homeForfeit, setHomeForfeit] = useState(currentHomeForfeit);
+  const [awayForfeit, setAwayForfeit] = useState(!currentHomeForfeit && currentAwayForfeit);
 
   const eligible = teams.filter((team) => team.divisionId === division);
   const selectedHome = teams.find((team) => team.id === fixtureHome);
@@ -483,9 +485,7 @@ export function AdminMatchForms({
 
           <button
             type="submit"
-            disabled={
-              busy === "fixture" || !fixtureDirty || (!hasReport && eligible.length < 2)
-            }
+            disabled={busy === "fixture" || !fixtureDirty || (!hasReport && eligible.length < 2)}
             className={buttonClass("primary")}
           >
             {busy === "fixture" ? "Saving\u2026" : "Save fixture"}
@@ -547,7 +547,12 @@ export function AdminMatchForms({
               <input
                 type="checkbox"
                 name="homeForfeit"
-                defaultChecked={currentHomeForfeit}
+                checked={homeForfeit}
+                disabled={awayForfeit}
+                onChange={(event) => {
+                  setHomeForfeit(event.target.checked);
+                  if (event.target.checked) setAwayForfeit(false);
+                }}
                 className="h-4 w-4"
               />
               {homeTeamLabel} forfeit
@@ -556,7 +561,12 @@ export function AdminMatchForms({
               <input
                 type="checkbox"
                 name="awayForfeit"
-                defaultChecked={currentAwayForfeit}
+                checked={awayForfeit}
+                disabled={homeForfeit}
+                onChange={(event) => {
+                  setAwayForfeit(event.target.checked);
+                  if (event.target.checked) setHomeForfeit(false);
+                }}
                 className="h-4 w-4"
               />
               {awayTeamLabel} forfeit

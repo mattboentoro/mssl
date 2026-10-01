@@ -138,12 +138,17 @@ export const reasonSchema = z.object({
   reason: trimmed(500).min(5, "Give a reason of at least 5 characters."),
 });
 
-export const overrideSchema = reasonSchema.extend({
-  homeScore: scoreSchema,
-  awayScore: scoreSchema,
-  homeForfeit: z.boolean().default(false),
-  awayForfeit: z.boolean().default(false),
-});
+export const overrideSchema = reasonSchema
+  .extend({
+    homeScore: scoreSchema,
+    awayScore: scoreSchema,
+    homeForfeit: z.boolean().default(false),
+    awayForfeit: z.boolean().default(false),
+  })
+  .refine((value) => !(value.homeForfeit && value.awayForfeit), {
+    path: ["awayForfeit"],
+    message: "Only one team can forfeit a match.",
+  });
 
 export const matchUpdateSchema = z.object({
   /*
