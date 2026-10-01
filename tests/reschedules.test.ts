@@ -208,6 +208,22 @@ function clientWithTransitionRace(): PrismaClient {
 beforeEach(resetDatabase);
 afterAll(async () => prisma.$disconnect());
 
+describe("Captain reschedule request UI", () => {
+  it("uses expandable head-to-head cards with details hidden in the body", () => {
+    const page = fs.readFileSync(
+      path.join(process.cwd(), "src/app/captain/reschedules/page.tsx"),
+      "utf8",
+    );
+
+    expect(page).toContain('as="details"');
+    expect(page).toContain("<MatchHeadToHead");
+    expect(page).toContain("<MatchKitColors");
+    expect(page.indexOf("<summary")).toBeLessThan(page.indexOf("Current kickoff"));
+    expect(page).toContain("topLeft={request.match.division.name}");
+    expect(page).toContain("status={status}");
+  });
+});
+
 describe("Captain reschedule requests", () => {
   it("creates a complete snapshot, audits it, notifies the opponent, and leaves the fixture unchanged", async () => {
     const fx = await fixture();

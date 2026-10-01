@@ -843,7 +843,12 @@ export async function listReschedulesForCaptain(db: PrismaClient, appUserId: str
         OR: [{ homeTeamId: teamId }, { awayTeamId: teamId }],
       })),
     },
-    include: { homeTeam: true, awayTeam: true, report: { select: { id: true } } },
+    include: {
+      homeTeam: true,
+      awayTeam: true,
+      division: { select: { name: true } },
+      report: { select: { id: true } },
+    },
     orderBy: { kickoffAt: "asc" },
   });
   const now = new Date();
@@ -863,7 +868,13 @@ export async function listReschedulesForCaptain(db: PrismaClient, appUserId: str
       },
     },
     include: {
-      match: { include: { homeTeam: true, awayTeam: true } },
+      match: {
+        include: {
+          homeTeam: true,
+          awayTeam: true,
+          division: { select: { name: true } },
+        },
+      },
       requestingTeam: true,
       requestedBy: { select: { displayName: true } },
     },
