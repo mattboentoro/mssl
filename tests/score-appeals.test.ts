@@ -184,7 +184,7 @@ beforeEach(resetDatabase);
 afterAll(async () => prisma.$disconnect());
 
 describe("score appeal form UI", () => {
-  it("uses compact disclosures, clear score spacing, and gated mutually exclusive forfeits", () => {
+  it("uses shared centered matchups, compact disclosures, and gated forfeits", () => {
     const page = fs.readFileSync(
       path.join(process.cwd(), "src/app/captain/appeals/page.tsx"),
       "utf8",
@@ -193,10 +193,21 @@ describe("score appeal form UI", () => {
       path.join(process.cwd(), "src/components/score-appeal-form.tsx"),
       "utf8",
     );
+    const matchDisplay = fs.readFileSync(
+      path.join(process.cwd(), "src/components/match-display.tsx"),
+      "utf8",
+    );
+    const results = fs.readFileSync(
+      path.join(process.cwd(), "src/app/captain/results/page.tsx"),
+      "utf8",
+    );
 
     expect(page).toContain('as="details"');
-    expect(page).toContain("mx-3");
-    expect(page).toContain("text-center");
+    expect(page).toContain("<MatchHeadToHead");
+    expect(page).toContain("<MatchScore");
+    expect(matchDisplay).toContain("sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]");
+    expect(matchDisplay).toContain("<MatchKitColors");
+    expect(results).toContain("<MatchHeadToHead");
     expect(form).toContain("disabled={pending || !ready}");
     expect(form).toContain("reason.trim().length >= 5");
     expect(form).toContain("setRequestedAwayForfeit(false)");

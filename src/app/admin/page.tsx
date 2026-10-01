@@ -1,9 +1,10 @@
 import Link from "next/link";
 
+import { MatchHeadToHead, MatchScore } from "@/components/match-display";
 import { Badge, Card, EmptyState } from "@/components/ui";
 import { formatDateTime } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
-import { getActiveSeason, scoreText } from "@/lib/queries";
+import { displayedScore, getActiveSeason } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -92,27 +93,31 @@ export default async function AdminOverviewPage() {
           </Card>
         ) : (
           <Card className="divide-subtle divide-y">
-            {pending.map((match) => (
-              <Link
-                key={match.id}
-                href={`/admin/matches/${match.id}`}
-                className="hover:bg-surface-muted flex flex-wrap items-center justify-between gap-3 p-4"
-              >
-                <div className="min-w-0">
-                  <p className="font-medium">
-                    {match.homeTeam.name} v {match.awayTeam.name}
-                  </p>
-                  <p className="text-muted text-xs">
-                    {match.division.name} &middot; {formatDateTime(match.kickoffAt)} &middot; filed
-                    by {match.referee?.name ?? "unknown"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-lg font-semibold">{scoreText(match.report)}</span>
-                  <Badge tone="warning">Review</Badge>
-                </div>
-              </Link>
-            ))}
+            {pending.map((match) => {
+              const score = displayedScore(match.report)!;
+              return (
+                <Link
+                  key={match.id}
+                  href={`/admin/matches/${match.id}`}
+                  className="hover:bg-surface-muted block p-4"
+                >
+                  <MatchHeadToHead
+                    home={{ name: match.homeTeam.name }}
+                    away={{ name: match.awayTeam.name }}
+                    center={<MatchScore home={score.home} away={score.away} />}
+                    metadata={
+                      <span className="inline-flex flex-wrap items-center justify-center gap-2">
+                        <span>
+                          {match.division.name} &middot; {formatDateTime(match.kickoffAt)} &middot;
+                          filed by {match.referee?.name ?? "unknown"}
+                        </span>
+                        <Badge tone="warning">Review</Badge>
+                      </span>
+                    }
+                  />
+                </Link>
+              );
+            })}
           </Card>
         )}
       </section>

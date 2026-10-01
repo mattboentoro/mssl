@@ -4,7 +4,7 @@ import { KitSwatch, TeamColorBar } from "@/components/team-colors";
 import { Badge, Card, FormGuide, MatchStatusBadge } from "@/components/ui";
 import { formatDateTime } from "@/lib/dates";
 import { kitColorName, resolveKit } from "@/lib/kits";
-import { scoreText, type MatchListItem } from "@/lib/queries";
+import { displayedScore, type MatchListItem } from "@/lib/queries";
 import { pointsPerGame, type PrimaryMetric, type StandingsRow } from "@/lib/standings";
 
 /*
@@ -13,84 +13,153 @@ import { pointsPerGame, type PrimaryMetric, type StandingsRow } from "@/lib/stan
 */
 const ASSIGNMENT_ONLY_STATUSES: readonly MatchListItem["status"][] = ["SCHEDULED", "ASSIGNED"];
 
+type HeadToHeadTeam = {
+  name: string;
+  href?: string;
+  forfeited?: boolean;
+};
+
+export function MatchScore({
+  home,
+  away,
+  label = "Score",
+}: {
+  home: number;
+  away: number;
+  label?: string;
+}) {
+  return (
+    <span
+      className="bg-surface-muted border-subtle inline-flex items-center rounded-lg border px-5 py-2 text-xl font-bold tabular-nums shadow-sm"
+      aria-label={`${label}: ${home} to ${away}`}
+    >
+      {home}
+      <span className="text-muted mx-3" aria-hidden>
+        &ndash;
+      </span>
+      {away}
+    </span>
+  );
+}
+
+export function MatchKitColors({
+  homeTeam,
+  awayTeam,
+  homeKit,
+  awayKit,
+}: {
+  homeTeam: MatchListItem["homeTeam"];
+  awayTeam: MatchListItem["awayTeam"];
+  homeKit: string;
+  awayKit: string;
+}) {
+  const homeColor = resolveKit(homeTeam, homeKit);
+  const awayColor = resolveKit(awayTeam, awayKit);
+
+  return (
+    <span
+      className="bg-surface-muted border-subtle inline-flex items-center gap-3 rounded-lg border px-4 py-2 shadow-sm"
+      aria-label={`${homeTeam.name} in ${kitColorName(homeColor)}, ${awayTeam.name} in ${kitColorName(awayColor)}`}
+    >
+      <span
+        aria-hidden
+        className="h-5 w-5 rounded-full ring-1 ring-black/20 dark:ring-white/25"
+        style={{ backgroundColor: homeColor }}
+      />
+      <span className="text-muted text-xs font-semibold">vs</span>
+      <span
+        aria-hidden
+        className="h-5 w-5 rounded-full ring-1 ring-black/20 dark:ring-white/25"
+        style={{ backgroundColor: awayColor }}
+      />
+    </span>
+  );
+}
+
+export function MatchHeadToHead({
+  home,
+  away,
+  center,
+  metadata,
+}: {
+  home: HeadToHeadTeam;
+  away: HeadToHeadTeam;
+  center: React.ReactNode;
+  metadata?: React.ReactNode;
+}) {
+  const team = (side: HeadToHeadTeam, alignment: string) => {
+    const content = (
+      <>
+        <span className="truncate">{side.name}</span>
+        {side.forfeited ? (
+          <span className="text-danger block text-[10px] font-semibold uppercase">Forfeit</span>
+        ) : null}
+      </>
+    );
+    return side.href ? (
+      <Link href={side.href} className={`min-w-0 font-semibold hover:underline ${alignment}`}>
+        {content}
+      </Link>
+    ) : (
+      <span className={`min-w-0 font-semibold ${alignment}`}>{content}</span>
+    );
+  };
+
+  return (
+    <div>
+      <div className="grid items-center gap-4 text-center sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-8">
+        {team(home, "sm:text-right")}
+        <div className="shrink-0">{center}</div>
+        {team(away, "sm:text-left")}
+      </div>
+      {metadata ? <div className="text-muted mt-3 text-center text-xs">{metadata}</div> : null}
+    </div>
+  );
+}
+
 export function MatchRow({ match, action }: { match: MatchListItem; action?: React.ReactNode }) {
-  const score = scoreText(match.report);
+  const score = displayedScore(match.report);
 
   return (
     <Card as="li" className="p-4">
-      <div className="flex items-start gap-4">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-            <span className="text-muted">{formatDateTime(match.kickoffAt)}</span>
+      <MatchHeadToHead
+        home={{
+          name: match.homeTeam.name,
+          href: `/teams/${match.homeTeam.slug}`,
+          forfeited: Boolean(match.report?.homeForfeit),
+        }}
+        away={{
+          name: match.awayTeam.name,
+          href: `/teams/${match.awayTeam.slug}`,
+          forfeited: Boolean(match.report?.awayForfeit),
+        }}
+        center={
+          score ? (
+            <MatchScore home={score.home} away={score.away} />
+          ) : (
+            <MatchKitColors
+              homeTeam={match.homeTeam}
+              awayTeam={match.awayTeam}
+              homeKit={match.homeKit}
+              awayKit={match.awayKit}
+            />
+          )
+        }
+        metadata={
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+            <span>{formatDateTime(match.kickoffAt)}</span>
             <Badge tone="neutral">{match.division.name}</Badge>
             <Badge tone="neutral">MW {match.matchweek}</Badge>
             {ASSIGNMENT_ONLY_STATUSES.includes(match.status) ? null : (
               <MatchStatusBadge match={match} />
             )}
             {match.report?.status === "DISPUTED" ? <Badge tone="danger">Disputed</Badge> : null}
+            <span>&#128205; {match.venueName ?? "TBD"}</span>
           </div>
-
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <TeamCell
-              team={match.homeTeam}
-              kit={match.homeKit}
-              forfeited={Boolean(match.report?.homeForfeit)}
-            />
-            {score ? (
-              <span className="text-xl font-bold tabular-nums">{score}</span>
-            ) : (
-              <span className="text-muted text-sm font-semibold">vs</span>
-            )}
-            <TeamCell
-              team={match.awayTeam}
-              kit={match.awayKit}
-              forfeited={Boolean(match.report?.awayForfeit)}
-            />
-          </div>
-
-          <div className="text-muted mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-            {match.venueName ? (
-              <span>&#128205; {match.venueName}</span>
-            ) : (
-              <span>&#128205; TBD</span>
-            )}
-          </div>
-        </div>
-        {action ? <div className="shrink-0">{action}</div> : null}
-      </div>
+        }
+      />
+      {action ? <div className="mt-3 flex justify-center">{action}</div> : null}
     </Card>
-  );
-}
-
-type TeamCellTeam = MatchListItem["homeTeam"];
-
-function TeamCell({
-  team,
-  kit,
-  forfeited = false,
-}: {
-  team: TeamCellTeam;
-  kit: string;
-  forfeited?: boolean;
-}) {
-  return (
-    <span className="flex min-w-0 items-center gap-1.5">
-      <Link
-        href={`/teams/${team.slug}`}
-        className="flex min-w-0 items-center gap-1.5 text-left font-semibold hover:underline"
-      >
-        <KitSwatch team={team} kit={kit} teamName={team.name} />
-        <span className="truncate">{team.name}</span>
-      </Link>
-      {/*
-        The awarded scoreline is nobody's actual result, so the side that gave
-        the fixture up is named beside the team rather than left for the reader
-        to infer from a 3-0 nobody played.
-      */}
-      {forfeited ? (
-        <span className="text-danger text-[10px] font-semibold uppercase">Forfeit</span>
-      ) : null}
-    </span>
   );
 }
 

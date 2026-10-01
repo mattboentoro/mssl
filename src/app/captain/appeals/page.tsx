@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { forbidden, redirect } from "next/navigation";
 
+import { MatchHeadToHead, MatchScore } from "@/components/match-display";
 import { CancelScoreAppealForm, ScoreAppealForm } from "@/components/score-appeal-form";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
 import { AuthzError, requireCaptain } from "@/lib/authz";
@@ -52,19 +53,19 @@ export default async function CaptainAppealsPage() {
                 className="group overflow-hidden"
               >
                 <summary className="hover:bg-surface-muted cursor-pointer list-none px-5 py-4 transition">
-                  <div className="grid items-center gap-4 text-center sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-8">
-                    <h3 className="font-semibold sm:text-right">{match.homeTeam.name}</h3>
-                    <div className="bg-surface-muted border-subtle rounded-lg border px-5 py-2 text-xl font-bold tabular-nums shadow-sm">
-                      {report.homeScore}
-                      <span className="text-muted mx-3">&ndash;</span>
-                      {report.awayScore}
-                    </div>
-                    <h3 className="font-semibold sm:text-left">{match.awayTeam.name}</h3>
-                  </div>
-                  <p className="text-muted mt-2 text-center text-xs">
-                    {formatDateTime(match.kickoffAt)} &middot; Appealing as{" "}
-                    {match.teamId === match.homeTeam.id ? match.homeTeam.name : match.awayTeam.name}
-                  </p>
+                  <MatchHeadToHead
+                    home={{ name: match.homeTeam.name }}
+                    away={{ name: match.awayTeam.name }}
+                    center={<MatchScore home={report.homeScore} away={report.awayScore} />}
+                    metadata={
+                      <>
+                        {formatDateTime(match.kickoffAt)} &middot; Appealing as{" "}
+                        {match.teamId === match.homeTeam.id
+                          ? match.homeTeam.name
+                          : match.awayTeam.name}
+                      </>
+                    }
+                  />
                 </summary>
                 <div className="border-subtle border-t p-5">
                   <ScoreAppealForm
@@ -94,17 +95,25 @@ export default async function CaptainAppealsPage() {
         {appeals.length ? (
           appeals.map((appeal) => (
             <Card key={appeal.id} className="p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-muted text-xs">
-                    {formatDateTime(appeal.createdAt)} &middot; {appeal.team.name}
-                  </p>
-                  <h3 className="mt-1 font-semibold">
-                    {appeal.match.homeTeam.name} v {appeal.match.awayTeam.name}
-                  </h3>
-                </div>
-                <Badge tone={statusTone(appeal.status)}>{appeal.status}</Badge>
-              </div>
+              <MatchHeadToHead
+                home={{ name: appeal.match.homeTeam.name }}
+                away={{ name: appeal.match.awayTeam.name }}
+                center={
+                  <MatchScore
+                    home={appeal.requestedHomeScore}
+                    away={appeal.requestedAwayScore}
+                    label="Requested score"
+                  />
+                }
+                metadata={
+                  <span className="inline-flex flex-wrap items-center justify-center gap-2">
+                    <span>
+                      {formatDateTime(appeal.createdAt)} &middot; Appealed by {appeal.team.name}
+                    </span>
+                    <Badge tone={statusTone(appeal.status)}>{appeal.status}</Badge>
+                  </span>
+                }
+              />
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
                 <div>
                   <dt className="text-muted">Original</dt>
