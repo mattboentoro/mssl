@@ -5,11 +5,13 @@ import { useFormStatus } from "react-dom";
 
 import {
   createRescheduleSlotAction,
+  deleteRescheduleSlotAction,
   importRescheduleSlotsAction,
   setRescheduleSlotAvailabilityAction,
   updateRescheduleSlotAction,
   type RescheduleSlotActionState,
 } from "@/app/admin/reschedule-slots/actions";
+import { SubmitButton } from "@/components/admin-forms";
 import { Alert, buttonClass, inputClass, labelClass } from "@/components/ui";
 
 function Submit({
@@ -166,6 +168,22 @@ export function RescheduleSlotAvailabilityForm({
       <input type="hidden" name="available" value={String(enable)} />
       <Feedback state={state} />
       <Submit variant={enable ? "secondary" : "danger"}>{enable ? "Enable" : "Disable"}</Submit>
+    </form>
+  );
+}
+
+export function DeleteRescheduleSlotForm({ slotId }: { slotId: string }) {
+  const [state, action] = useActionState(deleteRescheduleSlotAction, {});
+  return (
+    <form action={action} className="space-y-2">
+      <input type="hidden" name="slotId" value={slotId} />
+      <Feedback state={state} />
+      <SubmitButton
+        variant="danger"
+        confirm="Delete this disabled availability slot permanently? This cannot be undone."
+      >
+        Delete
+      </SubmitButton>
     </form>
   );
 }

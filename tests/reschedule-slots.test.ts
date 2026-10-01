@@ -4,6 +4,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import {
   createRescheduleSlot,
   createRescheduleSlots,
+  deleteRescheduleSlot,
   setRescheduleSlotAvailability,
   updateRescheduleSlot,
 } from "@/lib/reschedule-slots";
@@ -195,6 +196,7 @@ describe("reschedule availability slots", () => {
       actor,
       now: NOW,
     });
+
     const updated = await updateRescheduleSlot(prisma, {
       slotId: slot.id,
       kickoffAt: new Date("2026-10-21T20:00:00Z"),
@@ -221,6 +223,33 @@ describe("reschedule availability slots", () => {
     await expect(
       setRescheduleSlotAvailability(prisma, { slotId: slot.id, available: true, actor }),
     ).resolves.toMatchObject({ status: "AVAILABLE" });
+  });
+
+  it("deletes and audits only disabled slots", async () => {
+    const actor = await admin();
+    const slot = await createRescheduleSlot(prisma, {
+      kickoffAt: new Date("2026-10-20T19:00:00Z"),
+      venueName: "Marymoor Turf A",
+      actor,
+      now: NOW,
+    });
+
+    await expect(deleteRescheduleSlot(prisma, { slotId: slot.id, actor })).rejects.toMatchObject({
+      code: "INVALID_STATE",
+    });
+    await setRescheduleSlotAvailability(prisma, {
+      slotId: slot.id,
+      available: false,
+      actor,
+    });
+    await deleteRescheduleSlot(prisma, { slotId: slot.id, actor });
+
+    await expect(prisma.rescheduleSlot.findUnique({ where: { id: slot.id } })).resolves.toBeNull();
+    await expect(
+      prisma.auditLog.findFirstOrThrow({
+        where: { entityId: slot.id, action: "reschedule_slot.delete" },
+      }),
+    ).resolves.toMatchObject({ actorRole: "admin" });
   });
 
   it("does not let Admin edits or disabling overwrite a concurrent reservation", async () => {

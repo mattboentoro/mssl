@@ -11,6 +11,7 @@ import {
 import {
   createRescheduleSlot,
   createRescheduleSlots,
+  deleteRescheduleSlot,
   RescheduleSlotError,
   setRescheduleSlotAvailability,
   updateRescheduleSlot,
@@ -138,6 +139,23 @@ export async function setRescheduleSlotAvailabilityAction(
     });
     refresh();
     return { ok: value(form, "available") === "true" ? "Slot enabled." : "Slot disabled." };
+  } catch (error) {
+    return failure(error);
+  }
+}
+
+export async function deleteRescheduleSlotAction(
+  _state: RescheduleSlotActionState,
+  form: FormData,
+): Promise<RescheduleSlotActionState> {
+  try {
+    const user = await requireAdmin();
+    await deleteRescheduleSlot(prisma, {
+      slotId: value(form, "slotId"),
+      actor: actor(user),
+    });
+    refresh();
+    return { ok: "Slot deleted." };
   } catch (error) {
     return failure(error);
   }

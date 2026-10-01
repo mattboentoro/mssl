@@ -287,3 +287,40 @@ export async function setRescheduleSlotAvailability(
     return updated;
   });
 }
+
+export async function deleteRescheduleSlot(
+  db: PrismaClient,
+  input: { slotId: string; actor: AdminActor },
+): Promise<void> {
+  await db.$transaction(async (tx) => {
+    const slot = await tx.rescheduleSlot.findUnique({ where: { id: input.slotId } });
+    if (!slot) {
+      throw new RescheduleSlotError("Reschedule slot not found.", 404, "NOT_FOUND");
+    }
+    if (slot.status !== "DISABLED") {
+      throw new RescheduleSlotError("Only disabled slots can be deleted.", 409, "INVALID_STATE");
+    }
+
+    const deleted = await tx.rescheduleSlot.deleteMany({
+      where: { id: slot.id, status: "DISABLED", updatedAt: slot.updatedAt },
+    });
+    if (deleted.count !== 1) {
+      throw new RescheduleSlotError(
+        "This slot changed while it was being deleted.",
+        409,
+        "INVALID_STATE",
+      );
+    }
+    await writeAudit(tx, {
+      actor: toAuditActor(input.actor, "admin"),
+      action: "reschedule_slot.delete",
+      entity: "RescheduleSlot",
+      entityId: slot.id,
+      metadata: {
+        kickoffAt: slot.kickoffAt,
+        venueName: slot.venueName,
+        status: slot.status,
+      },
+    });
+  });
+}

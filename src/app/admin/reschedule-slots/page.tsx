@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import {
   CreateRescheduleSlotForm,
+  DeleteRescheduleSlotForm,
   EditRescheduleSlotForm,
   ImportRescheduleSlotsForm,
   RescheduleSlotAvailabilityForm,
@@ -76,10 +77,15 @@ export default async function AdminRescheduleSlotsPage() {
                         {reservation ? "Reserved" : slot.status.toLowerCase()}
                       </Badge>
                       {slot.status !== "USED" && !reservation ? (
-                        <RescheduleSlotAvailabilityForm
-                          slotId={slot.id}
-                          enable={slot.status === "DISABLED"}
-                        />
+                        <div className="flex items-start gap-2">
+                          <RescheduleSlotAvailabilityForm
+                            slotId={slot.id}
+                            enable={slot.status === "DISABLED"}
+                          />
+                          {slot.status === "DISABLED" ? (
+                            <DeleteRescheduleSlotForm slotId={slot.id} />
+                          ) : null}
+                        </div>
                       ) : null}
                     </div>
                   </div>
