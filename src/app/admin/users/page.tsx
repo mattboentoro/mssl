@@ -47,42 +47,58 @@ export default async function UsersPage() {
                     {user.status.toLowerCase()}
                   </Badge>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Badge>viewer</Badge>
-                  {user.memberships.map((membership) => (
-                    <Badge key={membership.id}>
-                      player · {membership.team.name} · {membership.season.name}
-                    </Badge>
-                  ))}
-                  {user.captainAssignments.map((captain) => (
-                    <Badge key={captain.id} tone="brand">
-                      captain · {captain.team.name} · {captain.season?.name ?? "all seasons"}
-                    </Badge>
-                  ))}
-                  {ASSIGNABLE_ROLES.map((role) => {
-                    const hasRole = assigned.has(role);
-                    return (
-                      <ActionForm action={mutateRoleAction} key={role} className="inline-block">
-                        <input type="hidden" name="userId" value={user.id} />
-                        <input type="hidden" name="role" value={role} />
-                        <input
-                          type="hidden"
-                          name="operation"
-                          value={hasRole ? "revoke" : "assign"}
-                        />
-                        <SubmitButton
-                          variant={hasRole ? "danger" : "secondary"}
-                          confirm={
-                            hasRole
-                              ? `Remove only the ${role} role from ${user.displayName}? Their other roles and team assignments will remain.`
-                              : `Add the ${role} role to ${user.displayName} without changing their other roles?`
-                          }
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge>viewer</Badge>
+                    {user.memberships.map((membership) => (
+                      <Badge key={membership.id}>
+                        player · {membership.team.name} · {membership.season.name}
+                      </Badge>
+                    ))}
+                    {user.captainAssignments.map((captain) => (
+                      <Badge key={captain.id} tone="brand">
+                        captain · {captain.team.name} · {captain.season?.name ?? "all seasons"}
+                      </Badge>
+                    ))}
+                    {user.rolesAssigned
+                      .filter(({ role }) => role === "REFEREE" || role === "ADMIN")
+                      .map(({ id, role }) => (
+                        <Badge key={id} tone={role === "ADMIN" ? "accent" : "brand"}>
+                          {role.toLowerCase()}
+                        </Badge>
+                      ))}
+                  </div>
+                  <div className="flex flex-wrap gap-2 lg:justify-end">
+                    {ASSIGNABLE_ROLES.map((role) => {
+                      const hasRole = assigned.has(role);
+                      return (
+                        <ActionForm
+                          action={mutateRoleAction}
+                          key={role}
+                          className="inline-block"
+                          showSuccess={false}
                         >
-                          {hasRole ? `Remove ${role}` : `Add ${role}`}
-                        </SubmitButton>
-                      </ActionForm>
-                    );
-                  })}
+                          <input type="hidden" name="userId" value={user.id} />
+                          <input type="hidden" name="role" value={role} />
+                          <input
+                            type="hidden"
+                            name="operation"
+                            value={hasRole ? "revoke" : "assign"}
+                          />
+                          <SubmitButton
+                            variant={hasRole ? "danger" : "secondary"}
+                            confirm={
+                              hasRole
+                                ? `Remove only the ${role} role from ${user.displayName}? Their other roles and team assignments will remain.`
+                                : `Add the ${role} role to ${user.displayName} without changing their other roles?`
+                            }
+                          >
+                            {hasRole ? `Remove ${role}` : `Add ${role}`}
+                          </SubmitButton>
+                        </ActionForm>
+                      );
+                    })}
+                  </div>
                 </div>
               </Card>
             );
