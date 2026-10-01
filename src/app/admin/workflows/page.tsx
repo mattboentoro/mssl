@@ -40,6 +40,73 @@ function Result({
   );
 }
 
+function ScoreComparison({
+  label,
+  home,
+  away,
+  homeScore,
+  awayScore,
+  homeForfeit,
+  awayForfeit,
+  tone,
+}: {
+  label: string;
+  home: string;
+  away: string;
+  homeScore: number;
+  awayScore: number;
+  homeForfeit: boolean;
+  awayForfeit: boolean;
+  tone: "current" | "original" | "requested";
+}) {
+  const styles = {
+    current: {
+      panel: "border-brand/35 bg-brand/5",
+      label: "text-brand",
+      score: "border-brand/30 bg-brand/10 text-brand",
+    },
+    original: {
+      panel: "border-warning/40 bg-warning/10",
+      label: "text-warning",
+      score: "border-warning/40 bg-warning/15 text-warning",
+    },
+    requested: {
+      panel: "border-success/40 bg-success/10",
+      label: "text-success",
+      score: "border-success/40 bg-success/15 text-success",
+    },
+  }[tone];
+
+  return (
+    <div className={`rounded-xl border p-4 ${styles.panel}`}>
+      <p className={`text-center text-xs font-bold tracking-wide uppercase ${styles.label}`}>
+        {label}
+      </p>
+      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
+        <p className="text-right text-sm font-semibold">{home}</p>
+        <div
+          className={`min-w-24 rounded-lg border px-4 py-2 text-center text-2xl font-bold tabular-nums ${styles.score}`}
+          aria-label={`${label}: ${home} ${homeScore} to ${awayScore} ${away}`}
+        >
+          {homeScore}
+          <span className="mx-3 opacity-60" aria-hidden>
+            &ndash;
+          </span>
+          {awayScore}
+        </div>
+        <p className="text-left text-sm font-semibold">{away}</p>
+      </div>
+      {homeForfeit || awayForfeit ? (
+        <div className="mt-3 text-center">
+          <Badge tone="warning">
+            {homeForfeit ? home : away} forfeit
+          </Badge>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default async function AdminWorkflowsPage() {
   const [reschedules, results, appeals] = await Promise.all([
     prisma.rescheduleRequest.findMany({
@@ -213,47 +280,45 @@ export default async function AdminWorkflowsPage() {
                 noteRequired
               >
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <div>
-                    <p className="text-muted text-xs font-semibold uppercase">
-                      Current official result
-                    </p>
-                    {appeal.match.report ? (
-                      <Result
-                        home={appeal.match.homeTeam.name}
-                        away={appeal.match.awayTeam.name}
-                        homeScore={appeal.match.report.homeScore}
-                        awayScore={appeal.match.report.awayScore}
-                        homeForfeit={appeal.match.report.homeForfeit}
-                        awayForfeit={appeal.match.report.awayForfeit}
-                      />
-                    ) : (
-                      <p className="text-danger">Report no longer exists</p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-muted text-xs font-semibold uppercase">Original snapshot</p>
-                    <Result
+                  {appeal.match.report ? (
+                    <ScoreComparison
+                      label="Current official"
+                      tone="current"
                       home={appeal.match.homeTeam.name}
                       away={appeal.match.awayTeam.name}
-                      homeScore={appeal.originalHomeScore}
-                      awayScore={appeal.originalAwayScore}
-                      homeForfeit={appeal.originalHomeForfeit}
-                      awayForfeit={appeal.originalAwayForfeit}
+                      homeScore={appeal.match.report.homeScore}
+                      awayScore={appeal.match.report.awayScore}
+                      homeForfeit={appeal.match.report.homeForfeit}
+                      awayForfeit={appeal.match.report.awayForfeit}
                     />
-                  </div>
-                  <div>
-                    <p className="text-muted text-xs font-semibold uppercase">
-                      Requested correction
-                    </p>
-                    <Result
-                      home={appeal.match.homeTeam.name}
-                      away={appeal.match.awayTeam.name}
-                      homeScore={appeal.requestedHomeScore}
-                      awayScore={appeal.requestedAwayScore}
-                      homeForfeit={appeal.requestedHomeForfeit}
-                      awayForfeit={appeal.requestedAwayForfeit}
-                    />
-                  </div>
+                  ) : (
+                    <div className="border-danger/40 bg-danger/10 rounded-xl border p-4 text-center">
+                      <p className="text-danger text-xs font-bold tracking-wide uppercase">
+                        Current official
+                      </p>
+                      <p className="text-danger mt-3 font-semibold">Report no longer exists</p>
+                    </div>
+                  )}
+                  <ScoreComparison
+                    label="Original snapshot"
+                    tone="original"
+                    home={appeal.match.homeTeam.name}
+                    away={appeal.match.awayTeam.name}
+                    homeScore={appeal.originalHomeScore}
+                    awayScore={appeal.originalAwayScore}
+                    homeForfeit={appeal.originalHomeForfeit}
+                    awayForfeit={appeal.originalAwayForfeit}
+                  />
+                  <ScoreComparison
+                    label="Requested correction"
+                    tone="requested"
+                    home={appeal.match.homeTeam.name}
+                    away={appeal.match.awayTeam.name}
+                    homeScore={appeal.requestedHomeScore}
+                    awayScore={appeal.requestedAwayScore}
+                    homeForfeit={appeal.requestedHomeForfeit}
+                    awayForfeit={appeal.requestedAwayForfeit}
+                  />
                 </div>
                 <p className="text-muted mt-2 text-sm">
                   Appealed by {appeal.submittedBy.displayName} ({appeal.team.name})
