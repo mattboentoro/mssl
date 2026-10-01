@@ -214,13 +214,27 @@ describe("Captain reschedule request UI", () => {
       path.join(process.cwd(), "src/app/captain/reschedules/page.tsx"),
       "utf8",
     );
+    const forms = fs.readFileSync(
+      path.join(process.cwd(), "src/components/reschedule-forms.tsx"),
+      "utf8",
+    );
+    const matchDisplay = fs.readFileSync(
+      path.join(process.cwd(), "src/components/match-display.tsx"),
+      "utf8",
+    );
 
     expect(page).toContain('as="details"');
+    expect(page).toContain("<MatchDisclosureStack");
+    expect(page).toContain("<MatchDisclosureHint");
     expect(page).toContain("<MatchHeadToHead");
     expect(page).toContain("<MatchKitColors");
     expect(page.indexOf("<summary")).toBeLessThan(page.indexOf("Current kickoff"));
     expect(page).toContain("topLeft={request.match.division.name}");
     expect(page).toContain("status={status}");
+    expect(forms).toContain("disabled={!ready}");
+    expect(forms).toContain("revisedReason.trim() !== reason.trim()");
+    expect(matchDisplay).toContain("absolute inset-x-3 top-3 bottom-0");
+    expect(matchDisplay).toContain("View details");
   });
 });
 

@@ -19,6 +19,29 @@ type HeadToHeadTeam = {
   forfeited?: boolean;
 };
 
+export function MatchDisclosureStack({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative pb-2">
+      <div
+        aria-hidden
+        className="bg-surface-muted border-subtle absolute inset-x-3 top-3 bottom-0 rounded-xl border shadow-sm"
+      />
+      <div className="relative z-[1]">{children}</div>
+    </div>
+  );
+}
+
+export function MatchDisclosureHint() {
+  return (
+    <span className="text-muted mt-3 flex items-center justify-center gap-1 text-xs font-semibold">
+      View details
+      <span aria-hidden className="inline-block transition-transform group-open:rotate-180">
+        &#8964;
+      </span>
+    </span>
+  );
+}
+
 export function MatchScore({
   home,
   away,

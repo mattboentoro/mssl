@@ -7,7 +7,12 @@ import {
   RescheduleResponseForm,
   RescheduleRevisionForm,
 } from "@/components/reschedule-forms";
-import { MatchHeadToHead, MatchKitColors } from "@/components/match-display";
+import {
+  MatchDisclosureHint,
+  MatchDisclosureStack,
+  MatchHeadToHead,
+  MatchKitColors,
+} from "@/components/match-display";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
 import { AuthzError, requireCaptain } from "@/lib/authz";
 import { formatDateTime } from "@/lib/dates";
@@ -135,97 +140,105 @@ export default async function CaptainReschedulesPage({
               );
               return (
                 <div key={request.id} id={`request-${request.id}`}>
-                  <Card as="details" className="group overflow-hidden">
-                    <summary className="hover:bg-surface-muted cursor-pointer list-none px-5 py-4 transition">
-                      <MatchHeadToHead
-                        home={{ name: request.match.homeTeam.name }}
-                        away={{ name: request.match.awayTeam.name }}
-                        center={
-                          <MatchKitColors
-                            homeTeam={request.match.homeTeam}
-                            awayTeam={request.match.awayTeam}
-                            homeKit={request.match.homeKit}
-                            awayKit={request.match.awayKit}
-                          />
-                        }
-                        topLeft={request.match.division.name}
-                        topRight={`MW ${request.match.matchweek}`}
-                        time={formatDateTime(request.originalKickoffAt ?? request.match.kickoffAt)}
-                        status={status}
-                        location={<>&#128205; {request.originalVenueName ?? "TBD"}</>}
-                      />
-                    </summary>
-                    <div className="border-subtle border-t p-5">
-                      <p className="text-muted mb-4 text-sm">
-                        Proposed by <strong>{request.requestingTeam.name}</strong> (
-                        {request.requestedBy.displayName})
-                      </p>
-                      <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                        <div className="bg-surface-muted rounded-lg p-3">
-                          <dt className="text-muted text-xs">Current kickoff</dt>
-                          <dd className="mt-1 font-medium">
-                            {formatDateTime(request.originalKickoffAt ?? request.match.kickoffAt)}
-                          </dd>
-                        </div>
-                        <div className="bg-surface-muted rounded-lg p-3">
-                          <dt className="text-muted text-xs">Proposed kickoff</dt>
-                          <dd className="mt-1 font-medium">
-                            {request.proposedKickoffAt
-                              ? formatDateTime(request.proposedKickoffAt)
-                              : "Not provided"}
-                          </dd>
-                        </div>
-                        <div className="bg-surface-muted rounded-lg p-3">
-                          <dt className="text-muted text-xs">Current venue</dt>
-                          <dd className="mt-1 font-medium">{request.originalVenueName ?? "TBD"}</dd>
-                        </div>
-                        <div className="bg-surface-muted rounded-lg p-3">
-                          <dt className="text-muted text-xs">Proposed venue</dt>
-                          <dd className="mt-1 font-medium">
-                            {request.proposedVenueName ?? "No change"}
-                          </dd>
-                        </div>
-                      </dl>
-                      <p className="mt-3 text-sm">
-                        <span className="font-medium">Rationale:</span> {request.reason}
-                      </p>
-                      {request.responseNote ? (
-                        <p className="mt-2 text-sm">
-                          <span className="font-medium">Opponent note:</span> {request.responseNote}
+                  <MatchDisclosureStack>
+                    <Card as="details" className="group overflow-hidden">
+                      <summary className="hover:bg-surface-muted cursor-pointer list-none px-5 py-4 transition">
+                        <MatchHeadToHead
+                          home={{ name: request.match.homeTeam.name }}
+                          away={{ name: request.match.awayTeam.name }}
+                          center={
+                            <MatchKitColors
+                              homeTeam={request.match.homeTeam}
+                              awayTeam={request.match.awayTeam}
+                              homeKit={request.match.homeKit}
+                              awayKit={request.match.awayKit}
+                            />
+                          }
+                          topLeft={request.match.division.name}
+                          topRight={`MW ${request.match.matchweek}`}
+                          time={formatDateTime(
+                            request.originalKickoffAt ?? request.match.kickoffAt,
+                          )}
+                          status={status}
+                          location={<>&#128205; {request.originalVenueName ?? "TBD"}</>}
+                        />
+                        <MatchDisclosureHint />
+                      </summary>
+                      <div className="border-subtle border-t p-5">
+                        <p className="text-muted mb-4 text-sm">
+                          Proposed by <strong>{request.requestingTeam.name}</strong> (
+                          {request.requestedBy.displayName})
                         </p>
-                      ) : null}
-                      {request.adminReviewNote ? (
-                        <p className="mt-2 text-sm">
-                          <span className="font-medium">League note:</span>{" "}
-                          {request.adminReviewNote}
+                        <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                          <div className="bg-surface-muted rounded-lg p-3">
+                            <dt className="text-muted text-xs">Current kickoff</dt>
+                            <dd className="mt-1 font-medium">
+                              {formatDateTime(request.originalKickoffAt ?? request.match.kickoffAt)}
+                            </dd>
+                          </div>
+                          <div className="bg-surface-muted rounded-lg p-3">
+                            <dt className="text-muted text-xs">Proposed kickoff</dt>
+                            <dd className="mt-1 font-medium">
+                              {request.proposedKickoffAt
+                                ? formatDateTime(request.proposedKickoffAt)
+                                : "Not provided"}
+                            </dd>
+                          </div>
+                          <div className="bg-surface-muted rounded-lg p-3">
+                            <dt className="text-muted text-xs">Current venue</dt>
+                            <dd className="mt-1 font-medium">
+                              {request.originalVenueName ?? "TBD"}
+                            </dd>
+                          </div>
+                          <div className="bg-surface-muted rounded-lg p-3">
+                            <dt className="text-muted text-xs">Proposed venue</dt>
+                            <dd className="mt-1 font-medium">
+                              {request.proposedVenueName ?? "No change"}
+                            </dd>
+                          </div>
+                        </dl>
+                        <p className="mt-3 text-sm">
+                          <span className="font-medium">Rationale:</span> {request.reason}
                         </p>
-                      ) : null}
-                      {isProposingCaptain &&
-                      request.status === "PENDING_OPPONENT" &&
-                      request.proposedKickoffAt ? (
-                        <>
-                          <RescheduleRevisionForm
-                            requestId={request.id}
-                            slots={[
-                              ...(request.slotId
-                                ? [
-                                    {
-                                      id: request.slotId,
-                                      label: `${formatDateTime(request.proposedKickoffAt)} — ${request.proposedVenueName ?? "TBD"} (current)`,
-                                    },
-                                  ]
-                                : []),
-                              ...slotOptions.filter((slot) => slot.id !== request.slotId),
-                            ]}
-                            selectedSlotId={request.slotId ?? undefined}
-                            reason={request.reason}
-                          />
-                          <RescheduleCancelForm requestId={request.id} />
-                        </>
-                      ) : null}
-                      {canRespond ? <RescheduleResponseForm requestId={request.id} /> : null}
-                    </div>
-                  </Card>
+                        {request.responseNote ? (
+                          <p className="mt-2 text-sm">
+                            <span className="font-medium">Opponent note:</span>{" "}
+                            {request.responseNote}
+                          </p>
+                        ) : null}
+                        {request.adminReviewNote ? (
+                          <p className="mt-2 text-sm">
+                            <span className="font-medium">League note:</span>{" "}
+                            {request.adminReviewNote}
+                          </p>
+                        ) : null}
+                        {isProposingCaptain &&
+                        request.status === "PENDING_OPPONENT" &&
+                        request.proposedKickoffAt ? (
+                          <>
+                            <RescheduleRevisionForm
+                              requestId={request.id}
+                              slots={[
+                                ...(request.slotId
+                                  ? [
+                                      {
+                                        id: request.slotId,
+                                        label: `${formatDateTime(request.proposedKickoffAt)} — ${request.proposedVenueName ?? "TBD"} (current)`,
+                                      },
+                                    ]
+                                  : []),
+                                ...slotOptions.filter((slot) => slot.id !== request.slotId),
+                              ]}
+                              selectedSlotId={request.slotId ?? undefined}
+                              reason={request.reason}
+                            />
+                            <RescheduleCancelForm requestId={request.id} />
+                          </>
+                        ) : null}
+                        {canRespond ? <RescheduleResponseForm requestId={request.id} /> : null}
+                      </div>
+                    </Card>
+                  </MatchDisclosureStack>
                 </div>
               );
             })}

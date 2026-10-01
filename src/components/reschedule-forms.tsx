@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import {
@@ -18,11 +18,13 @@ function Submit({
   variant = "primary",
   name,
   value,
+  disabled = false,
 }: {
   children: React.ReactNode;
   variant?: "primary" | "secondary" | "danger" | "success";
   name?: string;
   value?: string;
+  disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
   return (
@@ -30,7 +32,7 @@ function Submit({
       type="submit"
       name={name}
       value={value}
-      disabled={pending}
+      disabled={pending || disabled}
       className={buttonClass(variant)}
     >
       {pending ? "Working\u2026" : children}
@@ -83,10 +85,18 @@ function RescheduleFields({
   slots,
   selectedSlotId,
   reason,
+  slotValue,
+  reasonValue,
+  onSlotChange,
+  onReasonChange,
 }: {
   slots: RescheduleSlotOption[];
   selectedSlotId?: string;
   reason?: string;
+  slotValue?: string;
+  reasonValue?: string;
+  onSlotChange?: (value: string) => void;
+  onReasonChange?: (value: string) => void;
 }) {
   return (
     <>
@@ -97,7 +107,13 @@ function RescheduleFields({
         <select
           id={`reschedule-slot-${selectedSlotId ?? "new"}`}
           name="slotId"
-          defaultValue={selectedSlotId ?? ""}
+          {...(onSlotChange
+            ? {
+                value: slotValue ?? "",
+                onChange: (event: React.ChangeEvent<HTMLSelectElement>) =>
+                  onSlotChange(event.target.value),
+              }
+            : { defaultValue: selectedSlotId ?? "" })}
           className={inputClass}
           required
         >
@@ -118,7 +134,13 @@ function RescheduleFields({
         <textarea
           id={`reschedule-reason-${selectedSlotId ?? "new"}`}
           name="reason"
-          defaultValue={reason}
+          {...(onReasonChange
+            ? {
+                value: reasonValue ?? "",
+                onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) =>
+                  onReasonChange(event.target.value),
+              }
+            : { defaultValue: reason })}
           maxLength={MAX_RESCHEDULE_REASON_LENGTH}
           rows={3}
           className={inputClass}
@@ -141,12 +163,27 @@ export function RescheduleRevisionForm({
   reason: string;
 }) {
   const [state, action] = useActionState(reviseRescheduleAction, {});
+  const [slotId, setSlotId] = useState(selectedSlotId ?? "");
+  const [revisedReason, setRevisedReason] = useState(reason);
+  const changed = slotId !== (selectedSlotId ?? "") || revisedReason.trim() !== reason.trim();
+  const ready = changed && slotId !== "" && revisedReason.trim() !== "";
+
   return (
     <form action={action} className="mt-4 space-y-3 border-t border-current/10 pt-4">
       <input type="hidden" name="requestId" value={requestId} />
       <Feedback state={state} />
-      <RescheduleFields slots={slots} selectedSlotId={selectedSlotId} reason={reason} />
-      <Submit variant="secondary">Revise proposal</Submit>
+      <RescheduleFields
+        slots={slots}
+        selectedSlotId={selectedSlotId}
+        reason={reason}
+        slotValue={slotId}
+        reasonValue={revisedReason}
+        onSlotChange={setSlotId}
+        onReasonChange={setRevisedReason}
+      />
+      <Submit variant="secondary" disabled={!ready}>
+        Revise proposal
+      </Submit>
     </form>
   );
 }
