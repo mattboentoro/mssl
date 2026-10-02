@@ -212,6 +212,8 @@ describe("score appeal form UI", () => {
     expect(matchDisplay).toContain('"premier league": DIVISION_COLOR_CLASSES[0]');
     expect(matchDisplay).toContain('"first division": DIVISION_COLOR_CLASSES[1]');
     expect(matchDisplay).toContain("divisionColorClass(match.division.name)");
+    expect(matchDisplay).toContain("homeColor={resolveKit(match.homeTeam, match.homeKit)}");
+    expect(matchDisplay).toContain("awayColor={resolveKit(match.awayTeam, match.awayKit)}");
     expect(matchDisplay).toContain("topRight={`MW ${match.matchweek}`}");
     expect(matchDisplay).toContain("<MatchKitColors");
     expect(results).toContain("<MatchHeadToHead");

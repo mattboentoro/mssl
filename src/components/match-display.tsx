@@ -88,21 +88,44 @@ export function MatchScore({
   home,
   away,
   label = "Score",
+  homeColor,
+  awayColor,
 }: {
   home: number;
   away: number;
   label?: string;
+  homeColor?: string;
+  awayColor?: string;
 }) {
   return (
     <span
-      className="bg-surface-muted border-subtle inline-flex items-center rounded-lg border px-3 py-2 text-base font-bold tabular-nums shadow-sm sm:px-5 sm:py-2.5 sm:text-xl"
+      className="bg-surface-muted border-subtle inline-flex flex-col items-center rounded-lg border px-3 py-2 text-base font-bold tabular-nums shadow-sm sm:px-5 sm:py-2.5 sm:text-xl"
       aria-label={`${label}: ${home} to ${away}`}
     >
-      {home}
-      <span className="text-muted mx-3" aria-hidden>
-        &ndash;
+      <span>
+        {home}
+        <span className="text-muted mx-3" aria-hidden>
+          &ndash;
+        </span>
+        {away}
       </span>
-      {away}
+      {homeColor && awayColor ? (
+        <span
+          className="mt-1.5 flex items-center gap-2"
+          aria-label={`Played colors: ${kitColorName(homeColor)} and ${kitColorName(awayColor)}`}
+        >
+          <span
+            aria-hidden
+            className="h-1.5 w-7 rounded-sm ring-1 ring-black/20 dark:ring-white/25"
+            style={{ backgroundColor: homeColor }}
+          />
+          <span
+            aria-hidden
+            className="h-1.5 w-7 rounded-sm ring-1 ring-black/20 dark:ring-white/25"
+            style={{ backgroundColor: awayColor }}
+          />
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -227,7 +250,12 @@ export function MatchRow({ match, action }: { match: MatchListItem; action?: Rea
         }}
         center={
           score ? (
-            <MatchScore home={score.home} away={score.away} />
+            <MatchScore
+              home={score.home}
+              away={score.away}
+              homeColor={resolveKit(match.homeTeam, match.homeKit)}
+              awayColor={resolveKit(match.awayTeam, match.awayKit)}
+            />
           ) : (
             <MatchKitColors
               homeTeam={match.homeTeam}
