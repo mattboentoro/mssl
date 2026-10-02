@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { forbidden, redirect } from "next/navigation";
 
+import { MatchHeadToHead, MatchKitColors, MatchScore } from "@/components/match-display";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
 import { AuthzError, requireCaptain } from "@/lib/authz";
 import { listCaptainResultMatches } from "@/lib/captain-results";
@@ -46,38 +47,62 @@ export default async function CaptainResultsPage() {
         <div className="space-y-3">
           {matches.map((match) => {
             const eligible = !match.refereeId && !match.report && match.status === "SCHEDULED";
+            const score = match.report
+              ? { home: match.report.homeScore, away: match.report.awayScore }
+              : match.resultProposal
+                ? {
+                    home: match.resultProposal.homeScore,
+                    away: match.resultProposal.awayScore,
+                  }
+                : null;
             return (
               <Card key={match.id} className="p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-muted text-xs">{formatDateTime(match.kickoffAt)}</p>
-                    <h2 className="font-semibold">
-                      {match.homeTeam.name} v {match.awayTeam.name}
-                    </h2>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {match.resultProposal ? (
+                <MatchHeadToHead
+                  home={{ name: match.homeTeam.name }}
+                  away={{ name: match.awayTeam.name }}
+                  center={
+                    score ? (
+                      <MatchScore home={score.home} away={score.away} />
+                    ) : (
+                      <MatchKitColors
+                        homeTeam={match.homeTeam}
+                        awayTeam={match.awayTeam}
+                        homeKit={match.homeKit}
+                        awayKit={match.awayKit}
+                      />
+                    )
+                  }
+                  topLeft={match.division.name}
+                  topRight={`MW ${match.matchweek}`}
+                  time={formatDateTime(match.kickoffAt)}
+                  status={
+                    match.resultProposal ? (
                       <Badge>
                         {labels[match.resultProposal.status] ?? match.resultProposal.status}
                       </Badge>
-                    ) : null}
-                    {eligible ? (
-                      <Link
-                        className="text-accent text-sm font-semibold hover:underline"
-                        href={`/captain/results/${match.id}`}
-                      >
-                        {match.resultProposal ? "View proposal" : "Enter result"} &rarr;
-                      </Link>
-                    ) : (
-                      <span className="text-muted text-xs">
-                        {match.report
-                          ? "Official result filed"
-                          : match.refereeId
-                            ? "Referee assigned"
-                            : "Unavailable"}
-                      </span>
-                    )}
-                  </div>
+                    ) : match.report ? (
+                      <Badge tone="success">Official</Badge>
+                    ) : null
+                  }
+                  location={<>&#128205; {match.venueName ?? "TBD"}</>}
+                />
+                <div className="mt-3 text-center">
+                  {eligible ? (
+                    <Link
+                      className="text-accent text-sm font-semibold hover:underline"
+                      href={`/captain/results/${match.id}`}
+                    >
+                      {match.resultProposal ? "View proposal" : "Enter result"} &rarr;
+                    </Link>
+                  ) : (
+                    <span className="text-muted text-xs">
+                      {match.report
+                        ? "Official result filed"
+                        : match.refereeId
+                          ? "Referee assigned"
+                          : "Unavailable"}
+                    </span>
+                  )}
                 </div>
               </Card>
             );

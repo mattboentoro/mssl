@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { forbidden, notFound, redirect } from "next/navigation";
 
 import { CaptainResultForm, CaptainResultResponseForm } from "@/components/captain-result-form";
+import { MatchHeadToHead, MatchKitColors, MatchScore } from "@/components/match-display";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { AuthzError, requireParticipantCaptain } from "@/lib/authz";
 import { formatDateTime } from "@/lib/dates";
@@ -24,7 +25,13 @@ export default async function CaptainResultPage({ params }: { params: Promise<{ 
   }
   const match = await prisma.match.findUnique({
     where: { id },
-    include: { homeTeam: true, awayTeam: true, report: true, resultProposal: true },
+    include: {
+      homeTeam: true,
+      awayTeam: true,
+      division: { select: { name: true } },
+      report: true,
+      resultProposal: true,
+    },
   });
   if (!match) notFound();
   const proposal = match.resultProposal;
@@ -46,21 +53,37 @@ export default async function CaptainResultPage({ params }: { params: Promise<{ 
         description={formatDateTime(match.kickoffAt)}
       />
       <Card className="p-6">
+        <MatchHeadToHead
+          home={{
+            name: match.homeTeam.name,
+            forfeited: Boolean(proposal?.homeForfeit),
+          }}
+          away={{
+            name: match.awayTeam.name,
+            forfeited: Boolean(proposal?.awayForfeit),
+          }}
+          center={
+            proposal ? (
+              <MatchScore home={proposal.homeScore} away={proposal.awayScore} />
+            ) : (
+              <MatchKitColors
+                homeTeam={match.homeTeam}
+                awayTeam={match.awayTeam}
+                homeKit={match.homeKit}
+                awayKit={match.awayKit}
+              />
+            )
+          }
+          topLeft={match.division.name}
+          topRight={`MW ${match.matchweek}`}
+          time={formatDateTime(match.kickoffAt)}
+          status={proposal ? <Badge>{proposal.status.replaceAll("_", " ")}</Badge> : undefined}
+          location={<>&#128205; {match.venueName ?? "TBD"}</>}
+        />
         {proposal ? (
           <>
-            <div className="flex flex-wrap items-center gap-3">
-              <p className="text-2xl font-bold tabular-nums">
-                {proposal.homeScore}–{proposal.awayScore}
-              </p>
-              <Badge>{proposal.status.replaceAll("_", " ")}</Badge>
-            </div>
-            {proposal.homeForfeit || proposal.awayForfeit ? (
-              <p className="text-danger mt-2 text-sm">
-                {proposal.homeForfeit ? match.homeTeam.name : match.awayTeam.name} forfeited.
-              </p>
-            ) : null}
             {proposal.notes ? (
-              <p className="text-muted mt-3 whitespace-pre-wrap">{proposal.notes}</p>
+              <p className="text-muted mt-4 text-center whitespace-pre-wrap">{proposal.notes}</p>
             ) : null}
             {canRespond ? (
               <CaptainResultResponseForm matchId={id} proposalId={proposal.id} />

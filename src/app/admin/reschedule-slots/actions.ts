@@ -5,7 +5,13 @@ import { revalidatePath } from "next/cache";
 import { AuthzError, requireAdmin } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import {
+  parseRescheduleSlotWorkbook,
+  RescheduleSlotImportError,
+} from "@/lib/reschedule-slot-import";
+import {
   createRescheduleSlot,
+  createRescheduleSlots,
+  deleteRescheduleSlot,
   RescheduleSlotError,
   setRescheduleSlotAvailability,
   updateRescheduleSlot,
@@ -40,7 +46,11 @@ function refresh() {
 }
 
 function failure(error: unknown): RescheduleSlotActionState {
-  if (error instanceof AuthzError || error instanceof RescheduleSlotError) {
+  if (
+    error instanceof AuthzError ||
+    error instanceof RescheduleSlotError ||
+    error instanceof RescheduleSlotImportError
+  ) {
     return { error: error.message };
   }
   console.error("[reschedule-slot] action failed", error);
@@ -60,6 +70,37 @@ export async function createRescheduleSlotAction(
     });
     refresh();
     return { ok: "Reschedule slot added." };
+  } catch (error) {
+    return failure(error);
+  }
+}
+
+export async function importRescheduleSlotsAction(
+  _state: RescheduleSlotActionState,
+  form: FormData,
+): Promise<RescheduleSlotActionState> {
+  try {
+    const user = await requireAdmin();
+    const workbook = form.get("workbook");
+    if (!(workbook instanceof File) || workbook.size === 0) {
+      return { error: "Choose an .xlsx workbook to import." };
+    }
+    if (!workbook.name.toLowerCase().endsWith(".xlsx")) {
+      return { error: "Only .xlsx workbooks are supported." };
+    }
+    if (workbook.size > 5 * 1024 * 1024) {
+      return { error: "The workbook must be 5 MB or smaller." };
+    }
+
+    const slots = await parseRescheduleSlotWorkbook(Buffer.from(await workbook.arrayBuffer()));
+    const result = await createRescheduleSlots(prisma, {
+      slots,
+      actor: actor(user),
+    });
+    refresh();
+    return {
+      ok: `${result.count} availability ${result.count === 1 ? "slot" : "slots"} imported.`,
+    };
   } catch (error) {
     return failure(error);
   }
@@ -98,6 +139,23 @@ export async function setRescheduleSlotAvailabilityAction(
     });
     refresh();
     return { ok: value(form, "available") === "true" ? "Slot enabled." : "Slot disabled." };
+  } catch (error) {
+    return failure(error);
+  }
+}
+
+export async function deleteRescheduleSlotAction(
+  _state: RescheduleSlotActionState,
+  form: FormData,
+): Promise<RescheduleSlotActionState> {
+  try {
+    const user = await requireAdmin();
+    await deleteRescheduleSlot(prisma, {
+      slotId: value(form, "slotId"),
+      actor: actor(user),
+    });
+    refresh();
+    return { ok: "Slot deleted." };
   } catch (error) {
     return failure(error);
   }

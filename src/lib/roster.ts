@@ -511,6 +511,7 @@ export async function createRosterInvitation(
       data: {
         seasonId: input.seasonId,
         teamId: input.teamId,
+        freeAgentRequestId: freeAgentRequest?.id,
         invitedById: actor.id,
         invitedUserId: invitedUser.id,
         email: email.trim(),
@@ -518,6 +519,12 @@ export async function createRosterInvitation(
         message: cleanMessage(input.message),
       },
     });
+    if (freeAgentRequest) {
+      await tx.freeAgentRequest.update({
+        where: { id: freeAgentRequest.id },
+        data: { status: "CONTACTED" },
+      });
+    }
     if (invitedUser.status === "ACTIVE") {
       await notify(tx, [invitedUser.id], {
         type: "ROSTER_INVITATION",
@@ -601,7 +608,7 @@ export async function respondToRosterInvitation(
     const actor = await actorFor(tx, input.actorId);
     const invitation = await tx.rosterInvitation.findUnique({
       where: { id: input.invitationId },
-      include: { team: true, season: true, invitedBy: { select: { email: true } } },
+      include: { team: true, season: true },
     });
     if (!invitation) throw new RosterError("That invitation does not exist.", 404, "NOT_FOUND");
     if (
@@ -636,61 +643,39 @@ export async function respondToRosterInvitation(
       },
     });
     if (input.decision === "ACCEPTED") {
-      const placementAudit = await tx.auditLog.findFirst({
-        where: {
-          action: "free_agent.placement.invited",
-          entity: "RosterInvitation",
-          entityId: invitation.id,
-        },
-        select: { metadata: true },
-      });
-      if (placementAudit?.metadata) {
-        let freeAgentRequestId: string | undefined;
-        try {
-          const metadata = JSON.parse(placementAudit.metadata) as {
-            freeAgentRequestId?: unknown;
-          };
-          if (typeof metadata.freeAgentRequestId === "string") {
-            freeAgentRequestId = metadata.freeAgentRequestId;
-          }
-        } catch {
-          // A malformed historical audit row must not break roster acceptance.
-        }
-        if (freeAgentRequestId) {
-          const placed = await tx.freeAgentRequest.updateMany({
-            where: {
-              id: freeAgentRequestId,
-              submittedByEmail: invitation.normalizedEmail,
-              status: { in: ["PENDING", "CONTACTED"] },
-            },
-            data: {
-              status: "PLACED",
-              reviewedAt: new Date(),
-              reviewedByEmail: invitation.invitedBy.email,
+      const freeAgentRequestId = invitation.freeAgentRequestId;
+      if (freeAgentRequestId) {
+        const requestUpdated = await tx.freeAgentRequest.updateMany({
+          where: {
+            id: freeAgentRequestId,
+            submittedByEmail: invitation.normalizedEmail,
+            status: { in: ["PENDING", "CONTACTED"] },
+          },
+          data: {
+            status: "CONTACTED",
+          },
+        });
+        if (requestUpdated.count === 1) {
+          const coCaptains = (await captainIds(tx, invitation)).filter(
+            (id) => id !== invitation.invitedById,
+          );
+          await notify(tx, coCaptains, {
+            type: "FREE_AGENT_PLACED",
+            title: `${actor.displayName} joined ${invitation.team.name}`,
+            body: `The free-agent roster invitation was accepted for ${invitation.season.name}.`,
+            href: "/captain/roster",
+          });
+          await writeAudit(tx, {
+            actor: auditActor(actor, "player"),
+            action: "free_agent.placement.accepted",
+            entity: "FreeAgentRequest",
+            entityId: freeAgentRequestId,
+            metadata: {
+              invitationId: invitation.id,
+              teamId: invitation.teamId,
+              seasonId: invitation.seasonId,
             },
           });
-          if (placed.count === 1) {
-            const coCaptains = (await captainIds(tx, invitation)).filter(
-              (id) => id !== invitation.invitedById,
-            );
-            await notify(tx, coCaptains, {
-              type: "FREE_AGENT_PLACED",
-              title: `${actor.displayName} joined ${invitation.team.name}`,
-              body: `The free-agent roster invitation was accepted for ${invitation.season.name}.`,
-              href: "/captain/roster",
-            });
-            await writeAudit(tx, {
-              actor: auditActor(actor, "player"),
-              action: "free_agent.placement.accepted",
-              entity: "FreeAgentRequest",
-              entityId: freeAgentRequestId,
-              metadata: {
-                invitationId: invitation.id,
-                teamId: invitation.teamId,
-                seasonId: invitation.seasonId,
-              },
-            });
-          }
         }
       }
     }

@@ -158,7 +158,7 @@ export default async function HomePage() {
           <ButtonLink href="/standings" variant="secondary">
             Standings
           </ButtonLink>
-          <ButtonLink href={personalizedHref} variant="secondary">
+          <ButtonLink href={personalizedHref} variant={team ? "secondary" : "danger"}>
             {personalizedLabel}
           </ButtonLink>
         </div>

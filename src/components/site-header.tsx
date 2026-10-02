@@ -48,7 +48,6 @@ export function SiteHeader({ user }: { user: HeaderUser | null }) {
   if (user?.canSignUpAsFreeAgent) {
     links.push({ href: "/free-agents", label: "Sign up as free agent" });
   }
-  if (user?.isPlayer) links.push({ href: "/player", label: "Player" });
   if (user?.isCaptain) links.push({ href: "/captain", label: "Captain" });
   if (user?.isReferee) links.push({ href: "/referee", label: "Referee" });
   if (user?.isAdmin) links.push({ href: "/admin/matches", label: "Admin" });
@@ -106,7 +105,7 @@ export function SiteHeader({ user }: { user: HeaderUser | null }) {
           <AccountChip user={user} />
           <button
             type="button"
-            className="border-subtle hover:bg-surface-muted inline-flex h-9 w-9 items-center justify-center rounded-lg border lg:hidden"
+            className="bg-surface-muted border-subtle hover:bg-brand/10 active:bg-brand/20 inline-flex h-9 w-9 items-center justify-center rounded-lg border shadow-sm lg:hidden"
             aria-expanded={open}
             aria-controls="mobile-nav"
             aria-label="Toggle navigation"
@@ -172,7 +171,7 @@ function AccountChip({ user }: { user: HeaderUser | null }) {
       user.isPlayer ? "Player" : null,
     ]
       .filter(Boolean)
-      .join(" + ") || "Viewer";
+      .join(" + ") || "Account";
 
   return (
     <Link

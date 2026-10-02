@@ -5,10 +5,13 @@ import { useFormStatus } from "react-dom";
 
 import {
   createRescheduleSlotAction,
+  deleteRescheduleSlotAction,
+  importRescheduleSlotsAction,
   setRescheduleSlotAvailabilityAction,
   updateRescheduleSlotAction,
   type RescheduleSlotActionState,
 } from "@/app/admin/reschedule-slots/actions";
+import { SubmitButton } from "@/components/admin-forms";
 import { Alert, buttonClass, inputClass, labelClass } from "@/components/ui";
 
 function Submit({
@@ -65,6 +68,41 @@ export function CreateRescheduleSlotForm() {
         />
       </div>
       <Submit>Add slot</Submit>
+    </form>
+  );
+}
+
+export function ImportRescheduleSlotsForm() {
+  const [state, action] = useActionState(importRescheduleSlotsAction, {});
+
+  return (
+    <form action={action} className="grid gap-3">
+      <div>
+        <h2 className="text-ink text-lg font-semibold">Import Excel workbook</h2>
+        <p className="text-muted mt-1 text-sm">
+          Upload an .xlsx file with date, time, and venue headers. Times are interpreted in Pacific
+          time. Up to 500 rows can be imported at once.
+        </p>
+      </div>
+      <label className={labelClass}>
+        Excel workbook
+        <input
+          className={`${inputClass} mt-1`}
+          type="file"
+          name="workbook"
+          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          required
+        />
+      </label>
+      <p className="text-muted text-xs">
+        Example: <span className="text-ink font-semibold">date</span> 8/12/2026,{" "}
+        <span className="text-ink font-semibold">time</span> 6:30 PM,{" "}
+        <span className="text-ink font-semibold">venue</span> Marymoor Park.
+      </p>
+      <div className="w-fit">
+        <Submit>Import availability</Submit>
+      </div>
+      <Feedback state={state} />
     </form>
   );
 }
@@ -130,6 +168,22 @@ export function RescheduleSlotAvailabilityForm({
       <input type="hidden" name="available" value={String(enable)} />
       <Feedback state={state} />
       <Submit variant={enable ? "secondary" : "danger"}>{enable ? "Enable" : "Disable"}</Submit>
+    </form>
+  );
+}
+
+export function DeleteRescheduleSlotForm({ slotId }: { slotId: string }) {
+  const [state, action] = useActionState(deleteRescheduleSlotAction, {});
+  return (
+    <form action={action} className="space-y-2">
+      <input type="hidden" name="slotId" value={slotId} />
+      <Feedback state={state} />
+      <SubmitButton
+        variant="danger"
+        confirm="Delete this disabled availability slot permanently? This cannot be undone."
+      >
+        Delete
+      </SubmitButton>
     </form>
   );
 }

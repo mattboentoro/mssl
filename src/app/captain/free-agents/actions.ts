@@ -21,9 +21,9 @@ export async function placeFreeAgentAction(
       requestId: value(form, "requestId"),
       seasonId: value(form, "seasonId"),
       teamId: value(form, "teamId"),
-      message: value(form, "message"),
     });
     revalidatePath("/captain/free-agents");
+    revalidatePath("/admin/free-agents");
     revalidatePath("/captain/roster");
     revalidatePath("/roster");
     return { ok: "Roster invitation sent. The request stays open until the player accepts." };

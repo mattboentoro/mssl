@@ -39,6 +39,8 @@ function refreshRoster() {
   revalidatePath("/captain");
   revalidatePath("/captain/roster");
   revalidatePath("/admin/roster");
+  revalidatePath("/captain/free-agents");
+  revalidatePath("/admin/free-agents");
 }
 
 async function run(operation: () => Promise<unknown>, success: string): Promise<RosterActionState> {

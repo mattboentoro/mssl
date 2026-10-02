@@ -1,28 +1,127 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { signOut } from "@/auth";
-import { Alert, Badge, Button, Card, PageHeader } from "@/components/ui";
+import { Alert, Badge, Button, ButtonLink, Card, EmptyState, PageHeader } from "@/components/ui";
 import { getCurrentUser, getRefereeForUser } from "@/lib/authz";
+import {
+  CARD_LABELS,
+  DISCIPLINARY_SOURCE_LABELS,
+  SUSPENSION_REASON_LABELS,
+  type CardType,
+  type DisciplinarySource,
+  type SuspensionReason,
+} from "@/lib/enums";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = { title: "Your account" };
 export const dynamic = "force-dynamic";
 
+function normalizedPlayerName(value: string | null | undefined) {
+  return (
+    value
+      ?.replace(/\s*\(dev[^)]*\)\s*$/i, "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLowerCase() ?? ""
+  );
+}
+
 export default async function AccountPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/signin?callbackUrl=/account");
 
-  const referee = await getRefereeForUser(user);
-  const teams =
-    user.teamContexts.length > 0
-      ? await prisma.team.findMany({
-          where: { id: { in: [...new Set(user.teamContexts.map((context) => context.teamId))] } },
-          select: { id: true, name: true },
-        })
+  const [referee, memberships, captainAssignments] = await Promise.all([
+    getRefereeForUser(user),
+    prisma.teamMembership.findMany({
+      where: { userId: user.appUserId },
+      include: {
+        season: { select: { id: true, name: true, startsOn: true, endsOn: true } },
+        team: { select: { id: true, name: true } },
+      },
+      orderBy: [{ season: { startsOn: "desc" } }, { team: { name: "asc" } }],
+    }),
+    prisma.teamCaptain.findMany({
+      where: {
+        userId: user.appUserId,
+        status: "ACTIVE",
+        revokedAt: null,
+        seasonId: { not: null },
+      },
+      include: {
+        season: { select: { id: true, name: true, startsOn: true, endsOn: true } },
+        team: { select: { id: true, name: true } },
+      },
+    }),
+  ]);
+  const captainKeys = new Set(
+    captainAssignments.map((assignment) => `${assignment.seasonId}:${assignment.teamId}`),
+  );
+  const historyByTeam = new Map(
+    memberships.map((membership) => [
+      `${membership.seasonId}:${membership.teamId}`,
+      {
+        id: membership.id,
+        seasonId: membership.seasonId,
+        teamId: membership.teamId,
+        season: membership.season,
+        team: membership.team,
+        current: membership.status === "ACTIVE" && !membership.endedAt,
+        captain: captainKeys.has(`${membership.seasonId}:${membership.teamId}`),
+      },
+    ]),
+  );
+  for (const assignment of captainAssignments) {
+    if (!assignment.season) continue;
+    const key = `${assignment.seasonId}:${assignment.teamId}`;
+    if (!historyByTeam.has(key)) {
+      historyByTeam.set(key, {
+        id: `captain:${assignment.id}`,
+        seasonId: assignment.season.id,
+        teamId: assignment.teamId,
+        season: assignment.season,
+        team: assignment.team,
+        current: true,
+        captain: true,
+      });
+    }
+  }
+  const teamHistory = [...historyByTeam.values()].sort(
+    (left, right) =>
+      right.season.startsOn.getTime() - left.season.startsOn.getTime() ||
+      left.team.name.localeCompare(right.team.name),
+  );
+  const historyContexts = teamHistory.map(({ seasonId, teamId }) => ({ seasonId, teamId }));
+  const accountPlayerName = normalizedPlayerName(user.name);
+  const discipline =
+    accountPlayerName && historyContexts.length
+      ? (
+          await prisma.disciplinaryAction.findMany({
+            where: { OR: historyContexts },
+            include: {
+              match: {
+                select: {
+                  matchweek: true,
+                  homeTeam: { select: { shortName: true } },
+                  awayTeam: { select: { shortName: true } },
+                },
+              },
+            },
+            orderBy: { createdAt: "desc" },
+          })
+        ).filter((action) => normalizedPlayerName(action.playerName) === accountPlayerName)
       : [];
-  const teamNames = new Map(teams.map((team) => [team.id, team.name]));
+  const disciplineByMembership = new Map<string, typeof discipline>();
+  for (const action of discipline) {
+    const key = `${action.seasonId}:${action.teamId}`;
+    const records = disciplineByMembership.get(key);
+    if (records) records.push(action);
+    else disciplineByMembership.set(key, [action]);
+  }
+  const seasons = [
+    ...new Map(teamHistory.map((entry) => [entry.seasonId, entry.season])).values(),
+  ];
+  const visibleRoles = user.roles.filter((role) => role !== "viewer" && role !== "public");
 
   async function doSignOut() {
     "use server";
@@ -33,7 +132,8 @@ export default async function AccountPage() {
     <div className="mx-auto max-w-2xl">
       <PageHeader
         title="Your account"
-        description="What the server currently believes about you."
+        description="Your identity, league access, and playing history."
+        actions={<ButtonLink href="/roster">My roster</ButtonLink>}
       />
 
       {user.isDevBypass ? (
@@ -57,24 +157,6 @@ export default async function AccountPage() {
             <dt className="text-muted text-xs font-semibold uppercase">Name</dt>
             <dd className="mt-1">{user.name ?? "\u2014"}</dd>
           </div>
-          <div className="sm:col-span-2">
-            <dt className="text-muted text-xs font-semibold uppercase">Team contexts</dt>
-            <dd className="mt-1 text-sm">
-              {user.teamContexts.length ? (
-                <ul className="flex flex-wrap gap-2">
-                  {user.teamContexts.map((context) => (
-                    <li key={`${context.role}-${context.seasonId}-${context.teamId}`}>
-                      <Badge tone="neutral">
-                        {context.role}: {teamNames.get(context.teamId) ?? context.teamId}
-                      </Badge>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <span className="text-muted">None</span>
-              )}
-            </dd>
-          </div>
           <div>
             <dt className="text-muted text-xs font-semibold uppercase">Email</dt>
             <dd className="mt-1 font-mono text-sm break-all">{user.email ?? "\u2014"}</dd>
@@ -82,14 +164,18 @@ export default async function AccountPage() {
           <div>
             <dt className="text-muted text-xs font-semibold uppercase">Roles</dt>
             <dd className="mt-1 flex flex-wrap gap-2">
-              {user.roles.map((role) => (
-                <Badge
-                  key={role}
-                  tone={role === "admin" ? "accent" : role === "referee" ? "brand" : "neutral"}
-                >
-                  {role}
-                </Badge>
-              ))}
+              {visibleRoles.length ? (
+                visibleRoles.map((role) => (
+                  <Badge
+                    key={role}
+                    tone={role === "admin" ? "accent" : role === "referee" ? "brand" : "neutral"}
+                  >
+                    {role}
+                  </Badge>
+                ))
+              ) : (
+                <span className="text-muted text-sm">Standard account</span>
+              )}
             </dd>
           </div>
           <div>
@@ -106,33 +192,123 @@ export default async function AccountPage() {
             </dd>
           </div>
         </dl>
-
-        <div className="mt-6 flex flex-wrap gap-3">
-          {user.isPlayer ? (
-            <Link href="/player" className="text-accent text-sm font-medium hover:underline">
-              Go to Player dashboard &rarr;
-            </Link>
-          ) : null}
-          {user.isCaptain ? (
-            <Link href="/captain" className="text-accent text-sm font-medium hover:underline">
-              Go to Captain dashboard &rarr;
-            </Link>
-          ) : null}
-          {user.isReferee ? (
-            <Link href="/referee" className="text-accent text-sm font-medium hover:underline">
-              Go to Referee Control &rarr;
-            </Link>
-          ) : null}
-          {user.isAdmin ? (
-            <Link href="/admin/matches" className="text-accent text-sm font-medium hover:underline">
-              Go to Match Control &rarr;
-            </Link>
-          ) : null}
-        </div>
       </Card>
 
+      <section className="mt-8" aria-labelledby="season-overview">
+        <h2 id="season-overview" className="mb-3 text-xl font-semibold">
+          Seasons played
+        </h2>
+        {seasons.length ? (
+          <div className="space-y-3">
+            {seasons.map((season) => {
+              const seasonMemberships = teamHistory.filter(
+                (entry) => entry.seasonId === season.id,
+              );
+              const seasonDiscipline = seasonMemberships.flatMap(
+                (membership) =>
+                  disciplineByMembership.get(`${membership.seasonId}:${membership.teamId}`) ?? [],
+              );
+              return (
+                <Card as="details" key={season.id} className="group overflow-hidden">
+                  <summary className="hover:bg-surface-muted cursor-pointer list-none p-5 transition">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h3 className="font-semibold">{season.name}</h3>
+                        <p className="text-muted mt-1 text-sm">
+                          {seasonMemberships.map((membership) => membership.team.name).join(", ")}
+                        </p>
+                      </div>
+                      <Badge tone={seasonDiscipline.length ? "warning" : "neutral"}>
+                        {seasonDiscipline.length} discipline{" "}
+                        {seasonDiscipline.length === 1 ? "record" : "records"}
+                      </Badge>
+                    </div>
+                  </summary>
+                  <div className="border-subtle space-y-5 border-t p-5">
+                    {seasonMemberships.map((membership) => {
+                      const records =
+                        disciplineByMembership.get(`${membership.seasonId}:${membership.teamId}`) ??
+                        [];
+                      return (
+                        <section key={membership.id}>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <h4 className="font-semibold">{membership.team.name}</h4>
+                            <div className="flex flex-wrap gap-2">
+                              {membership.captain ? <Badge tone="brand">Captain</Badge> : null}
+                              <Badge tone={membership.current ? "success" : "neutral"}>
+                                {membership.current ? "Current team" : "Former roster"}
+                              </Badge>
+                            </div>
+                          </div>
+                          {records.length ? (
+                            <ul className="mt-3 space-y-2">
+                              {records.map((action) => (
+                                <li
+                                  key={action.id}
+                                  className="bg-surface-muted rounded-lg p-3 text-sm"
+                                >
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <Badge tone={action.type === "RED" ? "danger" : "warning"}>
+                                      {CARD_LABELS[action.type as CardType] ?? action.type}
+                                    </Badge>
+                                    {action.suspensionReason ? (
+                                      <Badge tone="danger">
+                                        {SUSPENSION_REASON_LABELS[
+                                          action.suspensionReason as SuspensionReason
+                                        ] ?? action.suspensionReason}
+                                        {action.gamesSuspended
+                                          ? ` · ${action.gamesSuspended} game${action.gamesSuspended === 1 ? "" : "s"}`
+                                          : ""}
+                                      </Badge>
+                                    ) : null}
+                                    <span className="text-muted text-xs">
+                                      {DISCIPLINARY_SOURCE_LABELS[
+                                        action.issuedBy as DisciplinarySource
+                                      ] ?? action.issuedBy}
+                                      {action.match
+                                        ? ` · MW ${action.match.matchweek} ${action.match.homeTeam.shortName} v ${action.match.awayTeam.shortName}`
+                                        : ""}
+                                    </span>
+                                  </div>
+                                  <p className="mt-2">
+                                    {action.note ??
+                                      (action.suspensionReason
+                                        ? "No additional reason was recorded."
+                                        : "No suspension or additional action recorded.")}
+                                  </p>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-muted mt-2 text-sm">
+                              No disciplinary actions recorded for this team and season.
+                            </p>
+                          )}
+                        </section>
+                      );
+                    })}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        ) : (
+          <Card className="p-6">
+            <EmptyState
+              title="No team history yet"
+              hint="Season and team history appears after you join a roster."
+            />
+          </Card>
+        )}
+        {teamHistory.length ? (
+          <p className="text-muted mt-3 text-xs">
+            Discipline includes records filed under your player name during that season.
+          </p>
+        ) : null}
+      </section>
+
       <form action={doSignOut} className="mt-6">
-        <Button type="submit" variant="secondary">
+        <Button type="submit" variant="danger">
           Sign out
         </Button>
       </form>

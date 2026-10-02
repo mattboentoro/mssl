@@ -131,9 +131,6 @@ export async function submitFreeAgentRequest(
           ? {
               ...answers,
               status: "PENDING",
-              reviewNote: null,
-              reviewedAt: null,
-              reviewedByEmail: null,
             }
           : answers,
       })
@@ -156,6 +153,7 @@ export async function submitFreeAgentRequest(
 
   revalidatePath("/free-agents");
   revalidatePath("/admin/free-agents");
+  revalidatePath("/captain/free-agents");
 
   return {
     ok: existing
@@ -192,6 +190,7 @@ export async function withdrawFreeAgentRequest(
 
   revalidatePath("/free-agents");
   revalidatePath("/admin/free-agents");
+  revalidatePath("/captain/free-agents");
 
   return { ok: "Your request has been withdrawn." };
 }

@@ -138,6 +138,15 @@ export default async function AdminMatchesPage({
           <form method="get" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
             <input type="hidden" name="view" value={view} />
             {params.month ? <input type="hidden" name="month" value={params.month} /> : null}
+            <Field label="Search" htmlFor="q">
+              <input
+                id="q"
+                name="q"
+                defaultValue={params.q ?? ""}
+                placeholder="Team name"
+                className={inputClass}
+              />
+            </Field>
             <Field label="Season" htmlFor="season">
               <select id="season" name="season" defaultValue={seasonId} className={inputClass}>
                 {seasons.map((s) => (
@@ -163,7 +172,7 @@ export default async function AdminMatchesPage({
               </select>
             </Field>
             <Field label="Dates" htmlFor="when">
-              <select id="when" name="when" defaultValue={when} className={inputClass}>
+              <select key={when} id="when" name="when" defaultValue={when} className={inputClass}>
                 <option value="upcoming">Upcoming only</option>
                 <option value="all">All dates</option>
               </select>
@@ -178,9 +187,6 @@ export default async function AdminMatchesPage({
                 ))}
               </select>
             </Field>
-            <Field label="Team contains" htmlFor="q">
-              <input id="q" name="q" defaultValue={params.q ?? ""} className={inputClass} />
-            </Field>
             <div className="flex items-end gap-2">
               <button
                 type="submit"
@@ -189,7 +195,7 @@ export default async function AdminMatchesPage({
                 Apply
               </button>
               <Link
-                href={`/admin/matches?view=${view}`}
+                href={`/admin/matches?view=${view}&when=${view === "calendar" ? "all" : "upcoming"}`}
                 className="text-muted px-2 py-2 text-sm hover:underline"
               >
                 Reset

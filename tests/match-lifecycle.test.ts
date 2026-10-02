@@ -546,6 +546,26 @@ describe("admin review", () => {
     expect(audit.metadata).toContain("ineligible player fielded");
   });
 
+  it("rejects an Admin result that forfeits both teams", async () => {
+    await expect(
+      overrideGameReport(prisma, {
+        matchId: fx.matchId,
+        actor: adminActor,
+        reason: "invalid double forfeit",
+        homeScore: 0,
+        awayScore: 0,
+        homeForfeit: true,
+        awayForfeit: true,
+      }),
+    ).rejects.toMatchObject({
+      status: 400,
+      code: "INVALID_STATE",
+    });
+    await expect(
+      prisma.gameReport.findUnique({ where: { matchId: fx.matchId } }),
+    ).resolves.toBeNull();
+  });
+
   it("reopens a completed game for its assigned referee", async () => {
     await submitted();
     await confirmGameReport(prisma, { matchId: fx.matchId, actor: adminActor });

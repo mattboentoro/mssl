@@ -108,7 +108,7 @@ export function Dialog({
               type="button"
               onClick={close}
               aria-label={`Close ${title}`}
-              className="text-muted hover:text-foreground text-lg leading-none"
+              className="bg-surface-muted text-muted hover:bg-brand/10 hover:text-foreground active:bg-brand/20 inline-flex h-8 w-8 items-center justify-center rounded-lg text-lg leading-none"
             >
               {"\u00d7"}
             </button>

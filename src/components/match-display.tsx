@@ -2,9 +2,10 @@ import Link from "next/link";
 
 import { KitSwatch, TeamColorBar } from "@/components/team-colors";
 import { Badge, Card, FormGuide, MatchStatusBadge } from "@/components/ui";
+import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/dates";
 import { kitColorName, resolveKit } from "@/lib/kits";
-import { scoreText, type MatchListItem } from "@/lib/queries";
+import { displayedScore, type MatchListItem } from "@/lib/queries";
 import { pointsPerGame, type PrimaryMetric, type StandingsRow } from "@/lib/standings";
 
 /*
@@ -13,84 +14,274 @@ import { pointsPerGame, type PrimaryMetric, type StandingsRow } from "@/lib/stan
 */
 const ASSIGNMENT_ONLY_STATUSES: readonly MatchListItem["status"][] = ["SCHEDULED", "ASSIGNED"];
 
+const DIVISION_COLOR_CLASSES = [
+  "text-blue-700 dark:text-blue-300",
+  "text-emerald-700 dark:text-emerald-300",
+  "text-violet-700 dark:text-violet-300",
+  "text-amber-700 dark:text-amber-300",
+  "text-rose-700 dark:text-rose-300",
+  "text-cyan-700 dark:text-cyan-300",
+] as const;
+
+const NAMED_DIVISION_COLOR_CLASSES: Record<string, (typeof DIVISION_COLOR_CLASSES)[number]> = {
+  "premier league": DIVISION_COLOR_CLASSES[0],
+  "first division": DIVISION_COLOR_CLASSES[1],
+};
+
+function divisionColorClass(name: string) {
+  const namedColor = NAMED_DIVISION_COLOR_CLASSES[name.trim().toLowerCase()];
+  if (namedColor) return namedColor;
+
+  let hash = 0;
+  for (const character of name) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  return DIVISION_COLOR_CLASSES[hash % DIVISION_COLOR_CLASSES.length];
+}
+
+type HeadToHeadTeam = {
+  name: string;
+  href?: string;
+  forfeited?: boolean;
+};
+
+export function MatchDisclosureStack({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="match-disclosure-stack relative pb-2">
+      <div
+        aria-hidden
+        className="match-disclosure-underlay bg-surface-muted border-subtle absolute inset-x-3 top-3 bottom-0 rounded-xl border shadow-sm"
+      />
+      <div className="relative z-[1]">{children}</div>
+    </div>
+  );
+}
+
+export function MatchDisclosureHint({
+  className,
+  label = "Expand match details",
+}: {
+  className?: string;
+  label?: string;
+} = {}) {
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      className={cn(
+        "bg-surface-muted border-subtle text-foreground mx-auto mt-3 flex h-5 w-5 items-center justify-center rounded-full border shadow-sm transition-transform group-open:rotate-180",
+        className,
+      )}
+    >
+      <svg aria-hidden viewBox="0 0 20 20" className="h-3 w-3" fill="none">
+        <path
+          d="m5 7.5 5 5 5-5"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </span>
+  );
+}
+
+export function MatchScore({
+  home,
+  away,
+  label = "Score",
+  homeColor,
+  awayColor,
+}: {
+  home: number;
+  away: number;
+  label?: string;
+  homeColor?: string;
+  awayColor?: string;
+}) {
+  return (
+    <span
+      className="bg-surface-muted border-subtle inline-flex flex-col items-center rounded-lg border px-3 py-2 text-base font-bold tabular-nums shadow-sm sm:px-5 sm:py-2.5 sm:text-xl"
+      aria-label={`${label}: ${home} to ${away}`}
+    >
+      <span>
+        {home}
+        <span className="text-muted mx-3" aria-hidden>
+          &ndash;
+        </span>
+        {away}
+      </span>
+      {homeColor && awayColor ? (
+        <span
+          className="mt-1.5 flex items-center gap-2"
+          aria-label={`Played colors: ${kitColorName(homeColor)} and ${kitColorName(awayColor)}`}
+        >
+          <span
+            aria-hidden
+            className="h-1.5 w-7 rounded-sm ring-1 ring-black/20 dark:ring-white/25"
+            style={{ backgroundColor: homeColor }}
+          />
+          <span
+            aria-hidden
+            className="h-1.5 w-7 rounded-sm ring-1 ring-black/20 dark:ring-white/25"
+            style={{ backgroundColor: awayColor }}
+          />
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+export function MatchKitColors({
+  homeTeam,
+  awayTeam,
+  homeKit,
+  awayKit,
+}: {
+  homeTeam: MatchListItem["homeTeam"];
+  awayTeam: MatchListItem["awayTeam"];
+  homeKit: string;
+  awayKit: string;
+}) {
+  const homeColor = resolveKit(homeTeam, homeKit);
+  const awayColor = resolveKit(awayTeam, awayKit);
+
+  return (
+    <span
+      className="bg-surface-muted border-subtle inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 shadow-sm sm:gap-3 sm:px-5 sm:py-2.5"
+      aria-label={`${homeTeam.name} in ${kitColorName(homeColor)}, ${awayTeam.name} in ${kitColorName(awayColor)}`}
+    >
+      <span
+        aria-hidden
+        className="h-[clamp(1.125rem,2.5vw,1.5rem)] w-[clamp(1.125rem,2.5vw,1.5rem)] rounded-full ring-1 ring-black/20 dark:ring-white/25"
+        style={{ backgroundColor: homeColor }}
+      />
+      <span className="text-muted text-[clamp(0.7rem,1.4vw,0.875rem)] font-semibold">vs</span>
+      <span
+        aria-hidden
+        className="h-[clamp(1.125rem,2.5vw,1.5rem)] w-[clamp(1.125rem,2.5vw,1.5rem)] rounded-full ring-1 ring-black/20 dark:ring-white/25"
+        style={{ backgroundColor: awayColor }}
+      />
+    </span>
+  );
+}
+
+export function MatchHeadToHead({
+  home,
+  away,
+  center,
+  topLeft,
+  topRight,
+  time,
+  status,
+  location,
+}: {
+  home: HeadToHeadTeam;
+  away: HeadToHeadTeam;
+  center: React.ReactNode;
+  topLeft?: React.ReactNode;
+  topRight?: React.ReactNode;
+  time?: React.ReactNode;
+  status?: React.ReactNode;
+  location?: React.ReactNode;
+}) {
+  const team = (side: HeadToHeadTeam, alignment: string) => {
+    const content = (
+      <>
+        <span className="truncate">{side.name}</span>
+        {side.forfeited ? (
+          <span className="text-danger block text-[10px] font-semibold uppercase">Forfeit</span>
+        ) : null}
+      </>
+    );
+    return side.href ? (
+      <Link
+        href={side.href}
+        className={`min-w-0 text-[clamp(0.9rem,1.5vw,1.1rem)] leading-tight font-semibold hover:underline ${alignment}`}
+      >
+        {content}
+      </Link>
+    ) : (
+      <span
+        className={`min-w-0 text-[clamp(0.9rem,1.5vw,1.1rem)] leading-tight font-semibold ${alignment}`}
+      >
+        {content}
+      </span>
+    );
+  };
+
+  return (
+    <div>
+      {topLeft || topRight ? (
+        <div className="text-muted mb-3 flex items-center justify-between gap-3 text-xs font-semibold uppercase">
+          <span>{topLeft}</span>
+          <span>{topRight}</span>
+        </div>
+      ) : null}
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 text-center sm:gap-8">
+        {team(home, "text-right")}
+        <div className="shrink-0">{center}</div>
+        {team(away, "text-left")}
+      </div>
+      {time || status || location ? (
+        <div className="text-muted mt-4 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 text-sm font-medium">
+          <span className="min-w-0 text-left">{time}</span>
+          <span className="flex justify-center">{status}</span>
+          <span className="min-w-0 text-right">{location}</span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function MatchRow({ match, action }: { match: MatchListItem; action?: React.ReactNode }) {
-  const score = scoreText(match.report);
+  const score = displayedScore(match.report);
 
   return (
     <Card as="li" className="p-4">
-      <div className="flex items-start gap-4">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-            <span className="text-muted">{formatDateTime(match.kickoffAt)}</span>
-            <Badge tone="neutral">{match.division.name}</Badge>
-            <Badge tone="neutral">MW {match.matchweek}</Badge>
+      <MatchHeadToHead
+        home={{
+          name: match.homeTeam.name,
+          href: `/teams/${match.homeTeam.slug}`,
+          forfeited: Boolean(match.report?.homeForfeit),
+        }}
+        away={{
+          name: match.awayTeam.name,
+          href: `/teams/${match.awayTeam.slug}`,
+          forfeited: Boolean(match.report?.awayForfeit),
+        }}
+        center={
+          score ? (
+            <MatchScore
+              home={score.home}
+              away={score.away}
+              homeColor={resolveKit(match.homeTeam, match.homeKit)}
+              awayColor={resolveKit(match.awayTeam, match.awayKit)}
+            />
+          ) : (
+            <MatchKitColors
+              homeTeam={match.homeTeam}
+              awayTeam={match.awayTeam}
+              homeKit={match.homeKit}
+              awayKit={match.awayKit}
+            />
+          )
+        }
+        topLeft={
+          <span className={divisionColorClass(match.division.name)}>{match.division.name}</span>
+        }
+        topRight={`MW ${match.matchweek}`}
+        time={formatDateTime(match.kickoffAt)}
+        status={
+          <span className="flex flex-wrap justify-center gap-1">
             {ASSIGNMENT_ONLY_STATUSES.includes(match.status) ? null : (
               <MatchStatusBadge match={match} />
             )}
             {match.report?.status === "DISPUTED" ? <Badge tone="danger">Disputed</Badge> : null}
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <TeamCell
-              team={match.homeTeam}
-              kit={match.homeKit}
-              forfeited={Boolean(match.report?.homeForfeit)}
-            />
-            {score ? (
-              <span className="text-xl font-bold tabular-nums">{score}</span>
-            ) : (
-              <span className="text-muted text-sm font-semibold">vs</span>
-            )}
-            <TeamCell
-              team={match.awayTeam}
-              kit={match.awayKit}
-              forfeited={Boolean(match.report?.awayForfeit)}
-            />
-          </div>
-
-          <div className="text-muted mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-            {match.venueName ? (
-              <span>&#128205; {match.venueName}</span>
-            ) : (
-              <span>&#128205; TBD</span>
-            )}
-          </div>
-        </div>
-        {action ? <div className="shrink-0">{action}</div> : null}
-      </div>
+          </span>
+        }
+        location={<>&#128205; {match.venueName ?? "TBD"}</>}
+      />
+      {action ? <div className="mt-3 flex justify-center">{action}</div> : null}
     </Card>
-  );
-}
-
-type TeamCellTeam = MatchListItem["homeTeam"];
-
-function TeamCell({
-  team,
-  kit,
-  forfeited = false,
-}: {
-  team: TeamCellTeam;
-  kit: string;
-  forfeited?: boolean;
-}) {
-  return (
-    <span className="flex min-w-0 items-center gap-1.5">
-      <Link
-        href={`/teams/${team.slug}`}
-        className="flex min-w-0 items-center gap-1.5 text-left font-semibold hover:underline"
-      >
-        <KitSwatch team={team} kit={kit} teamName={team.name} />
-        <span className="truncate">{team.name}</span>
-      </Link>
-      {/*
-        The awarded scoreline is nobody's actual result, so the side that gave
-        the fixture up is named beside the team rather than left for the reader
-        to infer from a 3-0 nobody played.
-      */}
-      {forfeited ? (
-        <span className="text-danger text-[10px] font-semibold uppercase">Forfeit</span>
-      ) : null}
-    </span>
   );
 }
 

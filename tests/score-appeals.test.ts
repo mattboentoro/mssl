@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import path from "node:path";
+
 import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -180,6 +183,47 @@ async function appeal(
 beforeEach(resetDatabase);
 afterAll(async () => prisma.$disconnect());
 
+describe("score appeal form UI", () => {
+  it("uses shared centered matchups, compact disclosures, and gated forfeits", () => {
+    const page = fs.readFileSync(
+      path.join(process.cwd(), "src/app/captain/appeals/page.tsx"),
+      "utf8",
+    );
+    const form = fs.readFileSync(
+      path.join(process.cwd(), "src/components/score-appeal-form.tsx"),
+      "utf8",
+    );
+    const matchDisplay = fs.readFileSync(
+      path.join(process.cwd(), "src/components/match-display.tsx"),
+      "utf8",
+    );
+    const results = fs.readFileSync(
+      path.join(process.cwd(), "src/app/captain/results/page.tsx"),
+      "utf8",
+    );
+
+    expect(page.match(/as="details"/g)).toHaveLength(2);
+    expect(page).toContain("<MatchHeadToHead");
+    expect(page).toContain("<MatchScore");
+    expect(page).toContain("Original result");
+    expect(page).toContain("Requested result");
+    expect(matchDisplay).toContain("grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]");
+    expect(matchDisplay).toContain("text-[clamp(0.9rem,1.5vw,1.1rem)]");
+    expect(matchDisplay).toContain('"premier league": DIVISION_COLOR_CLASSES[0]');
+    expect(matchDisplay).toContain('"first division": DIVISION_COLOR_CLASSES[1]');
+    expect(matchDisplay).toContain("divisionColorClass(match.division.name)");
+    expect(matchDisplay).toContain("homeColor={resolveKit(match.homeTeam, match.homeKit)}");
+    expect(matchDisplay).toContain("awayColor={resolveKit(match.awayTeam, match.awayKit)}");
+    expect(matchDisplay).toContain("topRight={`MW ${match.matchweek}`}");
+    expect(matchDisplay).toContain("<MatchKitColors");
+    expect(results).toContain("<MatchHeadToHead");
+    expect(form).toContain("disabled={pending || !ready}");
+    expect(form).toContain("reason.trim().length >= 5");
+    expect(form).toContain("setRequestedAwayForfeit(false)");
+    expect(form).toContain("setRequestedHomeForfeit(false)");
+  });
+});
+
 describe("score appeals", () => {
   it("allows either participating Captain to appeal an old result in a closed season", async () => {
     const fx = await fixture();
@@ -234,8 +278,8 @@ describe("score appeals", () => {
     });
     await expect(
       appeal(fx, {
-        requestedHomeScore: 1,
-        requestedAwayScore: 1,
+        requestedHomeScore: 0,
+        requestedAwayScore: 0,
         requestedHomeForfeit: true,
         requestedAwayForfeit: true,
       }),

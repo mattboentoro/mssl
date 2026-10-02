@@ -81,16 +81,8 @@ function validateResult(input: {
   const requestedAwayScore = score(input.requestedAwayScore, "Away score");
   const requestedHomeForfeit = Boolean(input.requestedHomeForfeit);
   const requestedAwayForfeit = Boolean(input.requestedAwayForfeit);
-  if (
-    requestedHomeForfeit &&
-    requestedAwayForfeit &&
-    (requestedHomeScore !== 0 || requestedAwayScore !== 0)
-  ) {
-    throw new ScoreAppealError(
-      "A double forfeit must be requested as 0-0.",
-      422,
-      "VALIDATION_FAILED",
-    );
+  if (requestedHomeForfeit && requestedAwayForfeit) {
+    throw new ScoreAppealError("Only one team can forfeit a match.", 422, "VALIDATION_FAILED");
   }
   return {
     requestedHomeScore,
@@ -508,6 +500,7 @@ export async function listScoreAppealsForCaptain(db: PrismaClient, appUserId: st
     include: {
       homeTeam: { select: { id: true, name: true } },
       awayTeam: { select: { id: true, name: true } },
+      division: { select: { name: true } },
       report: true,
       scoreAppeals: { where: { status: "PENDING" }, select: { teamId: true } },
     },
@@ -534,6 +527,7 @@ export async function listScoreAppealsForCaptain(db: PrismaClient, appUserId: st
         include: {
           homeTeam: { select: { name: true } },
           awayTeam: { select: { name: true } },
+          division: { select: { name: true } },
         },
       },
     },

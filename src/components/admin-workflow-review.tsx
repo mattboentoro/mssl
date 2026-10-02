@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { ActionForm, SubmitButton, type ServerAction } from "@/components/admin-forms";
+import { MatchDisclosureHint, MatchDisclosureStack } from "@/components/match-display";
 import { Card, Field, inputClass } from "@/components/ui";
 
 export function AdminWorkflowReview({
@@ -12,6 +13,7 @@ export function AdminWorkflowReview({
   idValue,
   noteName,
   noteRequired = false,
+  summary,
   children,
 }: {
   title: string;
@@ -21,12 +23,15 @@ export function AdminWorkflowReview({
   idValue: string;
   noteName: string;
   noteRequired?: boolean;
+  summary?: ReactNode;
   children: ReactNode;
 }) {
-  return (
-    <Card className="p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <h3 className="font-semibold">{title}</h3>
+  const content = (
+    <>
+      <div
+        className={`flex flex-wrap items-start gap-3 ${summary ? "justify-end" : "justify-between"}`}
+      >
+        {summary ? null : <h3 className="font-semibold">{title}</h3>}
         <Link className="text-brand text-sm hover:underline" href={`/admin/matches/${matchId}`}>
           Match detail
         </Link>
@@ -67,6 +72,22 @@ export function AdminWorkflowReview({
           </SubmitButton>
         </div>
       </ActionForm>
-    </Card>
+    </>
   );
+
+  if (summary) {
+    return (
+      <MatchDisclosureStack>
+        <Card as="details" className="group overflow-hidden">
+          <summary className="hover:bg-surface-muted cursor-pointer list-none px-5 py-4 transition">
+            {summary}
+            <MatchDisclosureHint label="Expand workflow review" />
+          </summary>
+          <div className="border-subtle border-t p-5">{content}</div>
+        </Card>
+      </MatchDisclosureStack>
+    );
+  }
+
+  return <Card className="p-5">{content}</Card>;
 }

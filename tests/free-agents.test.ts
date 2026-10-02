@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -7,7 +10,7 @@ import {
   PLAYER_POSITIONS,
   PLAYER_POSITION_LABELS,
 } from "@/lib/enums";
-import { freeAgentRequestSchema, freeAgentReviewSchema } from "@/lib/validation";
+import { freeAgentRequestSchema } from "@/lib/validation";
 
 /** The minimum a player has to answer: the three required questions. */
 const answers = {
@@ -16,6 +19,7 @@ const answers = {
   preferredDivisionId: "",
   notes: "",
 };
+const source = (file: string) => fs.readFileSync(path.join(process.cwd(), file), "utf8");
 
 describe("free-agent enums", () => {
   it("labels every position and status", () => {
@@ -27,13 +31,10 @@ describe("free-agent enums", () => {
     }
   });
 
-  it("treats only pending and contacted as still open", () => {
-    // The submit action reopens anything outside this set, so a mistake here
-    // would silently wipe an administrator's review note.
+  it("offers only system-managed not-placed and contacted states", () => {
+    expect([...FREE_AGENT_STATUSES]).toEqual(["PENDING", "CONTACTED"]);
     expect([...OPEN_FREE_AGENT_STATUSES]).toEqual(["PENDING", "CONTACTED"]);
-    for (const status of OPEN_FREE_AGENT_STATUSES) {
-      expect(FREE_AGENT_STATUSES).toContain(status);
-    }
+    expect(FREE_AGENT_STATUS_LABELS.PENDING).toBe("Not placed");
   });
 });
 
@@ -91,30 +92,26 @@ describe("freeAgentRequestSchema", () => {
   });
 });
 
-describe("freeAgentReviewSchema", () => {
-  it("accepts a status change with a note", () => {
-    const parsed = freeAgentReviewSchema.parse({
-      requestId: "req_1",
-      status: "CONTACTED",
-      reviewNote: "Passed to two captains.",
-    });
-    expect(parsed.status).toBe("CONTACTED");
-    expect(parsed.reviewNote).toBe("Passed to two captains.");
-  });
+describe("free-agent list UI", () => {
+  it("uses compact disclosures with system status and no manual review controls", () => {
+    const disclosure = source("src/components/free-agent-disclosure.tsx");
+    const adminPage = source("src/app/admin/free-agents/page.tsx");
+    const captainPage = source("src/app/captain/free-agents/page.tsx");
 
-  it("clears a blank note rather than storing an empty string", () => {
-    expect(
-      freeAgentReviewSchema.parse({ requestId: "req_1", status: "PLACED", reviewNote: "" })
-        .reviewNote,
-    ).toBeNull();
-  });
-
-  it("requires a request id and a known status", () => {
-    expect(freeAgentReviewSchema.safeParse({ requestId: "", status: "PLACED" }).success).toBe(
-      false,
-    );
-    expect(freeAgentReviewSchema.safeParse({ requestId: "req_1", status: "MAYBE" }).success).toBe(
-      false,
-    );
+    expect(disclosure).toContain('as="details"');
+    expect(disclosure).toContain("<MatchDisclosureStack");
+    expect(disclosure).not.toContain("<MatchDisclosureHint");
+    expect(disclosure).toContain("Experience");
+    expect(disclosure).toContain("Position");
+    expect(disclosure).toContain("Division");
+    expect(disclosure).toContain("Teams that reached out");
+    expect(adminPage).not.toContain("reviewFreeAgentRequest");
+    expect(adminPage).not.toContain('name="reviewNote"');
+    expect(adminPage).not.toContain('name="status" value=');
+    expect(captainPage).not.toContain('name="message"');
+    expect(captainPage).not.toContain('name="status"');
+    expect(captainPage).toContain("showStatus={false}");
+    expect(captainPage).toContain("showContactHistory={false}");
+    expect(captainPage).toContain('variant="primary"');
   });
 });

@@ -286,17 +286,6 @@ export default async function TeamPage({
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="space-y-8">
-          <section aria-labelledby="team-results">
-            <h2 id="team-results" className="mb-3 text-lg font-semibold">
-              Results
-            </h2>
-            {played.length === 0 ? (
-              <EmptyState title="No results yet" />
-            ) : (
-              <MatchList matches={[...played].reverse()} />
-            )}
-          </section>
-
           <section aria-labelledby="team-fixtures">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 id="team-fixtures" className="text-lg font-semibold">
@@ -318,6 +307,17 @@ export default async function TeamPage({
               <EmptyState title="No fixtures scheduled" />
             ) : (
               <MatchList matches={upcoming} actions={upcomingActions} />
+            )}
+          </section>
+
+          <section aria-labelledby="team-results">
+            <h2 id="team-results" className="mb-3 text-lg font-semibold">
+              Results
+            </h2>
+            {played.length === 0 ? (
+              <EmptyState title="No results yet" />
+            ) : (
+              <MatchList matches={[...played].reverse()} />
             )}
           </section>
         </div>

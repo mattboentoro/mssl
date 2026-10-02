@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 
 import { writeAudit } from "@/lib/audit";
-import { FREE_AGENT_STATUSES, OPEN_FREE_AGENT_STATUSES, type FreeAgentStatus } from "@/lib/enums";
+import { listAvailableFreeAgents } from "@/lib/free-agents";
 import { createRosterInvitation, RosterError } from "@/lib/roster";
 
 export class CaptainFreeAgentError extends Error {
@@ -16,7 +16,6 @@ export class CaptainFreeAgentError extends Error {
 }
 
 export interface CaptainFreeAgentFilters {
-  status?: string;
   divisionId?: string;
 }
 
@@ -54,29 +53,19 @@ export async function listCaptainFreeAgents(
     );
   }
 
-  const requestedStatus = input.filters?.status;
-  if (
-    requestedStatus &&
-    requestedStatus !== "all" &&
-    !(FREE_AGENT_STATUSES as readonly string[]).includes(requestedStatus)
-  ) {
-    throw new CaptainFreeAgentError("That status filter is not valid.", 400, "INVALID_FILTER");
-  }
-  const statusWhere =
-    requestedStatus === "all"
-      ? {}
-      : requestedStatus
-        ? { status: requestedStatus }
-        : { status: { in: [...OPEN_FREE_AGENT_STATUSES] } };
-  const where = {
-    ...statusWhere,
-    ...(input.filters?.divisionId ? { preferredDivisionId: input.filters.divisionId } : {}),
-  };
-  const requests = await db.freeAgentRequest.findMany({
-    where,
-    include: { preferredDivision: { select: { name: true } } },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-  });
+  const assignmentKeys = new Set(
+    assignments.map(({ seasonId, teamId }) => `${seasonId}:${teamId}`),
+  );
+  const requests = (
+    await listAvailableFreeAgents(db, {
+      divisionId: input.filters?.divisionId,
+    })
+  ).map((request) => ({
+    ...request,
+    invitations: request.invitations.filter((invitation) =>
+      assignmentKeys.has(`${invitation.seasonId}:${invitation.teamId}`),
+    ),
+  }));
 
   await writeAudit(db, {
     actor: { id: actor.id, email: actor.email, name: actor.displayName, role: "captain" },
@@ -84,7 +73,6 @@ export async function listCaptainFreeAgents(
     entity: "FreeAgentRequest",
     entityId: "captain-list",
     metadata: {
-      status: requestedStatus ?? "open",
       divisionId: input.filters?.divisionId ?? null,
       resultCount: requests.length,
     },
@@ -99,7 +87,6 @@ export async function placeFreeAgent(
     requestId: string;
     seasonId: string;
     teamId: string;
-    message?: string | null;
   },
 ) {
   if (!input.requestId || !input.seasonId || !input.teamId) {
@@ -115,14 +102,9 @@ export async function placeFreeAgent(
       seasonId: input.seasonId,
       teamId: input.teamId,
       freeAgentRequestId: input.requestId,
-      message: input.message,
     });
   } catch (error) {
     if (error instanceof RosterError) throw error;
     throw error;
   }
-}
-
-export function isFreeAgentStatus(value: string | undefined): value is FreeAgentStatus {
-  return Boolean(value && (FREE_AGENT_STATUSES as readonly string[]).includes(value));
 }

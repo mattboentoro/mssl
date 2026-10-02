@@ -3,7 +3,6 @@ import { z } from "zod";
 import {
   CARD_TYPES,
   DOCUMENT_CATEGORIES,
-  FREE_AGENT_STATUSES,
   KIT_CHOICES,
   MATCH_STATUSES,
   PLAYER_POSITIONS,
@@ -139,12 +138,17 @@ export const reasonSchema = z.object({
   reason: trimmed(500).min(5, "Give a reason of at least 5 characters."),
 });
 
-export const overrideSchema = reasonSchema.extend({
-  homeScore: scoreSchema,
-  awayScore: scoreSchema,
-  homeForfeit: z.boolean().default(false),
-  awayForfeit: z.boolean().default(false),
-});
+export const overrideSchema = reasonSchema
+  .extend({
+    homeScore: scoreSchema,
+    awayScore: scoreSchema,
+    homeForfeit: z.boolean().default(false),
+    awayForfeit: z.boolean().default(false),
+  })
+  .refine((value) => !(value.homeForfeit && value.awayForfeit), {
+    path: ["awayForfeit"],
+    message: "Only one team can forfeit a match.",
+  });
 
 export const matchUpdateSchema = z.object({
   /*
@@ -398,17 +402,6 @@ export const freeAgentRequestSchema = z.object({
 });
 
 export type FreeAgentRequestInput = z.infer<typeof freeAgentRequestSchema>;
-
-/** An administrator recording what the league did about a request. */
-export const freeAgentReviewSchema = z.object({
-  requestId: trimmed(60).min(1, "Missing request."),
-  status: z.enum(FREE_AGENT_STATUSES, {
-    errorMap: () => ({ message: "Pick a status." }),
-  }),
-  reviewNote: optionalText(500)
-    .nullable()
-    .transform((v) => v ?? null),
-});
 
 export const deleteFreeAgentRequestSchema = z.object({
   requestId: trimmed(60).min(1, "Missing request."),

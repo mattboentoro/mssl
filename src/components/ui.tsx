@@ -36,13 +36,20 @@ export function PageHeader({
           <p
             className={cn(
               "text-brand text-xs font-semibold tracking-[0.18em] uppercase",
-              backHref && "mt-3",
+              backHref && "mt-8",
             )}
           >
             {eyebrow}
           </p>
         ) : null}
-        <h1 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
+        <h1
+          className={cn(
+            "mt-1 text-3xl font-bold tracking-tight sm:text-4xl",
+            backHref && !eyebrow && "mt-8",
+          )}
+        >
+          {title}
+        </h1>
         {description ? (
           <div className="text-muted mt-2 text-sm sm:text-base">{description}</div>
         ) : null}
@@ -71,7 +78,7 @@ export function Card({
 }: {
   children: ReactNode;
   className?: string;
-  as?: "div" | "section" | "article" | "li";
+  as?: "div" | "section" | "article" | "li" | "details";
 }) {
   return (
     <As className={cn("bg-surface border-subtle rounded-xl border shadow-sm", className)}>
@@ -172,16 +179,16 @@ export function MatchStatusBadge({ match }: { match: MatchDisplayInput }) {
 export type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "success" | "danger";
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
-  primary: "bg-brand text-brand-contrast hover:opacity-90",
-  secondary: "bg-surface border-subtle border hover:bg-surface-muted",
-  outline: "border-subtle border-2 hover:bg-surface-muted",
-  ghost: "hover:bg-surface-muted",
-  success: "bg-success text-white hover:opacity-90",
-  danger: "bg-danger text-white hover:opacity-90",
+  primary: "bg-brand text-brand-contrast hover:bg-brand-strong active:bg-brand-strong",
+  secondary: "bg-surface-muted border-subtle border hover:bg-brand/10 active:bg-brand/20",
+  outline: "bg-surface-muted border-subtle border-2 hover:bg-brand/10 active:bg-brand/20",
+  ghost: "bg-surface-muted hover:bg-brand/10 active:bg-brand/20",
+  success: "bg-success text-white hover:brightness-95 active:brightness-90",
+  danger: "bg-danger text-white hover:brightness-95 active:brightness-90",
 };
 
 const BUTTON_BASE =
-  "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold shadow-sm transition-[color,background-color,border-color,opacity,filter,transform] duration-150 active:translate-y-px active:brightness-90 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:translate-y-0 disabled:active:brightness-100";
 
 /**
  * The bare-outline control used for page-level secondary actions: no fill, just
@@ -189,7 +196,7 @@ const BUTTON_BASE =
  * dialog triggers stay identical.
  */
 export const outlineButtonClass =
-  "border-subtle hover:bg-surface-muted inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition";
+  "bg-surface-muted border-subtle hover:bg-brand/10 active:bg-brand/20 inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium shadow-sm transition-[color,background-color,border-color,filter,transform] duration-150 active:translate-y-px active:brightness-90";
 
 export function buttonClass(variant: ButtonVariant = "primary", className?: string) {
   return cn(BUTTON_BASE, BUTTON_VARIANTS[variant], className);

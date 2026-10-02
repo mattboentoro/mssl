@@ -6,9 +6,15 @@ import { AddToCalendarButton } from "@/components/add-to-calendar-button";
 import { ClaimMatchCard } from "@/components/claim-match-card";
 import { ActionButton } from "@/components/match-actions";
 import { CalendarViewToggle, FixtureCalendar, parseView } from "@/components/fixture-calendar";
-import { FixtureLine } from "@/components/match-display";
+import {
+  FixtureLine,
+  MatchHeadToHead,
+  MatchKitColors,
+  MatchScore,
+} from "@/components/match-display";
 import {
   Alert,
+  Badge,
   Card,
   EmptyState,
   PageHeader,
@@ -21,7 +27,7 @@ import { AuthzError, requireReferee } from "@/lib/authz";
 import { formatDateTime, parseMonthValue, shiftMonth } from "@/lib/dates";
 import { zonedToUtc } from "@/lib/timezone";
 import { MATCH_STATUS_LABELS, type MatchStatus } from "@/lib/enums";
-import { getActiveSeason, getDivisions, listMatches, scoreText } from "@/lib/queries";
+import { displayedScore, getActiveSeason, getDivisions, listMatches } from "@/lib/queries";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = { title: "Referee Control" };
@@ -425,32 +431,48 @@ export default async function RefereePage({
           </Card>
         ) : (
           <Card className="divide-subtle divide-y">
-            {history.map((match) => (
-              <Link
-                key={match.id}
-                href={`/referee/${match.id}`}
-                className="hover:bg-surface-muted flex flex-wrap items-center justify-between gap-2 p-3"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">
-                    {match.homeTeam.name} v {match.awayTeam.name}
-                  </p>
-                  <p className="text-muted text-xs">
-                    {formatDateTime(match.kickoffAt)} &middot; {match.division.name}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  {match.report ? (
-                    <span className="font-mono text-sm font-semibold">
-                      {scoreText(match.report)}
-                    </span>
-                  ) : null}
-                  <span className="text-muted text-xs">
-                    {MATCH_STATUS_LABELS[match.status as MatchStatus]}
-                  </span>
-                </div>
-              </Link>
-            ))}
+            {history.map((match) => {
+              const score = displayedScore(match.report);
+              return (
+                <Link
+                  key={match.id}
+                  href={`/referee/${match.id}`}
+                  className="hover:bg-surface-muted block p-4"
+                >
+                  <MatchHeadToHead
+                    home={{
+                      name: match.homeTeam.name,
+                      forfeited: Boolean(match.report?.homeForfeit),
+                    }}
+                    away={{
+                      name: match.awayTeam.name,
+                      forfeited: Boolean(match.report?.awayForfeit),
+                    }}
+                    center={
+                      score ? (
+                        <MatchScore home={score.home} away={score.away} />
+                      ) : (
+                        <MatchKitColors
+                          homeTeam={match.homeTeam}
+                          awayTeam={match.awayTeam}
+                          homeKit={match.homeKit}
+                          awayKit={match.awayKit}
+                        />
+                      )
+                    }
+                    topLeft={match.division.name}
+                    topRight={`MW ${match.matchweek}`}
+                    time={formatDateTime(match.kickoffAt)}
+                    status={
+                      <Badge tone="neutral">
+                        {MATCH_STATUS_LABELS[match.status as MatchStatus]}
+                      </Badge>
+                    }
+                    location={<>&#128205; {match.venueName ?? "TBD"}</>}
+                  />
+                </Link>
+              );
+            })}
           </Card>
         )}
       </section>

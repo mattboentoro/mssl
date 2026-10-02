@@ -25,6 +25,7 @@ import {
   listNotifications,
   MAX_NOTIFICATION_BODY_LENGTH,
   MAX_NOTIFICATION_TITLE_LENGTH,
+  notificationHrefForUser,
 } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
@@ -86,6 +87,7 @@ export default async function NotificationsPage() {
           {notifications.length ? (
             <ol className="grid gap-3">
               {notifications.map((notification) => {
+                const notificationHref = notificationHrefForUser(notification, user);
                 const content = (
                   <>
                     <div className="flex flex-wrap items-start justify-between gap-2">
@@ -100,8 +102,8 @@ export default async function NotificationsPage() {
                 );
                 return (
                   <Card as="li" key={notification.id} className="p-5">
-                    {notification.href && isSafeInternalHref(notification.href) ? (
-                      <Link href={notification.href} className="block hover:opacity-90">
+                    {notificationHref && isSafeInternalHref(notificationHref) ? (
+                      <Link href={notificationHref} className="block hover:opacity-90">
                         {content}
                       </Link>
                     ) : (

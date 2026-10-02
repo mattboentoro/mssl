@@ -22,11 +22,9 @@ export const metadata: Metadata = {
 // cached across visitors.
 export const dynamic = "force-dynamic";
 
-const STATUS_TONES: Record<FreeAgentStatus, "warning" | "accent" | "success" | "neutral"> = {
-  PENDING: "warning",
+const STATUS_TONES: Record<FreeAgentStatus, "accent" | "neutral"> = {
+  PENDING: "neutral",
   CONTACTED: "accent",
-  PLACED: "success",
-  DECLINED: "neutral",
 };
 
 export default async function FreeAgentsPage() {
@@ -42,11 +40,31 @@ export default async function FreeAgentsPage() {
     email
       ? prisma.freeAgentRequest.findUnique({
           where: { submittedByEmail: email },
-          include: { preferredDivision: { select: { name: true } } },
+          include: {
+            preferredDivision: { select: { name: true } },
+            invitations: {
+              include: {
+                team: { select: { name: true } },
+                season: { select: { name: true } },
+              },
+              orderBy: { createdAt: "desc" },
+            },
+          },
         })
       : null,
     user?.appUserId ? getActiveTeamAssociation(prisma, user.appUserId) : Promise.resolve(null),
   ]);
+  const status: FreeAgentStatus = existing?.invitations.length ? "CONTACTED" : "PENDING";
+  const contactedTeams = existing
+    ? [
+        ...new Map(
+          existing.invitations.map((invitation) => [
+            `${invitation.seasonId}:${invitation.teamId}`,
+            invitation,
+          ]),
+        ).values(),
+      ]
+    : [];
 
   return (
     <div>
@@ -109,14 +127,11 @@ export default async function FreeAgentsPage() {
           </Card>
 
           <div className="grid gap-4">
-            {existing ? (
+            {existing && !activeTeam ? (
               <Card className="p-6">
                 <div className="flex items-baseline justify-between gap-3">
                   <h2 className="text-lg font-semibold tracking-tight">Status</h2>
-                  <Badge tone={STATUS_TONES[existing.status as FreeAgentStatus]}>
-                    {FREE_AGENT_STATUS_LABELS[existing.status as FreeAgentStatus] ??
-                      existing.status}
-                  </Badge>
+                  <Badge tone={STATUS_TONES[status]}>{FREE_AGENT_STATUS_LABELS[status]}</Badge>
                 </div>
 
                 <dl className="mt-4 grid gap-3 text-sm">
@@ -145,10 +160,21 @@ export default async function FreeAgentsPage() {
                   </div>
                 </dl>
 
-                {existing.reviewNote ? (
-                  <Alert className="mt-4" title="From the league" tone="info">
-                    {existing.reviewNote}
-                  </Alert>
+                {contactedTeams.length ? (
+                  <div className="mt-4">
+                    <p className="text-muted text-xs font-semibold tracking-wide uppercase">
+                      Teams that reached out
+                    </p>
+                    <ul className="mt-2 flex flex-wrap gap-2">
+                      {contactedTeams.map((invitation) => (
+                        <li key={`${invitation.seasonId}:${invitation.teamId}`}>
+                          <Badge tone="accent">
+                            {invitation.team.name} · {invitation.season.name}
+                          </Badge>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ) : null}
 
                 <div className="mt-5">
@@ -160,9 +186,9 @@ export default async function FreeAgentsPage() {
             <Card className="p-6">
               <h2 className="text-lg font-semibold tracking-tight">What happens next</h2>
               <ol className="text-muted mt-3 grid gap-2 text-sm">
-                <li>1. The league reviews new requests before each matchweek.</li>
-                <li>2. Captains with a space get your details and contact you directly.</li>
-                <li>3. Once you are placed, your request is closed off here.</li>
+                <li>1. Your request appears immediately as Not placed.</li>
+                <li>2. A team invitation changes the status to Contacted.</li>
+                <li>3. Once you join a team, your request leaves the free-agent list.</li>
               </ol>
               <p className="text-muted mt-4 text-sm">
                 Already know a captain? You can join their squad directly — there is no need to wait

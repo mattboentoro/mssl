@@ -698,7 +698,7 @@ async function createReport(args: {
 }
 
 /**
- * A handful of players waiting for a team, so Match Control's review screen has
+ * A handful of players waiting for a team, so the free-agent pool has
  * something in it on a fresh database.
  *
  * The dev-bypass "Player" persona is deliberately absent: signing in as them
@@ -720,7 +720,6 @@ async function seedFreeAgents() {
       divisionSlug: "premier-league",
       notes: "Played university soccer. Can make any Tuesday or Thursday kickoff.",
       status: "PENDING",
-      reviewNote: null as string | null,
       daysAgo: 2,
     },
     {
@@ -730,8 +729,7 @@ async function seedFreeAgents() {
       preferredPosition: "GOALKEEPER",
       divisionSlug: null,
       notes: "Keeper, but happy to play out if a side already has one.",
-      status: "CONTACTED",
-      reviewNote: "Sent your details to two sides short of a keeper.",
+      status: "PENDING",
       daysAgo: 9,
     },
     {
@@ -741,8 +739,7 @@ async function seedFreeAgents() {
       preferredPosition: "FORWARD",
       divisionSlug: "first-division",
       notes: null,
-      status: "PLACED",
-      reviewNote: "Signed for a First Division club ahead of matchweek 3.",
+      status: "PENDING",
       daysAgo: 24,
     },
     {
@@ -753,14 +750,12 @@ async function seedFreeAgents() {
       divisionSlug: null,
       notes: "Brand new to the game and keen to learn. Fit and reliable.",
       status: "PENDING",
-      reviewNote: null,
       daysAgo: 1,
     },
   ];
 
   for (const request of requests) {
     const createdAt = new Date(Date.now() - request.daysAgo * DAY);
-    const reviewed = request.status !== "PENDING";
     await prisma.freeAgentRequest.create({
       data: {
         submittedByName: request.submittedByName,
@@ -772,9 +767,6 @@ async function seedFreeAgents() {
           : null,
         notes: request.notes,
         status: request.status,
-        reviewNote: request.reviewNote,
-        reviewedAt: reviewed ? new Date(Date.now() - Math.max(0, request.daysAgo - 1) * DAY) : null,
-        reviewedByEmail: reviewed ? "alex.board@example.com" : null,
         createdAt,
       },
     });

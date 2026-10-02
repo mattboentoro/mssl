@@ -77,7 +77,7 @@ export function SubmitButton({
                 type="button"
                 onClick={() => dialogRef.current?.close()}
                 disabled={pending}
-                className={buttonClass("success")}
+                className={buttonClass("secondary")}
               >
                 Keep
               </button>

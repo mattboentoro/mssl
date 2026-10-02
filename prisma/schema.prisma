@@ -254,26 +254,29 @@ model TeamMembership {
 }
 
 model RosterInvitation {
-  id              String    @id @default(cuid())
-  seasonId        String
-  teamId          String
-  invitedById     String
-  invitedUserId   String?
-  email           String
-  normalizedEmail String
-  status          String    @default("PENDING")
-  message         String?
-  respondedAt     DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                 String    @id @default(cuid())
+  seasonId           String
+  teamId             String
+  freeAgentRequestId String?
+  invitedById        String
+  invitedUserId      String?
+  email              String
+  normalizedEmail    String
+  status             String    @default("PENDING")
+  message            String?
+  respondedAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  season      Season   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
-  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  invitedBy   AppUser  @relation("RosterInvitationSender", fields: [invitedById], references: [id], onDelete: Cascade)
-  invitedUser AppUser? @relation("RosterInvitationRecipient", fields: [invitedUserId], references: [id], onDelete: SetNull)
+  season           Season            @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  team             Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  freeAgentRequest FreeAgentRequest? @relation(fields: [freeAgentRequestId], references: [id], onDelete: SetNull)
+  invitedBy        AppUser           @relation("RosterInvitationSender", fields: [invitedById], references: [id], onDelete: Cascade)
+  invitedUser      AppUser?          @relation("RosterInvitationRecipient", fields: [invitedUserId], references: [id], onDelete: SetNull)
 
   @@index([seasonId, teamId, status])
   @@index([normalizedEmail, status])
+  @@index([freeAgentRequestId, createdAt])
 }
 
 model RosterJoinRequest {
@@ -695,10 +698,9 @@ model AuditLog {
 
 /// A player asking the league to find them a team.
 ///
-/// Not a squad record: MSSL keeps no player register, and referees type player
-/// names as free text on a game report. This is an expression of interest that
-/// an administrator reads and acts on off-site, by putting the player in touch
-/// with a captain who has room.
+/// An expression of interest shown to administrators and active Captains until
+/// the player joins a roster. Roster invitations provide the contact history
+/// and drive the system-managed status.
 ///
 /// One open request per person, keyed on the e-mail of the Microsoft account
 /// that submitted it. Submitting again edits the request already on file
@@ -723,7 +725,7 @@ model FreeAgentRequest {
   /// Anything else the player wants a captain to know.
   notes String?
 
-  /// One of FreeAgentStatus: PENDING | CONTACTED | PLACED | DECLINED
+  /// One of FreeAgentStatus: PENDING | CONTACTED. Updated by roster invitations.
   status          String    @default("PENDING")
   reviewNote      String?
   reviewedAt      DateTime?
@@ -732,7 +734,8 @@ model FreeAgentRequest {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  preferredDivision Division? @relation(fields: [preferredDivisionId], references: [id], onDelete: SetNull)
+  preferredDivision Division?          @relation(fields: [preferredDivisionId], references: [id], onDelete: SetNull)
+  invitations       RosterInvitation[]
 
   @@index([status])
   @@index([createdAt])

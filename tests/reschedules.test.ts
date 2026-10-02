@@ -208,6 +208,48 @@ function clientWithTransitionRace(): PrismaClient {
 beforeEach(resetDatabase);
 afterAll(async () => prisma.$disconnect());
 
+describe("Captain reschedule request UI", () => {
+  it("uses expandable head-to-head cards with details hidden in the body", () => {
+    const page = fs.readFileSync(
+      path.join(process.cwd(), "src/app/captain/reschedules/page.tsx"),
+      "utf8",
+    );
+    const forms = fs.readFileSync(
+      path.join(process.cwd(), "src/components/reschedule-forms.tsx"),
+      "utf8",
+    );
+    const matchDisplay = fs.readFileSync(
+      path.join(process.cwd(), "src/components/match-display.tsx"),
+      "utf8",
+    );
+    const styles = fs.readFileSync(path.join(process.cwd(), "src/app/globals.css"), "utf8");
+
+    expect(page).toContain('as="details"');
+    expect(page).toContain("<MatchDisclosureStack");
+    expect(page).toContain("<MatchDisclosureHint");
+    expect(page).toContain("<MatchHeadToHead");
+    expect(page).toContain("<MatchKitColors");
+    expect(page.indexOf("<summary")).toBeLessThan(page.indexOf("Current kickoff"));
+    expect(page).toContain("topLeft={request.match.division.name}");
+    expect(page).toContain("status={status}");
+    expect(page).toContain('"Pending my team"');
+    expect(page).toContain('"Rejected by my team"');
+    expect(page).toContain('request.status === "PENDING_OPPONENT" && canRespond');
+    expect(page).toContain('request.status === "REJECTED_OPPONENT" && isOpponentCaptain');
+    expect(forms).toContain("disabled={!ready}");
+    expect(forms).toContain("revisedReason.trim() !== reason.trim()");
+    expect(matchDisplay).toContain("absolute inset-x-3 top-3 bottom-0");
+    expect(matchDisplay).toContain('label = "Expand match details"');
+    expect(matchDisplay).toContain("aria-label={label}");
+    expect(matchDisplay).toContain("h-5 w-5");
+    expect(matchDisplay).not.toContain("View details");
+    expect(matchDisplay).not.toContain("&#8964;");
+    expect(styles).toContain(".match-disclosure-stack:has(details[open])");
+    expect(styles).toContain("> .match-disclosure-underlay");
+    expect(styles).toContain("display: none");
+  });
+});
+
 describe("Captain reschedule requests", () => {
   it("creates a complete snapshot, audits it, notifies the opponent, and leaves the fixture unchanged", async () => {
     const fx = await fixture();
@@ -373,7 +415,7 @@ describe("Captain reschedule requests", () => {
       prisma.notification.findFirstOrThrow({
         where: { userId: fx.admin.id, type: "RESCHEDULE_AWAITING_ADMIN" },
       }),
-    ).resolves.toBeTruthy();
+    ).resolves.toMatchObject({ href: `/admin/matches/${fx.match.id}` });
   });
 
   it("records an opponent rejection and closes the request", async () => {

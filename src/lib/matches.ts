@@ -615,6 +615,9 @@ export async function overrideGameReport(
     expectedReportUpdatedAt?: Date;
   },
 ): Promise<void> {
+  if (params.homeForfeit && params.awayForfeit) {
+    throw new MatchError("Only one team can forfeit a match.", 400, "INVALID_STATE");
+  }
   if ("$transaction" in db) {
     return db.$transaction((tx) => overrideGameReport(tx, params));
   }

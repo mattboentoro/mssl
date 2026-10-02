@@ -1,22 +1,17 @@
 import { AuthzError, requireAdmin } from "@/lib/authz";
-import { toCsvRow } from "@/lib/csv";
-import { toDateInputValue, formatTime } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
 import { resolveSeason } from "@/lib/queries";
+import { buildAdminMatchCsv } from "@/lib/schedule-export";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Header the schedule importer expects. Keep the two in lock-step. */
-const HEADER = ["matchweek", "kickoff", "division", "home", "away", "venue", "counts"];
-
 /**
  * Download a season's fixtures as CSV.
  *
- * Deliberately round-trips through the importer: the header and the kick-off
- * format are exactly what `importScheduleAction` reads back, so an organiser
- * can export, edit in Excel, and re-upload. Kick-offs are written as Redmond
- * wall-clock time with no offset — the same thing the importer assumes.
+ * Core fixture columns remain compatible with the schedule importer. Referee
+ * and status are informational columns that the importer safely ignores.
+ * Kick-offs are written as Redmond wall-clock time with no offset.
  */
 export async function GET(request: Request) {
   try {
@@ -41,25 +36,12 @@ export async function GET(request: Request) {
       division: { select: { name: true } },
       homeTeam: { select: { name: true } },
       awayTeam: { select: { name: true } },
+      referee: { select: { name: true } },
+      report: { select: { homeForfeit: true, awayForfeit: true } },
     },
   });
 
-  const lines = [toCsvRow(HEADER)];
-  for (const match of matches) {
-    lines.push(
-      toCsvRow([
-        String(match.matchweek),
-        `${toDateInputValue(match.kickoffAt)} ${formatTime(match.kickoffAt)}`,
-        match.division.name,
-        match.homeTeam.name,
-        match.awayTeam.name,
-        match.venueName ?? "",
-        match.countsForStandings ? "yes" : "no",
-      ]),
-    );
-  }
-
-  return new Response(`${lines.join("\r\n")}\r\n`, {
+  return new Response(buildAdminMatchCsv(matches), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="mssl-schedule-${season.slug}.csv"`,

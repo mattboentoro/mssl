@@ -20,6 +20,12 @@ import {
   inputClass,
 } from "@/components/ui";
 import { requireUser } from "@/lib/authz";
+import {
+  CARD_LABELS,
+  SUSPENSION_REASON_LABELS,
+  type CardType,
+  type SuspensionReason,
+} from "@/lib/enums";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = { title: "Manage roster" };
@@ -73,7 +79,7 @@ export default async function CaptainRosterPage({
     );
   }
 
-  const [memberships, captains, requests, invitations] = await Promise.all([
+  const [memberships, captains, requests, invitations, discipline] = await Promise.all([
     prisma.teamMembership.findMany({
       where: {
         seasonId: selected.seasonId,
@@ -112,6 +118,22 @@ export default async function CaptainRosterPage({
       include: { invitedBy: true },
       orderBy: { createdAt: "asc" },
     }),
+    prisma.disciplinaryAction.findMany({
+      where: {
+        seasonId: selected.seasonId,
+        teamId: selected.teamId,
+      },
+      include: {
+        match: {
+          select: {
+            matchweek: true,
+            homeTeam: { select: { shortName: true } },
+            awayTeam: { select: { shortName: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
   const captainUserIds = new Set(captains.flatMap(({ userId }) => (userId ? [userId] : [])));
 
@@ -123,7 +145,6 @@ export default async function CaptainRosterPage({
         eyebrow={user.isAdmin ? "Admin fallback" : "Captain"}
         title={`${selected.team.name} roster`}
         description={`${selected.season.name}. Membership changes and role changes are audited.`}
-        actions={<ButtonLink href="/roster">My roster</ButtonLink>}
       />
 
       {available.length > 1 ? (
@@ -212,6 +233,52 @@ export default async function CaptainRosterPage({
             <p className="text-muted mt-3 text-sm">No pending join requests.</p>
           )}
         </Card>
+
+        <section id="disciplinary-actions">
+          <Card className="p-6">
+            <h2 className="text-lg font-semibold">Disciplinary actions</h2>
+            <p className="text-muted mt-1 text-sm">
+              Cards and league sanctions recorded for {selected.team.name} in{" "}
+              {selected.season.name}.
+            </p>
+            {discipline.length ? (
+              <ul className="mt-4 space-y-3">
+                {discipline.map((action) => (
+                  <li className="bg-surface-muted rounded-lg p-4 text-sm" key={action.id}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold">{action.playerName}</span>
+                      <Badge tone={action.type === "RED" ? "danger" : "warning"}>
+                        {CARD_LABELS[action.type as CardType] ?? action.type}
+                      </Badge>
+                      {action.gamesSuspended ? (
+                        <Badge tone="danger">
+                          {action.suspensionReason
+                            ? `${SUSPENSION_REASON_LABELS[action.suspensionReason as SuspensionReason] ?? action.suspensionReason} · `
+                            : ""}
+                          {action.gamesSuspended} game
+                          {action.gamesSuspended === 1 ? "" : "s"}
+                        </Badge>
+                      ) : null}
+                      {action.match ? (
+                        <span className="text-muted text-xs">
+                          MW {action.match.matchweek} · {action.match.homeTeam.shortName} v{" "}
+                          {action.match.awayTeam.shortName}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-2">
+                      {action.note ?? "No additional reason was recorded."}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-muted mt-3 text-sm">
+                No disciplinary actions recorded for this team and season.
+              </p>
+            )}
+          </Card>
+        </section>
 
         <Card className="p-6">
           <h2 className="text-lg font-semibold">Active roster</h2>
