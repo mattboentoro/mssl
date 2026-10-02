@@ -28,7 +28,10 @@ export async function GET(
   const contentType = team.logoContentType as TeamLogoContentType;
 
   if (team.logoEtag && request.headers.get("if-none-match") === team.logoEtag) {
-    return new Response(null, { status: 304, headers: { ETag: team.logoEtag } });
+    return new Response(null, {
+      status: 304,
+      headers: { ETag: team.logoEtag, "Cache-Control": "public, max-age=0, must-revalidate" },
+    });
   }
 
   try {
@@ -40,7 +43,7 @@ export async function GET(
       headers: {
         "Content-Type": contentType,
         "Content-Length": String(bytes.byteLength),
-        "Cache-Control": "public, max-age=3600, must-revalidate",
+        "Cache-Control": "public, max-age=0, must-revalidate",
         "Content-Security-Policy": "default-src 'none'",
         "X-Content-Type-Options": "nosniff",
         ...(team.logoEtag ? { ETag: team.logoEtag } : {}),

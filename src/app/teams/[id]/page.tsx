@@ -13,13 +13,13 @@ import { zonedToUtc } from "@/lib/timezone";
 import { kitColorName, resolveKit } from "@/lib/kits";
 import { prisma } from "@/lib/prisma";
 import {
-  getActiveSeason,
-  getDisciplinaryRecords,
-  getStandingsForSeason,
-  getTeamDetail,
-  getTeamMatches,
-  splitTeamMatches,
-} from "@/lib/queries";
+  resolvePublicSeason as getActiveSeason,
+  getPublicTeamDiscipline,
+  getPublicStandings as getStandingsForSeason,
+  getPublicTeamDetail as getTeamDetail,
+  getPublicMatches,
+} from "@/lib/public-queries";
+import { splitTeamMatches } from "@/lib/queries";
 import { isRescheduleCutoffReached, OPEN_RESCHEDULE_STATUSES } from "@/lib/reschedules";
 
 export const dynamic = "force-dynamic";
@@ -58,9 +58,9 @@ export default async function TeamPage({
   );
 
   const [matches, standings, discipline] = await Promise.all([
-    getTeamMatches(team.id),
+    getPublicMatches({ team: team.id }),
     season ? getStandingsForSeason(season.id) : Promise.resolve([]),
-    season ? getDisciplinaryRecords(season.id) : Promise.resolve([]),
+    season ? getPublicTeamDiscipline(season.id, team.id) : Promise.resolve([]),
   ]);
 
   const row = standings
@@ -68,7 +68,7 @@ export default async function TeamPage({
     ?.rows.find((r) => r.teamId === team.id);
 
   const { played, upcoming } = splitTeamMatches(matches);
-  const teamCards = discipline.filter((d) => d.teamId === team.id);
+  const teamCards = discipline;
   const now = new Date();
   const [openReschedules, availableSlot] = captainContext
     ? await Promise.all([
@@ -204,12 +204,7 @@ export default async function TeamPage({
         <BackLink href="/teams">All teams</BackLink>
       </div>
       <div className="flex items-start gap-4">
-        <TeamLogo
-          teamId={team.id}
-          name={team.name}
-          hasLogo={Boolean(team.logoBlobName)}
-          size={72}
-        />
+        <TeamLogo teamId={team.id} name={team.name} hasLogo={team.hasLogo} size={72} />
         <PageHeader
           eyebrow={team.division.name}
           title={team.name}

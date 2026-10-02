@@ -1,4 +1,4 @@
-import { actorFrom, handleApi, parseJson } from "@/lib/api";
+import { actorFrom, handleMatchMutation, parseJson } from "@/lib/api";
 import { requireReferee } from "@/lib/authz";
 import { submitGameReport } from "@/lib/matches";
 import { prisma } from "@/lib/prisma";
@@ -17,7 +17,7 @@ export const runtime = "nodejs";
  * becomes read-only to the referee.
  */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  return handleApi(async () => {
+  return handleMatchMutation(async () => {
     const { id } = await context.params;
     const { user, referee } = await requireReferee();
     const input = await parseJson(request, gameReportSchema);

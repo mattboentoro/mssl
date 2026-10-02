@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { invalidatePublicData, type PublicCacheDomain } from "@/lib/public-cache";
 
 import { writeAudit } from "@/lib/audit";
 import { actorFrom } from "@/lib/api";
@@ -122,7 +123,8 @@ function slugify(value: string): string {
     .slice(0, 60);
 }
 
-function refreshAdmin(): void {
+function refreshAdmin(domain: PublicCacheDomain = "league"): void {
+  invalidatePublicData(domain);
   revalidatePath("/admin", "layout");
   revalidatePath("/", "layout");
 }
@@ -509,7 +511,7 @@ export async function createTeamAction(_prev: ActionState, form: FormData): Prom
         entityId: team.id,
         metadata: data,
       });
-      refreshAdmin();
+      refreshAdmin("teams");
       return `Team “${data.name}” created.`;
     },
   );
@@ -621,7 +623,7 @@ export async function updateTeamAction(_prev: ActionState, form: FormData): Prom
           ]),
         },
       });
-      refreshAdmin();
+      refreshAdmin("teams");
       return `Team “${data.name}” updated.`;
     },
   );
@@ -686,7 +688,7 @@ export async function deleteTeamAction(_prev: ActionState, form: FormData): Prom
         });
       });
 
-      refreshAdmin();
+      refreshAdmin("teams");
       return `Team “${team.name}” deleted along with ${fixtures} fixture(s).`;
     },
   );
@@ -750,7 +752,7 @@ export async function createPointsAdjustmentAction(
         return created;
       });
 
-      refreshAdmin();
+      refreshAdmin("standings");
       revalidatePath("/standings");
       const verb = adjustment.points < 0 ? "deducted from" : "awarded to";
       return `${Math.abs(adjustment.points)} point(s) ${verb} ${team.name} in ${season.name}.`;
@@ -788,7 +790,7 @@ export async function deletePointsAdjustmentAction(
         });
       });
 
-      refreshAdmin();
+      refreshAdmin("standings");
       revalidatePath("/standings");
       return `Adjustment reversed — ${existing.team.name} is back to its earned points.`;
     },
@@ -818,7 +820,7 @@ export async function createDisciplinaryAction(
     },
     async (data, actor) => {
       await addDisciplinaryAction(prisma, { actor: actorFrom(actor), input: data });
-      refreshAdmin();
+      refreshAdmin("discipline");
       const card = data.type === "RED" ? "Red" : "Yellow";
       if (data.gamesSuspended && data.gamesSuspended > 0) {
         return `${card} card recorded for ${data.playerName}, suspended ${data.gamesSuspended} game${data.gamesSuspended === 1 ? "" : "s"}.`;
@@ -850,7 +852,7 @@ export async function setSuspensionAction(
         note: data.note,
         actor: actorFrom(actor),
       });
-      refreshAdmin();
+      refreshAdmin("discipline");
       return data.gamesSuspended === 0
         ? "Reviewed. No suspension applied."
         : `Suspended for ${data.gamesSuspended} game${data.gamesSuspended === 1 ? "" : "s"}.`;
@@ -864,7 +866,7 @@ export async function deleteDisciplinaryActionAction(
 ): Promise<ActionState> {
   return run(z.object({ id: z.string().min(1) }), { id: str(form, "id") }, async (data, actor) => {
     await deleteDisciplinaryAction(prisma, { id: data.id, actor: actorFrom(actor) });
-    refreshAdmin();
+    refreshAdmin("discipline");
     return "Disciplinary record rescinded.";
   });
 }
@@ -920,7 +922,7 @@ export async function createMatchAction(_prev: ActionState, form: FormData): Pro
         entityId: match.id,
         metadata: data,
       });
-      refreshAdmin();
+      refreshAdmin("matches");
       return "Fixture created.";
     },
   );
@@ -946,7 +948,7 @@ export async function deleteMatchAction(_prev: ActionState, form: FormData): Pro
         entityId: data.matchId,
         metadata: { homeTeamId: match.homeTeamId, awayTeamId: match.awayTeamId },
       });
-      refreshAdmin();
+      refreshAdmin("matches");
       return "Fixture deleted.";
     },
   );
@@ -982,7 +984,7 @@ export async function createAnnouncementAction(
         entityId: announcement.id,
         metadata: { title: data.title },
       });
-      refreshAdmin();
+      refreshAdmin("content");
       return "Announcement published.";
     },
   );
@@ -1035,7 +1037,7 @@ export async function updateAnnouncementAction(
         });
       });
 
-      refreshAdmin();
+      refreshAdmin("content");
       return `Announcement “${data.title}” updated.`;
     },
   );
@@ -1065,7 +1067,7 @@ export async function deleteAnnouncementAction(
         });
       });
 
-      refreshAdmin();
+      refreshAdmin("content");
       return `Announcement “${announcement.title}” deleted.`;
     },
   );
@@ -1094,7 +1096,7 @@ export async function createDocumentAction(
         entityId: doc.id,
         metadata: { title: data.title },
       });
-      refreshAdmin();
+      refreshAdmin("content");
       return "Document added.";
     },
   );
@@ -1145,7 +1147,7 @@ export async function updateDocumentAction(
         });
       });
 
-      refreshAdmin();
+      refreshAdmin("content");
       return `Document “${data.title}” updated.`;
     },
   );
@@ -1170,7 +1172,7 @@ export async function deleteDocumentAction(
       });
     });
 
-    refreshAdmin();
+    refreshAdmin("content");
     return `Document “${document.title}” deleted.`;
   });
 }
@@ -1663,7 +1665,7 @@ export async function deleteFreeAgentRequest(
         });
       });
 
-      refreshAdmin();
+      refreshAdmin("freeAgents");
       revalidatePath("/free-agents");
       revalidatePath("/captain/free-agents");
       return `Removed ${request.submittedByName}'s request.`;

@@ -1,4 +1,4 @@
-import { actorFrom, handleApi, parseJson } from "@/lib/api";
+import { actorFrom, handleMatchMutation, parseJson } from "@/lib/api";
 import { requireAdmin } from "@/lib/authz";
 import { adminAssignReferee } from "@/lib/matches";
 import { prisma } from "@/lib/prisma";
@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 
 /** Assign or force-unassign a referee. Admin only; pass `refereeId: null` to clear. */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  return handleApi(async () => {
+  return handleMatchMutation(async () => {
     const { id } = await context.params;
     const user = await requireAdmin();
     const body = await parseJson(request, adminAssignSchema);

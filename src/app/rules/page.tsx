@@ -1,15 +1,13 @@
-import fs from "node:fs";
-import path from "node:path";
-
 import type { Metadata } from "next";
 
 import { Card, PageHeader } from "@/components/ui";
+import { isPublicRulesPublished } from "@/lib/public-queries";
 
 export const metadata: Metadata = {
   title: "Rules & regulations",
   description: "The MSSL Rules & Regulations, public copy.",
 };
-// The PDF can be dropped in after a deploy, so check the filesystem per request.
+// The PDF may be dropped in after deploy; revalidate its availability after 60 seconds.
 export const dynamic = "force-dynamic";
 
 /**
@@ -22,8 +20,8 @@ const PDF_URL = `/documents/${PDF_FILE}`;
 const SHAREPOINT_URL =
   "https://microsoft.sharepoint.com/:b:/r/teams/MicrosoftSoccerLeagueMSSL/SiteAssets/Forms/AllItems.aspx?id=%2Fteams%2FMicrosoftSoccerLeagueMSSL%2FSiteAssets%2FSitePages%2FLatest%2DUpdate%281%29%2FMicrosoft%2DSoccer%2DLeague%2D%2DMSSL%2D%2DRules%2D%2D%2DRegulations%2D%2D%2DPublic%2DCopy%2Epdf&parent=%2Fteams%2FMicrosoftSoccerLeagueMSSL%2FSiteAssets%2FSitePages%2FLatest%2DUpdate%281%29&p=true&share=cQqOdpml%5Fg6QQ6K2o7xtHDwiEgUCyvt5dscpaXrO1pjn2Vhm%2DQ";
 
-export default function RulesPage() {
-  const published = fs.existsSync(path.join(process.cwd(), "public", "documents", PDF_FILE));
+export default async function RulesPage() {
+  const published = await isPublicRulesPublished();
 
   return (
     <div>

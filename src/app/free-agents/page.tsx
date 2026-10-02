@@ -12,6 +12,7 @@ import {
 import { formatDate } from "@/lib/dates";
 import { getActiveTeamAssociation } from "@/lib/free-agent-eligibility";
 import { prisma } from "@/lib/prisma";
+import { getPublicDivisions } from "@/lib/public-queries";
 
 export const metadata: Metadata = {
   title: "Sign up as free agent",
@@ -30,10 +31,7 @@ const STATUS_TONES: Record<FreeAgentStatus, "accent" | "neutral"> = {
 export default async function FreeAgentsPage() {
   const user = await getCurrentUser();
 
-  const divisions = await prisma.division.findMany({
-    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-    select: { id: true, name: true },
-  });
+  const divisions = await getPublicDivisions();
 
   const email = user?.email?.trim().toLowerCase();
   const [existing, activeTeam] = await Promise.all([

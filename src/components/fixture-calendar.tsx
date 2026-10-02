@@ -10,7 +10,7 @@ import {
   shiftMonth,
   toDateInputValue,
 } from "@/lib/dates";
-import type { MatchListItem } from "@/lib/queries";
+import type { MatchDisplayItem } from "@/lib/queries";
 import { kitColorName, resolveKit } from "@/lib/kits";
 
 /**
@@ -25,7 +25,7 @@ import { kitColorName, resolveKit } from "@/lib/kits";
  * Every date is league time (Redmond), matching the rest of the site, so a
  * 19:00 Sunday kickoff never drifts into Monday for a viewer in another zone.
  */
-export function FixtureCalendar({
+export function FixtureCalendar<T extends MatchDisplayItem>({
   matches,
   year,
   month,
@@ -37,7 +37,7 @@ export function FixtureCalendar({
   monthParam = "month",
   emptyHint,
 }: {
-  matches: MatchListItem[];
+  matches: T[];
   year: number;
   month: number;
   /** Page the navigation links point back at, e.g. "/referee". */
@@ -45,12 +45,12 @@ export function FixtureCalendar({
   /** Other query parameters to preserve across month navigation. */
   query?: Record<string, string | undefined>;
   /** Where a fixture chip links to. Return undefined to render plain text. */
-  hrefForMatch?: (match: MatchListItem) => string | undefined;
+  hrefForMatch?: (match: T) => string | undefined;
   /**
    * Flag a fixture with a tick. Return a short label describing *why* it is
    * ticked; it is read out to screen readers and shown as a tooltip.
    */
-  markFor?: (match: MatchListItem) => string | undefined;
+  markFor?: (match: T) => string | undefined;
   /** Show the admin-oriented kit, team, and venue layout on each fixture. */
   showFixtureDetails?: boolean;
   monthParam?: string;
@@ -58,7 +58,7 @@ export function FixtureCalendar({
 }) {
   const grid = buildMonthGrid(year, month);
 
-  const byDay = new Map<string, MatchListItem[]>();
+  const byDay = new Map<string, T[]>();
   for (const match of matches) {
     const key = toDateInputValue(match.kickoffAt);
     const bucket = byDay.get(key);
@@ -191,7 +191,7 @@ function FixtureChip({
   mark,
   showFixtureDetails,
 }: {
-  match: MatchListItem;
+  match: MatchDisplayItem;
   href?: string;
   mark?: string;
   showFixtureDetails: boolean;

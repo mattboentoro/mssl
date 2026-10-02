@@ -6,8 +6,14 @@ import { MatchList } from "@/components/match-display";
 import { ButtonLink, Card, EmptyState, PageHeader, inputClass, labelClass } from "@/components/ui";
 import { parseMonthValue, shiftMonth } from "@/lib/dates";
 import { compareMatchweeks } from "@/lib/matchweek";
-import { getDivisions, getSeasons, listMatches, resolveSeason } from "@/lib/queries";
-import { prisma } from "@/lib/prisma";
+import {
+  getPublicDivisions,
+  getPublicSeasons,
+  getPublicMatches,
+  getPublicTeams,
+  resolvePublicSeason,
+  type PublicMatchFilters,
+} from "@/lib/public-queries";
 import { zonedToUtc } from "@/lib/timezone";
 
 export const metadata: Metadata = {
@@ -32,7 +38,10 @@ export default async function SchedulePage({
   searchParams: Promise<ScheduleParams>;
 }) {
   const params = await searchParams;
-  const [seasons, season] = await Promise.all([getSeasons(), resolveSeason(params.season)]);
+  const [seasons, season] = await Promise.all([
+    getPublicSeasons(),
+    resolvePublicSeason(params.season),
+  ]);
   // Anonymous visitors get fixtures and results; who has been appointed to
   // referee them is only shown once you are signed in.
 
@@ -46,11 +55,8 @@ export default async function SchedulePage({
   }
 
   const [divisions, teams] = await Promise.all([
-    getDivisions(),
-    prisma.team.findMany({
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
+    getPublicDivisions(),
+    getPublicTeams().then((rows) => rows.sort((a, b) => a.name.localeCompare(b.name))),
   ]);
 
   // Two choices only: what is still to come, or the whole season. A
@@ -59,10 +65,12 @@ export default async function SchedulePage({
   const view = params.view === "all" ? "all" : "fixtures";
   const matchweek = params.matchweek?.trim() || undefined;
 
-  const where: Record<string, unknown> = { seasonId: season.id };
-  if (params.division) where.divisionId = params.division;
-  if (params.team) where.OR = [{ homeTeamId: params.team }, { awayTeamId: params.team }];
-  if (matchweek) where.matchweek = matchweek;
+  const filters: PublicMatchFilters = {
+    season: season.id,
+    division: params.division,
+    team: params.team,
+    matchweek,
+  };
   /*
     "Upcoming" is about the clock, not about paperwork. Filtering on an absent
     report alone left a match that kicked off weeks ago but never had a result
@@ -70,10 +78,10 @@ export default async function SchedulePage({
     "All".
   */
   const upcomingFrom = view === "fixtures" ? new Date() : null;
-  if (view === "fixtures") where.report = { is: null };
-  if (upcomingFrom) where.kickoffAt = { gte: upcomingFrom };
+  if (view === "fixtures") filters.unreported = true;
+  if (upcomingFrom) filters.from = upcomingFrom;
 
-  const ordered = await listMatches(where);
+  const ordered = await getPublicMatches(filters);
 
   /*
     The calendar is a second way of reading the same filters, so it keeps
@@ -92,9 +100,10 @@ export default async function SchedulePage({
   const calendarFrom = upcomingFrom && upcomingFrom > monthStart ? upcomingFrom : monthStart;
   const calendarMatches =
     layout === "calendar"
-      ? await listMatches({
-          ...where,
-          kickoffAt: { gte: calendarFrom, lt: monthEnd },
+      ? await getPublicMatches({
+          ...filters,
+          from: calendarFrom,
+          until: monthEnd,
         })
       : [];
 

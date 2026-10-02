@@ -82,6 +82,36 @@ show accessible loading placeholders (without animation when reduced motion is
 requested). The admin overview streams league totals, pending reports, workflow
 queues, and recent activity independently.
 
+### Public data caching
+
+Public schedule, standings, team profiles, team discipline, announcements, season
+and division reference data use tagged Next.js Data Cache reads. Live data
+revalidates after 60 seconds; reference data and announcements after 300 seconds.
+Rules PDF availability revalidates after 60 seconds. TTL revalidation is
+on-demand and may serve one stale read while refreshing; explicit mutation
+invalidation expires entries immediately. Cached DTOs contain only public fields and JSON
+values; dates are explicitly serialized and restored. Schedule keys include all
+database filters and time bounds; upcoming reads share a minute-sized window
+but still apply the exact current cutoff on every request.
+
+Pages remain dynamic. Auth, permissions, team contexts, roster membership,
+free-agent requests/contact history, admin/captain/account data, notifications,
+and private calendar reads never use these caches. Free Agents caches only its
+public division choices, not player information. Public calendar feeds retain
+their existing HTTP policies (up to five minutes); personal feeds and Admin CSV
+remain no-store. Mutation API responses are explicitly private/no-store. Logos
+revalidate their ETag on every request so replacements do not remain in browsers
+for an hour.
+
+Successful mutation boundaries call `invalidatePublicData` after committing.
+Centralized domain dependencies expire affected tags immediately (including
+results, reschedules, appeals, roster/captain changes, profiles/logos, content,
+and free-agent updates). New mutation entry points must call this helper too;
+direct database maintenance must expire the relevant tags or allow the TTL to
+revalidate. Season/division changes and bulk imports invalidate all dependent
+public domains. Private workflow-only changes need no public invalidation until
+they alter published data.
+
 To exercise the privileged flows, go to **/signin** and use the dev bypass
 personas (enabled by `DEV_AUTH_BYPASS=true`, hard-disabled when
 `NODE_ENV=production`):

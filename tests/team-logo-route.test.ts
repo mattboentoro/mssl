@@ -46,6 +46,7 @@ describe("controlled team logo reads", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("image/png");
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("cache-control")).toBe("public, max-age=0, must-revalidate");
   });
 
   it("rejects absent, wrong-container, and unapproved content pointers", async () => {
@@ -87,6 +88,7 @@ describe("controlled team logo reads", () => {
       { params: Promise.resolve({ id: "team-1" }) },
     );
     expect(response.status).toBe(304);
+    expect(response.headers.get("cache-control")).toBe("public, max-age=0, must-revalidate");
     expect(storageFactory).not.toHaveBeenCalled();
   });
 });

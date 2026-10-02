@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { invalidatePublicData } from "@/lib/public-cache";
 
 import type { ActionState } from "@/app/admin/actions";
 import { actorFrom } from "@/lib/api";
@@ -151,6 +152,7 @@ export async function submitFreeAgentRequest(
     },
   });
 
+  invalidatePublicData("freeAgents");
   revalidatePath("/free-agents");
   revalidatePath("/admin/free-agents");
   revalidatePath("/captain/free-agents");
@@ -188,6 +190,7 @@ export async function withdrawFreeAgentRequest(
     metadata: {},
   });
 
+  invalidatePublicData("freeAgents");
   revalidatePath("/free-agents");
   revalidatePath("/admin/free-agents");
   revalidatePath("/captain/free-agents");

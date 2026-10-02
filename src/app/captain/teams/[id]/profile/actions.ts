@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { invalidatePublicData } from "@/lib/public-cache";
 
 import { actorFrom } from "@/lib/api";
 import { AuthzError, requireCaptainForTeam, requireUser, type SessionUser } from "@/lib/authz";
@@ -26,6 +27,7 @@ function text(form: FormData, key: string): string {
 }
 
 function refresh(teamId: string): void {
+  invalidatePublicData("teams");
   revalidatePath(`/captain/teams/${teamId}/profile`);
   revalidatePath("/teams", "layout");
 }
@@ -84,8 +86,8 @@ export async function uploadTeamLogoAction(
       contentType,
       actor: actorFrom(actor),
       storage: getTeamLogoStorage(),
+      onCommitted: () => refresh(teamId),
     });
-    refresh(teamId);
     return { ok: "Team logo updated." };
   } catch (error) {
     return actionError(error);
@@ -104,8 +106,8 @@ export async function deleteTeamLogoAction(
       teamId,
       actor: actorFrom(actor),
       storage: getTeamLogoStorage(),
+      onCommitted: () => refresh(teamId),
     });
-    refresh(teamId);
     return { ok: "Team logo removed." };
   } catch (error) {
     return actionError(error);

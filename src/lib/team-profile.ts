@@ -66,6 +66,7 @@ export async function replaceTeamLogo(options: {
   storage: TeamLogoStorage;
   persistence?: TeamLogoPersistence;
   randomId?: () => string;
+  onCommitted?: () => void;
 }): Promise<void> {
   const persistence = options.persistence ?? prismaTeamLogoPersistence;
   const blobName = generateTeamLogoBlobName(options.contentType, options.randomId);
@@ -86,6 +87,7 @@ export async function replaceTeamLogo(options: {
     throw error;
   }
 
+  options.onCommitted?.();
   if (oldLogo?.blobName && oldLogo.blobName !== uploaded.blobName) {
     try {
       await options.storage.delete(oldLogo.blobName);
@@ -102,11 +104,13 @@ export async function deleteTeamLogo(options: {
   actor: AuditActor;
   storage: TeamLogoStorage;
   persistence?: TeamLogoPersistence;
+  onCommitted?: () => void;
 }): Promise<void> {
   const oldLogo = await (options.persistence ?? prismaTeamLogoPersistence).commitDeletion(
     options.teamId,
     options.actor,
   );
+  options.onCommitted?.();
   if (!oldLogo?.blobName) return;
   try {
     await options.storage.delete(oldLogo.blobName);

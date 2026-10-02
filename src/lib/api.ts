@@ -3,6 +3,7 @@ import { ZodError, type ZodType } from "zod";
 
 import { AuthzError, type SessionUser } from "@/lib/authz";
 import { MatchError } from "@/lib/matches";
+import { invalidatePublicData } from "@/lib/public-cache";
 import { flattenZodError } from "@/lib/validation";
 
 /**
@@ -29,13 +30,13 @@ export function apiError(
 ): NextResponse<ApiErrorBody> {
   return NextResponse.json<ApiErrorBody>(
     { error: message, code, ...(fields ? { fields } : {}) },
-    { status },
+    { status, headers: { "Cache-Control": "private, no-store" } },
   );
 }
 
 export async function handleApi<T>(fn: () => Promise<T>): Promise<NextResponse> {
   try {
-    return NextResponse.json(await fn());
+    return NextResponse.json(await fn(), { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     if (error instanceof AuthzError) {
       return apiError(error.status, error.code, error.message);
@@ -54,6 +55,15 @@ export async function handleApi<T>(fn: () => Promise<T>): Promise<NextResponse> 
     console.error("[api] unhandled error", error);
     return apiError(500, "INTERNAL", "Something went wrong. Please try again.");
   }
+}
+
+/** All match POST routes invalidate public projections only after their write commits. */
+export async function handleMatchMutation<T>(fn: () => Promise<T>): Promise<NextResponse> {
+  return handleApi(async () => {
+    const result = await fn();
+    invalidatePublicData("matches");
+    return result;
+  });
 }
 
 /** Parse a JSON body against a schema. An empty body is treated as `{}`. */

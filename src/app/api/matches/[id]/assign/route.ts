@@ -1,4 +1,4 @@
-import { actorFrom, handleApi, parseJson } from "@/lib/api";
+import { actorFrom, handleMatchMutation, parseJson } from "@/lib/api";
 import { requireReferee } from "@/lib/authz";
 import { assignRefereeToMatch } from "@/lib/matches";
 import { prisma } from "@/lib/prisma";
@@ -16,7 +16,7 @@ export const runtime = "nodejs";
  * Returns 409 ALREADY_ASSIGNED when another referee won the race.
  */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  return handleApi(async () => {
+  return handleMatchMutation(async () => {
     const { id } = await context.params;
     const { user, referee } = await requireReferee();
     const body = await parseJson(request, assignSchema);

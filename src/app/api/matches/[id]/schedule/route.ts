@@ -1,4 +1,4 @@
-import { actorFrom, handleApi, parseJson } from "@/lib/api";
+import { actorFrom, handleMatchMutation, parseJson } from "@/lib/api";
 import { requireAdmin } from "@/lib/authz";
 import { MatchError, updateMatchSchedule } from "@/lib/matches";
 import { prisma } from "@/lib/prisma";
@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 
 /** Reschedule, postpone, cancel or re-kit a match. Admin only. */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  return handleApi(async () => {
+  return handleMatchMutation(async () => {
     const { id } = await context.params;
     const user = await requireAdmin();
     const body = await parseJson(request, matchUpdateSchema);

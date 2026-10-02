@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { invalidatePublicData } from "@/lib/public-cache";
 
 import { AuthzError, requirePlayer, requireUser } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
@@ -34,6 +35,7 @@ function required(form: FormData, key: string): string {
 }
 
 function refreshRoster() {
+  invalidatePublicData("teams", "freeAgents");
   revalidatePath("/roster");
   revalidatePath("/player");
   revalidatePath("/captain");

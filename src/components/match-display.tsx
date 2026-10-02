@@ -5,7 +5,7 @@ import { Badge, Card, FormGuide, MatchStatusBadge } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/dates";
 import { kitColorName, resolveKit } from "@/lib/kits";
-import { displayedScore, type MatchListItem } from "@/lib/queries";
+import { displayedScore, type MatchDisplayItem as MatchListItem } from "@/lib/queries";
 import { pointsPerGame, type PrimaryMetric, type StandingsRow } from "@/lib/standings";
 
 /*
@@ -273,7 +273,7 @@ export function MatchRow({ match, action }: { match: MatchListItem; action?: Rea
         status={
           <span className="flex flex-wrap justify-center gap-1">
             {ASSIGNMENT_ONLY_STATUSES.includes(match.status) ? null : (
-              <MatchStatusBadge match={match} />
+              <MatchStatusBadge match={{ ...match, refereeId: match.refereeId ?? null }} />
             )}
             {match.report?.status === "DISPUTED" ? <Badge tone="danger">Disputed</Badge> : null}
           </span>

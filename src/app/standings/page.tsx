@@ -4,7 +4,11 @@ import { StandingsTable } from "@/components/match-display";
 import { SeasonTabs } from "@/components/season-tabs";
 import { Alert, Card, EmptyState, PageHeader } from "@/components/ui";
 import { config } from "@/lib/config";
-import { getSeasons, getStandingsForSeason, resolveSeason } from "@/lib/queries";
+import {
+  getPublicSeasons as getSeasons,
+  getPublicStandings as getStandingsForSeason,
+  resolvePublicSeason as resolveSeason,
+} from "@/lib/public-queries";
 
 export const metadata: Metadata = {
   title: "Standings",

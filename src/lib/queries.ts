@@ -117,6 +117,25 @@ export const MATCH_LIST_INCLUDE = {
 } as const;
 
 export type MatchListItem = Awaited<ReturnType<typeof listMatches>>[number];
+export type MatchDisplayItem = Pick<
+  MatchListItem,
+  | "id"
+  | "status"
+  | "kickoffAt"
+  | "matchweek"
+  | "venueName"
+  | "homeKit"
+  | "awayKit"
+  | "homeTeam"
+  | "awayTeam"
+  | "division"
+> & {
+  refereeId?: string | null;
+  report: Pick<
+    NonNullable<MatchListItem["report"]>,
+    "status" | "homeScore" | "awayScore" | "homeForfeit" | "awayForfeit"
+  > | null;
+};
 
 export async function listMatches(where: Record<string, unknown> = {}, take?: number) {
   return prisma.match.findMany({

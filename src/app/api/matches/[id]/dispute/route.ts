@@ -1,4 +1,4 @@
-import { actorFrom, handleApi, parseJson } from "@/lib/api";
+import { actorFrom, handleMatchMutation, parseJson } from "@/lib/api";
 import { requireAdmin } from "@/lib/authz";
 import { disputeGameReport } from "@/lib/matches";
 import { prisma } from "@/lib/prisma";
@@ -7,7 +7,7 @@ import { reasonSchema } from "@/lib/validation";
 export const runtime = "nodejs";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  return handleApi(async () => {
+  return handleMatchMutation(async () => {
     const { id } = await context.params;
     const user = await requireAdmin();
     const { reason } = await parseJson(request, reasonSchema);

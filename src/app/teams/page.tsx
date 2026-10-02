@@ -4,7 +4,7 @@ import Link from "next/link";
 import { TeamColorBar } from "@/components/team-colors";
 import { TeamLogo } from "@/components/team-logo";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
-import { getTeams } from "@/lib/queries";
+import { getPublicTeams as getTeams } from "@/lib/public-queries";
 
 export const metadata: Metadata = {
   title: "Teams",
@@ -53,7 +53,7 @@ export default async function TeamsPage() {
                         <TeamLogo
                           teamId={team.id}
                           name={team.name}
-                          hasLogo={Boolean(team.logoBlobName)}
+                          hasLogo={team.hasLogo}
                           size={44}
                         />
                         <TeamColorBar team={team} size="lg" />

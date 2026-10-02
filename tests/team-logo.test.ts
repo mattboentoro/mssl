@@ -95,8 +95,16 @@ describe("team logo replacement lifecycle", () => {
       storage,
       persistence,
       randomId: () => "new",
+      onCommitted: () => {
+        events.push("invalidate");
+      },
     });
-    expect(events).toEqual(["upload:teams/new.png", "commit", "delete:teams/old.png"]);
+    expect(events).toEqual([
+      "upload:teams/new.png",
+      "commit",
+      "invalidate",
+      "delete:teams/old.png",
+    ]);
   });
 
   it("compensates by deleting the new blob when the database transaction fails", async () => {
@@ -115,6 +123,9 @@ describe("team logo replacement lifecycle", () => {
         storage,
         persistence,
         randomId: () => "new",
+        onCommitted: () => {
+          events.push("invalidate");
+        },
       }),
     ).rejects.toThrow("database failed");
     expect(events).toEqual(["upload:teams/new.png", "commit", "delete:teams/new.png"]);
@@ -159,6 +170,39 @@ describe("team logo replacement lifecycle", () => {
     const { events, storage, persistence } = fixtures();
     await deleteTeamLogo({ teamId: "team-1", actor: { id: "actor" }, storage, persistence });
     expect(events).toEqual(["clear", "delete:teams/old.png"]);
+  });
+
+  it("invalidates a committed logo change even when old blob cleanup fails", async () => {
+    for (const operation of ["replace", "delete"]) {
+      const { events, storage, persistence } = fixtures();
+      storage.delete = async () => {
+        throw new Error("storage offline");
+      };
+      const onCommitted = () => {
+        events.push("invalidate");
+      };
+      const result =
+        operation === "replace"
+          ? replaceTeamLogo({
+              teamId: "team-1",
+              actor: { id: "actor" },
+              storage,
+              persistence,
+              onCommitted,
+              bytes: png,
+              contentType: "image/png",
+              randomId: () => "new",
+            })
+          : deleteTeamLogo({
+              teamId: "team-1",
+              actor: { id: "actor" },
+              storage,
+              persistence,
+              onCommitted,
+            });
+      await expect(result).rejects.toThrow("storage offline");
+      expect(events.at(-1)).toBe("invalidate");
+    }
   });
 });
 
