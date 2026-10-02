@@ -95,7 +95,7 @@ export function MatchScore({
 }) {
   return (
     <span
-      className="bg-surface-muted border-subtle inline-flex items-center rounded-lg border px-3 py-2 text-lg font-bold tabular-nums shadow-sm sm:px-6 sm:py-3 sm:text-2xl"
+      className="bg-surface-muted border-subtle inline-flex items-center rounded-lg border px-3 py-2 text-base font-bold tabular-nums shadow-sm sm:px-5 sm:py-2.5 sm:text-xl"
       aria-label={`${label}: ${home} to ${away}`}
     >
       {home}
@@ -123,18 +123,18 @@ export function MatchKitColors({
 
   return (
     <span
-      className="bg-surface-muted border-subtle inline-flex items-center gap-2 rounded-lg border px-3 py-2 shadow-sm sm:gap-4 sm:px-6 sm:py-3"
+      className="bg-surface-muted border-subtle inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 shadow-sm sm:gap-3 sm:px-5 sm:py-2.5"
       aria-label={`${homeTeam.name} in ${kitColorName(homeColor)}, ${awayTeam.name} in ${kitColorName(awayColor)}`}
     >
       <span
         aria-hidden
-        className="h-[clamp(1.25rem,3vw,1.75rem)] w-[clamp(1.25rem,3vw,1.75rem)] rounded-full ring-1 ring-black/20 dark:ring-white/25"
+        className="h-[clamp(1.125rem,2.5vw,1.5rem)] w-[clamp(1.125rem,2.5vw,1.5rem)] rounded-full ring-1 ring-black/20 dark:ring-white/25"
         style={{ backgroundColor: homeColor }}
       />
       <span className="text-muted text-[clamp(0.7rem,1.4vw,0.875rem)] font-semibold">vs</span>
       <span
         aria-hidden
-        className="h-[clamp(1.25rem,3vw,1.75rem)] w-[clamp(1.25rem,3vw,1.75rem)] rounded-full ring-1 ring-black/20 dark:ring-white/25"
+        className="h-[clamp(1.125rem,2.5vw,1.5rem)] w-[clamp(1.125rem,2.5vw,1.5rem)] rounded-full ring-1 ring-black/20 dark:ring-white/25"
         style={{ backgroundColor: awayColor }}
       />
     </span>
@@ -172,13 +172,13 @@ export function MatchHeadToHead({
     return side.href ? (
       <Link
         href={side.href}
-        className={`min-w-0 text-[clamp(0.95rem,1.8vw,1.2rem)] leading-tight font-semibold hover:underline ${alignment}`}
+        className={`min-w-0 text-[clamp(0.9rem,1.5vw,1.1rem)] leading-tight font-semibold hover:underline ${alignment}`}
       >
         {content}
       </Link>
     ) : (
       <span
-        className={`min-w-0 text-[clamp(0.95rem,1.8vw,1.2rem)] leading-tight font-semibold ${alignment}`}
+        className={`min-w-0 text-[clamp(0.9rem,1.5vw,1.1rem)] leading-tight font-semibold ${alignment}`}
       >
         {content}
       </span>
