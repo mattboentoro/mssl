@@ -14,6 +14,21 @@ import { pointsPerGame, type PrimaryMetric, type StandingsRow } from "@/lib/stan
 */
 const ASSIGNMENT_ONLY_STATUSES: readonly MatchListItem["status"][] = ["SCHEDULED", "ASSIGNED"];
 
+const DIVISION_COLOR_CLASSES = [
+  "text-blue-700 dark:text-blue-300",
+  "text-emerald-700 dark:text-emerald-300",
+  "text-violet-700 dark:text-violet-300",
+  "text-amber-700 dark:text-amber-300",
+  "text-rose-700 dark:text-rose-300",
+  "text-cyan-700 dark:text-cyan-300",
+] as const;
+
+function divisionColorClass(name: string) {
+  let hash = 0;
+  for (const character of name) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  return DIVISION_COLOR_CLASSES[hash % DIVISION_COLOR_CLASSES.length];
+}
+
 type HeadToHeadTeam = {
   name: string;
   href?: string;
@@ -72,7 +87,7 @@ export function MatchScore({
 }) {
   return (
     <span
-      className="bg-surface-muted border-subtle inline-flex items-center rounded-lg border px-5 py-2 text-xl font-bold tabular-nums shadow-sm"
+      className="bg-surface-muted border-subtle inline-flex items-center rounded-lg border px-3 py-2 text-lg font-bold tabular-nums shadow-sm sm:px-6 sm:py-3 sm:text-2xl"
       aria-label={`${label}: ${home} to ${away}`}
     >
       {home}
@@ -100,18 +115,18 @@ export function MatchKitColors({
 
   return (
     <span
-      className="bg-surface-muted border-subtle inline-flex items-center gap-3 rounded-lg border px-4 py-2 shadow-sm"
+      className="bg-surface-muted border-subtle inline-flex items-center gap-2 rounded-lg border px-3 py-2 shadow-sm sm:gap-4 sm:px-6 sm:py-3"
       aria-label={`${homeTeam.name} in ${kitColorName(homeColor)}, ${awayTeam.name} in ${kitColorName(awayColor)}`}
     >
       <span
         aria-hidden
-        className="h-5 w-5 rounded-full ring-1 ring-black/20 dark:ring-white/25"
+        className="h-[clamp(1.25rem,3vw,1.75rem)] w-[clamp(1.25rem,3vw,1.75rem)] rounded-full ring-1 ring-black/20 dark:ring-white/25"
         style={{ backgroundColor: homeColor }}
       />
-      <span className="text-muted text-xs font-semibold">vs</span>
+      <span className="text-muted text-[clamp(0.7rem,1.4vw,0.875rem)] font-semibold">vs</span>
       <span
         aria-hidden
-        className="h-5 w-5 rounded-full ring-1 ring-black/20 dark:ring-white/25"
+        className="h-[clamp(1.25rem,3vw,1.75rem)] w-[clamp(1.25rem,3vw,1.75rem)] rounded-full ring-1 ring-black/20 dark:ring-white/25"
         style={{ backgroundColor: awayColor }}
       />
     </span>
@@ -147,11 +162,18 @@ export function MatchHeadToHead({
       </>
     );
     return side.href ? (
-      <Link href={side.href} className={`min-w-0 font-semibold hover:underline ${alignment}`}>
+      <Link
+        href={side.href}
+        className={`min-w-0 text-[clamp(1rem,2.2vw,1.35rem)] leading-tight font-semibold hover:underline ${alignment}`}
+      >
         {content}
       </Link>
     ) : (
-      <span className={`min-w-0 font-semibold ${alignment}`}>{content}</span>
+      <span
+        className={`min-w-0 text-[clamp(1rem,2.2vw,1.35rem)] leading-tight font-semibold ${alignment}`}
+      >
+        {content}
+      </span>
     );
   };
 
@@ -163,10 +185,10 @@ export function MatchHeadToHead({
           <span>{topRight}</span>
         </div>
       ) : null}
-      <div className="grid items-center gap-4 text-center sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-8">
-        {team(home, "sm:text-right")}
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 text-center sm:gap-8">
+        {team(home, "text-right")}
         <div className="shrink-0">{center}</div>
-        {team(away, "sm:text-left")}
+        {team(away, "text-left")}
       </div>
       {time || status || location ? (
         <div className="text-muted mt-4 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 text-sm font-medium">
@@ -207,7 +229,9 @@ export function MatchRow({ match, action }: { match: MatchListItem; action?: Rea
             />
           )
         }
-        topLeft={match.division.name}
+        topLeft={
+          <span className={divisionColorClass(match.division.name)}>{match.division.name}</span>
+        }
         topRight={`MW ${match.matchweek}`}
         time={formatDateTime(match.kickoffAt)}
         status={

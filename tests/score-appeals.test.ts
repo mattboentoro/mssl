@@ -207,9 +207,9 @@ describe("score appeal form UI", () => {
     expect(page).toContain("<MatchScore");
     expect(page).toContain("Original result");
     expect(page).toContain("Requested result");
-    expect(matchDisplay).toContain("sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]");
     expect(matchDisplay).toContain("grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]");
-    expect(matchDisplay).toContain("topLeft={match.division.name}");
+    expect(matchDisplay).toContain("text-[clamp(1rem,2.2vw,1.35rem)]");
+    expect(matchDisplay).toContain("divisionColorClass(match.division.name)");
     expect(matchDisplay).toContain("topRight={`MW ${match.matchweek}`}");
     expect(matchDisplay).toContain("<MatchKitColors");
     expect(results).toContain("<MatchHeadToHead");
