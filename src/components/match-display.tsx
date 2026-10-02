@@ -164,13 +164,13 @@ export function MatchHeadToHead({
     return side.href ? (
       <Link
         href={side.href}
-        className={`min-w-0 text-[clamp(1rem,2.2vw,1.35rem)] leading-tight font-semibold hover:underline ${alignment}`}
+        className={`min-w-0 text-[clamp(0.95rem,1.8vw,1.2rem)] leading-tight font-semibold hover:underline ${alignment}`}
       >
         {content}
       </Link>
     ) : (
       <span
-        className={`min-w-0 text-[clamp(1rem,2.2vw,1.35rem)] leading-tight font-semibold ${alignment}`}
+        className={`min-w-0 text-[clamp(0.95rem,1.8vw,1.2rem)] leading-tight font-semibold ${alignment}`}
       >
         {content}
       </span>
