@@ -1,6 +1,7 @@
 import { ActionForm, FieldError, SubmitButton } from "@/components/admin-forms";
 import { CloseOnSuccess, Dialog, DialogCancel } from "@/components/form-dialog";
 import { SeasonTabs } from "@/components/season-tabs";
+import { Pagination } from "@/components/pagination";
 import { Badge, Card, EmptyState, Field, inputClass, outlineButtonClass } from "@/components/ui";
 import {
   createDisciplinaryAction,
@@ -16,6 +17,7 @@ import {
 } from "@/lib/enums";
 import { formatDate } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
+import { firstParam, pagination, type SearchParams } from "@/lib/pagination";
 import {
   getDisciplinaryRecords,
   getSeasonSuspensions,
@@ -32,9 +34,10 @@ const gamesLabel = (games: number) => `${games} game${games === 1 ? "" : "s"}`;
 export default async function AdminDisciplinePage({
   searchParams,
 }: {
-  searchParams: Promise<{ season?: string }>;
+  searchParams: Promise<SearchParams>;
 }) {
-  const { season: seasonParam } = await searchParams;
+  const params = await searchParams;
+  const seasonParam = firstParam(params.season);
   const [seasons, season] = await Promise.all([getSeasons(), resolveSeason(seasonParam)]);
 
   if (!season) {
@@ -48,8 +51,14 @@ export default async function AdminDisciplinePage({
     );
   }
 
-  const [records, suspensions, teams, matches] = await Promise.all([
-    getDisciplinaryRecords(season.id),
+  const range = pagination(
+    params.page,
+    await prisma.disciplinaryAction.count({ where: { seasonId: season.id } }),
+  );
+  const [records, pending, suspensions, teams, matches] = await Promise.all([
+    getDisciplinaryRecords(season.id, { skip: range.skip, take: range.take }),
+    // The review queue must remain season-wide, independent of the register page.
+    getDisciplinaryRecords(season.id, { pendingOnly: true }),
     getSeasonSuspensions(season.id),
     prisma.team.findMany({
       orderBy: { name: "asc" },
@@ -68,11 +77,6 @@ export default async function AdminDisciplinePage({
     }),
   ]);
 
-  // A red card carries no automatic length, so it waits here until somebody
-  // decides one. Yellows never queue: the third one bans the player by itself.
-  const pending = records.filter(
-    (record) => record.type === "RED" && record.gamesSuspended === null,
-  );
   const active = outstandingSuspensions(suspensions);
   const banById = new Map(suspensions.map((ban) => [ban.id, ban]));
 
@@ -335,6 +339,12 @@ export default async function AdminDisciplinePage({
             })}
           </Card>
         )}
+        <Pagination
+          basePath="/admin/discipline"
+          params={params}
+          range={range}
+          label="Disciplinary records"
+        />
       </section>
     </div>
   );

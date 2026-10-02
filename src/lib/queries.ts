@@ -301,13 +301,21 @@ export interface DisciplinaryRow {
 }
 
 /**
- * Every disciplinary record in a season: cards filed by referees on game
- * reports, plus league sanctions added in Game Administration.
+ * Cards filed by referees and league sanctions in a season. Unpaged by default;
+ * the admin register requests a page and the review queue requests pending reds.
  */
-export async function getDisciplinaryRecords(seasonId: string): Promise<DisciplinaryRow[]> {
+export async function getDisciplinaryRecords(
+  seasonId: string,
+  options: { skip?: number; take?: number; pendingOnly?: boolean } = {},
+): Promise<DisciplinaryRow[]> {
   const rows = await prisma.disciplinaryAction.findMany({
-    where: { seasonId },
-    orderBy: [{ createdAt: "desc" }],
+    where: {
+      seasonId,
+      ...(options.pendingOnly ? { type: "RED", gamesSuspended: null } : {}),
+    },
+    skip: options.skip,
+    take: options.take,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     include: {
       team: { select: { id: true, name: true, division: { select: { name: true } } } },
       match: {

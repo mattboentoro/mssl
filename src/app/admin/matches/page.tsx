@@ -1,10 +1,12 @@
 import Link from "next/link";
+import type { Prisma } from "@prisma/client";
 
 import { FieldError } from "@/components/admin-forms";
 import { ClickableRow } from "@/components/clickable-row";
 import { CalendarViewToggle, FixtureCalendar, parseView } from "@/components/fixture-calendar";
 import { Dialog, FormDialog } from "@/components/form-dialog";
 import { MatchKitPicker } from "@/components/match-kit-picker";
+import { Pagination } from "@/components/pagination";
 import { ScheduleImportForm } from "@/components/schedule-import-form";
 import { KitSwatch } from "@/components/team-colors";
 import {
@@ -24,27 +26,27 @@ import {
   matchDisplayWhere,
 } from "@/lib/match-status";
 import { prisma } from "@/lib/prisma";
+import { firstParam, pagination, type SearchParams } from "@/lib/pagination";
 import { getActiveSeason, listMatches, scoreText } from "@/lib/queries";
 import { zonedToUtc } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
 
-interface Params {
-  status?: string;
-  division?: string;
-  q?: string;
-  season?: string;
-  view?: string;
-  month?: string;
-  when?: string;
-}
-
 export default async function AdminMatchesPage({
   searchParams,
 }: {
-  searchParams: Promise<Params>;
+  searchParams: Promise<SearchParams>;
 }) {
-  const params = await searchParams;
+  const query = await searchParams;
+  const params = {
+    season: firstParam(query.season),
+    status: firstParam(query.status),
+    division: firstParam(query.division),
+    q: firstParam(query.q),
+    view: firstParam(query.view),
+    month: firstParam(query.month),
+    when: firstParam(query.when),
+  };
   const workflowReviewCount = await prisma.$transaction([
     prisma.rescheduleRequest.count({ where: { status: "PENDING_ADMIN" } }),
     prisma.captainResultProposal.count({ where: { status: "PENDING_ADMIN" } }),
@@ -65,7 +67,7 @@ export default async function AdminMatchesPage({
   // default.
   const when = params.when === "all" ? "all" : "upcoming";
 
-  const where: Record<string, unknown> = { seasonId };
+  const where: Prisma.MatchWhereInput = { seasonId };
   // Filtering on what the badge says, not on the stored column: "waiting
   // report" and "not started" are both SCHEDULED underneath, so the raw status
   // would not tell them apart.
@@ -80,35 +82,39 @@ export default async function AdminMatchesPage({
     ];
   }
 
+  const view = parseView(params.view);
+  const range = pagination(query.page, view === "list" ? await prisma.match.count({ where }) : 0);
   const [divisions, teams, matches] = await Promise.all([
     prisma.division.findMany({ orderBy: { sortOrder: "asc" } }),
     prisma.team.findMany({ orderBy: { name: "asc" } }),
-    prisma.match.findMany({
-      where,
-      orderBy: [{ kickoffAt: "asc" }],
-      take: 200,
-      include: {
-        homeTeam: { select: { name: true, colorPrimary: true, colorAlternate: true } },
-        awayTeam: { select: { name: true, colorPrimary: true, colorAlternate: true } },
-        division: { select: { name: true } },
-        referee: { select: { name: true } },
-        report: {
-          select: {
-            homeScore: true,
-            awayScore: true,
-            homeForfeit: true,
-            awayForfeit: true,
-            status: true,
+    view === "list"
+      ? prisma.match.findMany({
+          where,
+          orderBy: [{ kickoffAt: "asc" }, { id: "asc" }],
+          take: range.take,
+          skip: range.skip,
+          include: {
+            homeTeam: { select: { name: true, colorPrimary: true, colorAlternate: true } },
+            awayTeam: { select: { name: true, colorPrimary: true, colorAlternate: true } },
+            division: { select: { name: true } },
+            referee: { select: { name: true } },
+            report: {
+              select: {
+                homeScore: true,
+                awayScore: true,
+                homeForfeit: true,
+                awayForfeit: true,
+                status: true,
+              },
+            },
           },
-        },
-      },
-    }),
+        })
+      : [],
   ]);
 
   // The calendar covers one whole league-time month, so it replaces the list's
-  // ordering, its 200-row cap and its upcoming-only window. The other filters
+  // pagination and its upcoming-only window. The other filters
   // (season, division, status, team) still apply.
-  const view = parseView(params.view);
   const { year, month } = parseMonthValue(params.month);
   const next = shiftMonth(year, month, 1);
   const calendarMatches =
@@ -210,7 +216,7 @@ export default async function AdminMatchesPage({
           <h2 id="fixture-list" className="text-lg font-semibold">
             {view === "calendar"
               ? `Fixture calendar (${calendarMatches.length})`
-              : `Fixtures (${matches.length})`}
+              : `Fixtures (${range.total})`}
           </h2>
           <div className="flex flex-wrap items-center gap-2">
             <Link href="/admin/workflows" className={outlineButtonClass}>
@@ -435,6 +441,9 @@ export default async function AdminMatchesPage({
             </table>
           </Card>
         )}
+        {view === "list" ? (
+          <Pagination basePath="/admin/matches" params={query} range={range} label="Fixtures" />
+        ) : null}
       </section>
     </div>
   );

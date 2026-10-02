@@ -71,6 +71,17 @@ not update the site automatically. To revise individual fixtures, use
 season from **Match Control → Download CSV**, edit the exported file, and import
 it again.
 
+Admin Matches (list view) and the Disciplinary register use URL-based pages of
+100 records, with Previous/Next links preserving the current query parameters.
+Out-of-range pages resolve to the nearest available page. The fixture calendar
+still loads the complete selected month; discipline review queues and suspension
+calculations remain season-wide.
+
+Schedule, Account, and the Matches, Users, Rosters, and Reviews admin routes
+show accessible loading placeholders (without animation when reduced motion is
+requested). The admin overview streams league totals, pending reports, workflow
+queues, and recent activity independently.
+
 To exercise the privileged flows, go to **/signin** and use the dev bypass
 personas (enabled by `DEV_AUTH_BYPASS=true`, hard-disabled when
 `NODE_ENV=production`):
