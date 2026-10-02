@@ -23,7 +23,15 @@ const DIVISION_COLOR_CLASSES = [
   "text-cyan-700 dark:text-cyan-300",
 ] as const;
 
+const NAMED_DIVISION_COLOR_CLASSES: Record<string, (typeof DIVISION_COLOR_CLASSES)[number]> = {
+  "premier league": DIVISION_COLOR_CLASSES[0],
+  "first division": DIVISION_COLOR_CLASSES[1],
+};
+
 function divisionColorClass(name: string) {
+  const namedColor = NAMED_DIVISION_COLOR_CLASSES[name.trim().toLowerCase()];
+  if (namedColor) return namedColor;
+
   let hash = 0;
   for (const character of name) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
   return DIVISION_COLOR_CLASSES[hash % DIVISION_COLOR_CLASSES.length];

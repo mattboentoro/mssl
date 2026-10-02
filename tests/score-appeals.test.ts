@@ -209,6 +209,8 @@ describe("score appeal form UI", () => {
     expect(page).toContain("Requested result");
     expect(matchDisplay).toContain("grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]");
     expect(matchDisplay).toContain("text-[clamp(0.95rem,1.8vw,1.2rem)]");
+    expect(matchDisplay).toContain('"premier league": DIVISION_COLOR_CLASSES[0]');
+    expect(matchDisplay).toContain('"first division": DIVISION_COLOR_CLASSES[1]');
     expect(matchDisplay).toContain("divisionColorClass(match.division.name)");
     expect(matchDisplay).toContain("topRight={`MW ${match.matchweek}`}");
     expect(matchDisplay).toContain("<MatchKitColors");
