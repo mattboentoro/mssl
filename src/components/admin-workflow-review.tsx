@@ -81,7 +81,7 @@ export function AdminWorkflowReview({
         <Card as="details" className="group overflow-hidden">
           <summary className="hover:bg-surface-muted cursor-pointer list-none px-5 py-4 transition">
             {summary}
-            <MatchDisclosureHint label="Expand workflow review" />
+            <MatchDisclosureHint />
           </summary>
           <div className="border-subtle border-t p-5">{content}</div>
         </Card>

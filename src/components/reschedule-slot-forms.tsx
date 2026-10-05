@@ -78,7 +78,7 @@ export function ImportRescheduleSlotsForm() {
   return (
     <form action={action} className="grid gap-3">
       <div>
-        <h2 className="text-ink text-lg font-semibold">Import Excel workbook</h2>
+        <h2 className="text-foreground text-lg font-semibold">Import Excel workbook</h2>
         <p className="text-muted mt-1 text-sm">
           Upload an .xlsx file with date, time, and venue headers. Times are interpreted in Pacific
           time. Up to 500 rows can be imported at once.
@@ -95,9 +95,9 @@ export function ImportRescheduleSlotsForm() {
         />
       </label>
       <p className="text-muted text-xs">
-        Example: <span className="text-ink font-semibold">date</span> 8/12/2026,{" "}
-        <span className="text-ink font-semibold">time</span> 6:30 PM,{" "}
-        <span className="text-ink font-semibold">venue</span> Marymoor Park.
+        Example: <span className="text-foreground font-semibold">date</span> 8/12/2026,{" "}
+        <span className="text-foreground font-semibold">time</span> 6:30 PM,{" "}
+        <span className="text-foreground font-semibold">venue</span> Marymoor Park.
       </p>
       <div className="w-fit">
         <Submit>Import availability</Submit>

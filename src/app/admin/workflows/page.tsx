@@ -86,21 +86,19 @@ function ScoreComparison({
         <p className="text-right text-sm font-semibold">{home}</p>
         <div
           className={`min-w-24 rounded-lg border px-4 py-2 text-center text-2xl font-bold tabular-nums ${styles.score}`}
-          aria-label={`${label}: ${home} ${homeScore} to ${awayScore} ${away}`}
         >
           {homeScore}
           <span className="mx-3 opacity-60" aria-hidden>
             &ndash;
           </span>
+          <span className="sr-only"> to </span>
           {awayScore}
         </div>
         <p className="text-left text-sm font-semibold">{away}</p>
       </div>
       {homeForfeit || awayForfeit ? (
         <div className="mt-3 text-center">
-          <Badge tone="warning">
-            {homeForfeit ? home : away} forfeit
-          </Badge>
+          <Badge tone="warning">{homeForfeit ? home : away} forfeit</Badge>
         </div>
       ) : null}
     </div>

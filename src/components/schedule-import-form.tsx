@@ -160,7 +160,12 @@ export function ScheduleImportForm({ seasons }: { seasons: { id: string; name: s
       ) : null}
 
       {state.rows && state.rows.length > 0 ? (
-        <Card className="overflow-x-auto">
+        <Card
+          tabIndex={0}
+          role="region"
+          aria-label="Schedule import preview"
+          className="overflow-x-auto"
+        >
           <div className="border-subtle flex flex-wrap gap-4 border-b p-4 text-sm">
             <span>
               <strong className="text-success">{state.validCount}</strong> importable
@@ -173,14 +178,27 @@ export function ScheduleImportForm({ seasons }: { seasons: { id: string; name: s
             </span>
           </div>
           <table className="w-full min-w-[48rem] text-sm">
+            <caption className="sr-only">Schedule import preview</caption>
             <thead className="bg-surface-muted text-muted text-xs uppercase">
               <tr>
-                <th className="px-3 py-2 text-left">Line</th>
-                <th className="px-3 py-2 text-left">Fixture</th>
-                <th className="px-3 py-2 text-left">Division</th>
-                <th className="px-3 py-2 text-left">Kick-off</th>
-                <th className="px-3 py-2 text-left">Venue</th>
-                <th className="px-3 py-2 text-left">Outcome</th>
+                <th scope="col" className="px-3 py-2 text-left">
+                  Line
+                </th>
+                <th scope="col" className="px-3 py-2 text-left">
+                  Fixture
+                </th>
+                <th scope="col" className="px-3 py-2 text-left">
+                  Division
+                </th>
+                <th scope="col" className="px-3 py-2 text-left">
+                  Kick-off
+                </th>
+                <th scope="col" className="px-3 py-2 text-left">
+                  Venue
+                </th>
+                <th scope="col" className="px-3 py-2 text-left">
+                  Outcome
+                </th>
               </tr>
             </thead>
             <tbody className="divide-subtle divide-y">

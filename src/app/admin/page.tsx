@@ -126,7 +126,11 @@ async function PendingReports() {
                   topRight={`MW ${match.matchweek}`}
                   time={formatDateTime(match.kickoffAt)}
                   status={<Badge tone="warning">Review</Badge>}
-                  location={<>&#128205; {match.venueName ?? "TBD"}</>}
+                  location={
+                    <>
+                      <span aria-hidden>&#128205;</span> {match.venueName ?? "TBD"}
+                    </>
+                  }
                 />
                 <p className="text-muted mt-2 text-center text-xs">
                   Filed by {match.referee?.name ?? "unknown"}
@@ -172,7 +176,7 @@ async function WorkflowQueues() {
       </div>
       <p className="text-muted mt-3 text-sm">
         Participant updates are delivered through{" "}
-        <Link href="/notifications" className="text-brand hover:underline">
+        <Link href="/notifications" className="text-brand underline">
           Notifications
         </Link>
         .

@@ -44,6 +44,8 @@ describe("kitColorName", () => {
   it("matches regardless of case or shorthand", () => {
     expect(kitColorName("#FFFFFF")).toBe("White");
     expect(kitColorName("#fff")).toBe("White");
+    expect(kitColorName("#000")).toBe("Black");
+    expect(kitColorName("#000000")).toBe("Black");
   });
 
   it("falls back to the hex for a colour predating the palette", () => {
@@ -151,6 +153,11 @@ describe("readableTextOn", () => {
   it("handles shorthand hex", () => {
     expect(readableTextOn("#fff")).toBe("#000000");
     expect(readableTextOn("#000")).toBe("#ffffff");
+  });
+
+  it("chooses black instead of low-contrast white on mid-tone kits", () => {
+    expect(readableTextOn("#0ea5e9")).toBe("#000000");
+    expect(readableTextOn("#ea580c")).toBe("#000000");
   });
 });
 

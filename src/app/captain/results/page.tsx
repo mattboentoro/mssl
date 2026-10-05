@@ -84,7 +84,11 @@ export default async function CaptainResultsPage() {
                       <Badge tone="success">Official</Badge>
                     ) : null
                   }
-                  location={<>&#128205; {match.venueName ?? "TBD"}</>}
+                  location={
+                    <>
+                      <span aria-hidden>&#128205;</span> {match.venueName ?? "TBD"}
+                    </>
+                  }
                 />
                 <div className="mt-3 text-center">
                   {eligible ? (

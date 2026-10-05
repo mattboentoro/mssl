@@ -51,6 +51,7 @@ export default async function TeamsPage() {
                     <Link href={`/teams/${team.slug}`} className="block p-4">
                       <div className="flex items-center gap-3">
                         <TeamLogo
+                          decorative
                           teamId={team.id}
                           name={team.name}
                           hasLogo={team.hasLogo}

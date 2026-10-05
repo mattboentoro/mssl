@@ -26,7 +26,12 @@ export default async function AdminRatingsPage() {
       {ratings.length === 0 ? (
         <EmptyState title="No referee ratings have been submitted" />
       ) : (
-        <Card className="overflow-x-auto">
+        <Card
+          tabIndex={0}
+          role="region"
+          aria-label="Referee ratings table"
+          className="overflow-x-auto"
+        >
           <table className="w-full text-left text-sm">
             <caption className="sr-only">
               Private referee ratings with submitting actor and team

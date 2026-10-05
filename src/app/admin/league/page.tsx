@@ -213,6 +213,7 @@ export default async function AdminLeaguePage() {
             </Field>
             <Field
               label="Primary colour"
+              group
               htmlFor="team-color-primary"
               hint="Home / first-choice kit."
             >
@@ -225,6 +226,7 @@ export default async function AdminLeaguePage() {
             </Field>
             <Field
               label="Alternate colour"
+              group
               htmlFor="team-color-alternate"
               hint="Worn when the kits would clash."
             >

@@ -106,7 +106,12 @@ export function FixtureCalendar<T extends MatchDisplayItem>({
         readers then announce "Saturday" with each cell rather than leaving the
         user to infer the column.
       */}
-      <div className="-mx-4 overflow-x-auto px-4">
+      <div
+        tabIndex={0}
+        role="region"
+        aria-label="Fixture calendar"
+        className="-mx-4 overflow-x-auto px-4"
+      >
         <table className="w-full min-w-[42rem] table-fixed border-collapse text-sm">
           <caption className="sr-only">Fixtures for {label}, shown in Redmond time</caption>
           <thead>
@@ -141,7 +146,7 @@ export function FixtureCalendar<T extends MatchDisplayItem>({
                       <span
                         className={[
                           "block text-right text-xs tabular-nums",
-                          cell.inMonth ? "text-muted" : "text-muted/50",
+                          cell.inMonth ? "text-muted" : "text-muted italic",
                           cell.isToday ? "text-brand font-bold" : "",
                         ]
                           .filter(Boolean)

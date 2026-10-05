@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 
 import { buttonClass } from "@/components/ui";
+import { useModalDialog } from "@/components/use-modal-dialog";
 
 type PendingNavigation = { type: "back" } | { type: "link"; href: string };
 
@@ -14,7 +15,7 @@ type PendingNavigation = { type: "back" } | { type: "link"; href: string };
  * navigation, so `beforeunload` remains as the final safety net.
  */
 export function UnsavedChangesGuard({ enabled }: { enabled: boolean }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const { ref: dialogRef, open, restoreFocus, onKeyDown } = useModalDialog();
   const titleId = useId();
   const enabledRef = useRef(enabled);
   const guardEntryActive = useRef(false);
@@ -43,7 +44,7 @@ export function UnsavedChangesGuard({ enabled }: { enabled: boolean }) {
   useEffect(() => {
     const showWarning = (navigation: PendingNavigation) => {
       setPendingNavigation(navigation);
-      dialogRef.current?.showModal();
+      open();
     };
 
     const onPopState = () => {
@@ -73,6 +74,17 @@ export function UnsavedChangesGuard({ enabled }: { enabled: boolean }) {
 
       const destination = new URL(anchor.href, window.location.href);
       if (destination.href === window.location.href) return;
+      if (
+        destination.origin === window.location.origin &&
+        destination.pathname === window.location.pathname &&
+        destination.search === window.location.search &&
+        destination.hash === "#main"
+      ) {
+        // Do not add a hash entry on top of the history sentinel.
+        event.preventDefault();
+        document.getElementById("main")?.focus();
+        return;
+      }
 
       event.preventDefault();
       event.stopPropagation();
@@ -93,7 +105,7 @@ export function UnsavedChangesGuard({ enabled }: { enabled: boolean }) {
       document.removeEventListener("click", onDocumentClick, true);
       window.removeEventListener("beforeunload", onBeforeUnload);
     };
-  }, []);
+  }, [open]);
 
   const stay = () => {
     setPendingNavigation(null);
@@ -117,7 +129,11 @@ export function UnsavedChangesGuard({ enabled }: { enabled: boolean }) {
   return (
     <dialog
       ref={dialogRef}
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
       aria-labelledby={titleId}
+      aria-describedby={`${titleId}-description`}
+      onClose={restoreFocus}
       onClick={(event) => {
         if (event.target === event.currentTarget) stay();
       }}
@@ -135,12 +151,17 @@ export function UnsavedChangesGuard({ enabled }: { enabled: boolean }) {
           <h3 id={titleId} className="mt-1 text-lg font-semibold">
             Leave this report?
           </h3>
-          <p className="text-muted mt-2 text-sm">
+          <p id={`${titleId}-description`} className="text-muted mt-2 text-sm">
             Your game report changes have not been submitted. Leaving now will discard them.
           </p>
         </div>
         <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <button type="button" onClick={stay} className={buttonClass("success")}>
+          <button
+            type="button"
+            data-dialog-initial-focus
+            onClick={stay}
+            className={buttonClass("success")}
+          >
             Keep editing
           </button>
           <button type="button" onClick={leave} className={buttonClass("danger")}>

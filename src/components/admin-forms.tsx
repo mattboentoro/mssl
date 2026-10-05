@@ -4,6 +4,7 @@ import {
   createContext,
   useActionState,
   useContext,
+  useEffect,
   useId,
   useRef,
   type ReactNode,
@@ -11,6 +12,7 @@ import {
 import { useFormStatus } from "react-dom";
 
 import { Alert, buttonClass, type ButtonVariant } from "@/components/ui";
+import { useModalDialog } from "@/components/use-modal-dialog";
 import type { ActionState } from "@/app/admin/actions";
 
 export type ServerAction<S extends ActionState = ActionState> = (
@@ -40,8 +42,9 @@ export function SubmitButton({
   className?: string;
 }) {
   const { pending } = useFormStatus();
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const { ref: dialogRef, open, restoreFocus, onKeyDown } = useModalDialog();
   const titleId = useId();
+  const descriptionId = useId();
 
   if (confirm) {
     return (
@@ -50,13 +53,20 @@ export function SubmitButton({
           type="button"
           disabled={pending}
           className={buttonClass(variant, className)}
-          onClick={() => dialogRef.current?.showModal()}
+          onClick={open}
         >
           {pending ? "Working\u2026" : children}
         </button>
         <dialog
           ref={dialogRef}
+          tabIndex={-1}
+          onKeyDown={onKeyDown}
           aria-labelledby={titleId}
+          aria-describedby={descriptionId}
+          onClose={restoreFocus}
+          onCancel={(event) => {
+            if (pending) event.preventDefault();
+          }}
           onClick={(event) => {
             if (event.target === event.currentTarget && !pending) dialogRef.current?.close();
           }}
@@ -70,11 +80,14 @@ export function SubmitButton({
               <h3 id={titleId} className="mt-1 text-lg font-semibold">
                 Are you sure?
               </h3>
-              <p className="text-muted mt-2 text-sm">{confirm}</p>
+              <p id={descriptionId} className="text-muted mt-2 text-sm">
+                {confirm}
+              </p>
             </div>
             <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <button
                 type="button"
+                data-dialog-initial-focus
                 onClick={() => dialogRef.current?.close()}
                 disabled={pending}
                 className={buttonClass("secondary")}
@@ -175,9 +188,39 @@ export function useActionResult() {
 }) {
   const state = useContext(ActionStateContext);
   const message = state.fieldErrors?.[name];
+  const id = useId();
+  const ref = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (!message) return;
+    const field = ref.current?.parentElement;
+    const control =
+      field?.tagName === "FIELDSET"
+        ? field
+        : field?.querySelector<HTMLElement>(
+            'input:not([type="hidden"]), select, textarea, [role="radiogroup"]',
+          );
+    if (!control) return;
+    const invalid = control.getAttribute("aria-invalid");
+    control.setAttribute("aria-invalid", "true");
+    control.setAttribute(
+      "aria-describedby",
+      [control.getAttribute("aria-describedby"), id].filter(Boolean).join(" "),
+    );
+    return () => {
+      const remaining = control
+        .getAttribute("aria-describedby")
+        ?.split(/\s+/)
+        .filter((token) => token !== id)
+        .join(" ");
+      if (remaining) control.setAttribute("aria-describedby", remaining);
+      else control.removeAttribute("aria-describedby");
+      if (invalid) control.setAttribute("aria-invalid", invalid);
+      else control.removeAttribute("aria-invalid");
+    };
+  }, [message, id]);
   if (!message) return null;
   return (
-    <p className="text-danger mt-1 text-xs" role="alert">
+    <p ref={ref} id={id} className="text-danger mt-1 text-xs" role="alert">
       {message}
     </p>
   );

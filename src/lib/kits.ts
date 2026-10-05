@@ -45,6 +45,7 @@ export const KIT_PALETTE: readonly { name: string; hex: string }[] = [
 /** The palette name for a hex, or a tidied-up hex when it predates the palette. */
 export function kitColorName(hex: string): string {
   const normalized = normalizeHex(hex);
+  if (normalized === "#000000") return "Black";
   return KIT_PALETTE.find((c) => c.hex === normalized)?.name ?? normalized.toUpperCase();
 }
 
@@ -192,5 +193,7 @@ export function readableTextOn(hex: string): "#000000" | "#ffffff" {
     return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
   };
   const luminance = 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
-  return luminance > 0.5 ? "#000000" : "#ffffff";
+  const blackContrast = (luminance + 0.05) / 0.05;
+  const whiteContrast = 1.05 / (luminance + 0.05);
+  return blackContrast >= whiteContrast ? "#000000" : "#ffffff";
 }

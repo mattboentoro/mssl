@@ -113,7 +113,7 @@ export default async function AdminAuditPage({
       {entries.length === 0 ? (
         <EmptyState title="No audit entries" hint="Nothing matches those filters yet." />
       ) : (
-        <Card className="overflow-x-auto">
+        <Card tabIndex={0} role="region" aria-label="Audit log table" className="overflow-x-auto">
           <table className="w-full min-w-[52rem] text-sm">
             <caption className="sr-only">Audit log entries</caption>
             <thead className="bg-surface-muted text-muted text-xs uppercase">

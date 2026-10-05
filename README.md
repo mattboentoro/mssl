@@ -537,6 +537,21 @@ their pending/confirmation behavior, and filter popovers release document
 listeners when closed or unmounted. Prefer local state boundaries over blanket
 memoization when adding interactive forms.
 
+Accessibility regressions in `tests/accessibility.test.ts` exercise the custom
+combobox/radio keyboard patterns, native-dialog lifecycle and focus restoration,
+safe pending confirmations, field descriptions/errors, mobile navigation, and
+concise non-text names with React DOM and dev-only axe-core. The style suite checks
+WCAG contrast ratios for both themes and every kit-palette checkmark, plus
+forced-colors and reduced-motion contracts. Kit colors remain unchanged data:
+real outlines and high-contrast text alternatives carry their meaning when color
+is unavailable. Native dialogs supply modal focus containment; jsdom lifecycle
+stubs do not prove browser inertness, rendering, or screen-reader behavior. A
+shared modal hook explicitly wraps Tab at either end and restores the invoker.
+Before release, check public/Admin/Captain workflows with a keyboard and screen
+reader, both themes, Windows forced-colors, and zoom/reflow in the target browsers.
+Keep the five-row filter list keyboard-operable without automatic submission, and
+retain native controls/links and the `#main` skip target when extending the UI.
+
 > **Windows note:** `npm run build` fails with `EPERM` on the Prisma query-engine
 > DLL while a dev server holds it open. Stop `npm run dev` first.
 

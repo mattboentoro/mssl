@@ -235,6 +235,7 @@ export function GameReportForm({
                   </span>
                   <button
                     type="button"
+                    aria-label={`Remove ${CARD_LABELS[card.type].toLowerCase()} ${index + 1}${card.playerName ? ` for ${card.playerName}` : ""}`}
                     onClick={() => removeCard(card.key)}
                     className="text-danger text-xs hover:underline"
                   >

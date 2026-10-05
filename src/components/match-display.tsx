@@ -57,15 +57,12 @@ export function MatchDisclosureStack({ children }: { children: React.ReactNode }
 
 export function MatchDisclosureHint({
   className,
-  label = "Expand match details",
 }: {
   className?: string;
-  label?: string;
 } = {}) {
   return (
     <span
-      role="img"
-      aria-label={label}
+      aria-hidden
       className={cn(
         "bg-surface-muted border-subtle text-foreground mx-auto mt-3 flex h-5 w-5 items-center justify-center rounded-full border shadow-sm transition-transform group-open:rotate-180",
         className,
@@ -98,30 +95,29 @@ export function MatchScore({
   awayColor?: string;
 }) {
   return (
-    <span
-      className="bg-surface-muted border-subtle inline-flex flex-col items-center rounded-lg border px-3 py-2 text-base font-bold tabular-nums shadow-sm sm:px-5 sm:py-2.5 sm:text-xl"
-      aria-label={`${label}: ${home} to ${away}`}
-    >
+    <span className="bg-surface-muted border-subtle inline-flex flex-col items-center rounded-lg border px-3 py-2 text-base font-bold tabular-nums shadow-sm sm:px-5 sm:py-2.5 sm:text-xl">
+      <span className="sr-only">{label}: </span>
       <span>
         {home}
         <span className="text-muted mx-3" aria-hidden>
           &ndash;
         </span>
+        <span className="sr-only"> to </span>
         {away}
       </span>
       {homeColor && awayColor ? (
-        <span
-          className="mt-1.5 flex items-center gap-2"
-          aria-label={`Played colors: ${kitColorName(homeColor)} and ${kitColorName(awayColor)}`}
-        >
+        <span className="mt-1.5 flex items-center gap-2">
+          <span className="forced-colors-description sr-only text-xs font-normal">
+            Home kit: {kitColorName(homeColor)}; away kit: {kitColorName(awayColor)}
+          </span>
           <span
             aria-hidden
-            className="h-1.5 w-7 rounded-sm ring-1 ring-black/20 dark:ring-white/25"
+            className="color-swatch h-1.5 w-7 rounded-sm"
             style={{ backgroundColor: homeColor }}
           />
           <span
             aria-hidden
-            className="h-1.5 w-7 rounded-sm ring-1 ring-black/20 dark:ring-white/25"
+            className="color-swatch h-1.5 w-7 rounded-sm"
             style={{ backgroundColor: awayColor }}
           />
         </span>
@@ -146,20 +142,24 @@ export function MatchKitColors({
 
   return (
     <span
-      className="bg-surface-muted border-subtle inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 shadow-sm sm:gap-3 sm:px-5 sm:py-2.5"
-      aria-label={`${homeTeam.name} in ${kitColorName(homeColor)}, ${awayTeam.name} in ${kitColorName(awayColor)}`}
+      role="img"
+      className="kit-colors bg-surface-muted border-subtle inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 shadow-sm sm:gap-3 sm:px-5 sm:py-2.5"
+      aria-label={`Home kit: ${kitColorName(homeColor)}; away kit: ${kitColorName(awayColor)}`}
     >
       <span
         aria-hidden
-        className="h-[clamp(1.125rem,2.5vw,1.5rem)] w-[clamp(1.125rem,2.5vw,1.5rem)] rounded-full ring-1 ring-black/20 dark:ring-white/25"
+        className="color-swatch h-[clamp(1.125rem,2.5vw,1.5rem)] w-[clamp(1.125rem,2.5vw,1.5rem)] rounded-full"
         style={{ backgroundColor: homeColor }}
       />
       <span className="text-muted text-[clamp(0.7rem,1.4vw,0.875rem)] font-semibold">vs</span>
       <span
         aria-hidden
-        className="h-[clamp(1.125rem,2.5vw,1.5rem)] w-[clamp(1.125rem,2.5vw,1.5rem)] rounded-full ring-1 ring-black/20 dark:ring-white/25"
+        className="color-swatch h-[clamp(1.125rem,2.5vw,1.5rem)] w-[clamp(1.125rem,2.5vw,1.5rem)] rounded-full"
         style={{ backgroundColor: awayColor }}
       />
+      <span aria-hidden className="forced-colors-label basis-full text-xs">
+        {kitColorName(homeColor)} / {kitColorName(awayColor)}
+      </span>
     </span>
   );
 }
@@ -186,7 +186,7 @@ export function MatchHeadToHead({
   const team = (side: HeadToHeadTeam, alignment: string) => {
     const content = (
       <>
-        <span className="truncate">{side.name}</span>
+        <span className="block break-words">{side.name}</span>
         {side.forfeited ? (
           <span className="text-danger block text-[10px] font-semibold uppercase">Forfeit</span>
         ) : null}
@@ -278,7 +278,11 @@ export function MatchRow({ match, action }: { match: MatchListItem; action?: Rea
             {match.report?.status === "DISPUTED" ? <Badge tone="danger">Disputed</Badge> : null}
           </span>
         }
-        location={<>&#128205; {match.venueName ?? "TBD"}</>}
+        location={
+          <>
+            <span aria-hidden>&#128205;</span> {match.venueName ?? "TBD"}
+          </>
+        }
       />
       {action ? <div className="mt-3 flex justify-center">{action}</div> : null}
     </Card>
@@ -329,7 +333,7 @@ export function FixtureLine({
       {sides.map(({ team, kit }, index) => (
         <span key={team.id} className="inline-flex items-center gap-1.5">
           {index === 1 ? <span className="text-muted mr-1 text-xs font-normal">v</span> : null}
-          <KitSwatch team={team} kit={kit} teamName={team.name} />
+          <KitSwatch team={team} kit={kit} teamName={team.name} decorative />
           {/*
             One interpolation so the name and its colour stay a single text
             node — React separates adjacent JSX text with an HTML comment.
@@ -381,7 +385,12 @@ export function StandingsTable({
   // the points column and finding it out of sequence.
   const showPpg = primaryMetric === "pointsPerGame";
   return (
-    <div className="border-subtle overflow-x-auto rounded-xl border">
+    <div
+      tabIndex={0}
+      role="region"
+      aria-label="Standings table"
+      className="border-subtle overflow-x-auto rounded-xl border"
+    >
       <table className="w-full min-w-[36rem] text-sm">
         <caption className="sr-only">{caption}</caption>
         <thead className="bg-surface-muted text-muted text-xs uppercase">
@@ -392,36 +401,56 @@ export function StandingsTable({
             <th scope="col" className="px-3 py-2 text-left">
               Team
             </th>
-            <th scope="col" className="px-2 py-2 text-right" title="Played">
+            <th scope="col" className="px-2 py-2 text-right" title="Played" aria-label="Played">
               P
             </th>
-            <th scope="col" className="px-2 py-2 text-right" title="Won">
+            <th scope="col" className="px-2 py-2 text-right" title="Won" aria-label="Won">
               W
             </th>
-            <th scope="col" className="px-2 py-2 text-right" title="Drawn">
+            <th scope="col" className="px-2 py-2 text-right" title="Drawn" aria-label="Drawn">
               D
             </th>
-            <th scope="col" className="px-2 py-2 text-right" title="Lost">
+            <th scope="col" className="px-2 py-2 text-right" title="Lost" aria-label="Lost">
               L
             </th>
             {compact ? null : (
               <>
-                <th scope="col" className="px-2 py-2 text-right" title="Goals for">
+                <th
+                  scope="col"
+                  className="px-2 py-2 text-right"
+                  title="Goals for"
+                  aria-label="Goals for"
+                >
                   GF
                 </th>
-                <th scope="col" className="px-2 py-2 text-right" title="Goals against">
+                <th
+                  scope="col"
+                  className="px-2 py-2 text-right"
+                  title="Goals against"
+                  aria-label="Goals against"
+                >
                   GA
                 </th>
               </>
             )}
-            <th scope="col" className="px-2 py-2 text-right" title="Goal difference">
+            <th
+              scope="col"
+              className="px-2 py-2 text-right"
+              title="Goal difference"
+              aria-label="Goal difference"
+            >
               GD
             </th>
-            <th scope="col" className="px-2 py-2 text-right" title="Points">
+            <th scope="col" className="px-2 py-2 text-right" title="Points" aria-label="Points">
               Pts
             </th>
             {showPpg ? (
-              <th scope="col" className="px-2 py-2 text-right" title="Points per game">
+              <th
+                scope="col"
+                className="px-2 py-2 text-right"
+                title="Points per game"
+                aria-label="Points per game"
+              >
                 PPG
               </th>
             ) : null}
