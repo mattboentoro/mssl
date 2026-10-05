@@ -42,7 +42,7 @@ export function TeamColorBar({
   return (
     <span
       aria-hidden
-      className={`color-swatch inline-block shrink-0 rounded-full ${dimension}`}
+      className={`team-color-bar inline-block shrink-0 rounded-full ${dimension}`}
       style={{
         background: `linear-gradient(180deg, ${primary} 0%, ${primary} 50%, ${alternate} 50%, ${alternate} 100%)`,
       }}

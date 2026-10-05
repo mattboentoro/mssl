@@ -66,7 +66,45 @@ describe("theme contrast and high-contrast fallbacks", () => {
         ).toBeGreaterThanOrEqual(4.5);
       expect(contrast(tokens.brand, tokens["brand-contrast"])).toBeGreaterThanOrEqual(4.5);
     });
+
+    it(`${theme} keeps the bar boundary and split visible for white, near-white, black and near-black kits`, () => {
+      const block = css.slice(css.indexOf(`${theme} {`)).split("}")[0];
+      const rgb = (hex: string) =>
+        hex.match(/[\da-f]{2}/gi)!.map((channel) => parseInt(channel, 16));
+      const foreground = rgb(block.match(/--foreground: (#[\da-f]{6});/)![1]);
+      const surface = rgb(block.match(/--surface: (#[\da-f]{6});/)![1]);
+      const edgeCases = theme === ":root" ? ["#ffffff", "#f8fafc"] : ["#000000", "#111111"];
+      for (const color of edgeCases) {
+        expect(
+          contrast(foreground, rgb(color)),
+          `outer boundary against ${color}`,
+        ).toBeGreaterThanOrEqual(3);
+      }
+      for (const color of ["#ffffff", "#f8fafc", "#000000", "#111111"]) {
+        expect(
+          Math.max(contrast(foreground, rgb(color)), contrast(surface, rgb(color))),
+          `two-tone divider against ${color}`,
+        ).toBeGreaterThanOrEqual(3);
+      }
+    });
   }
+
+  it("gives compact two-color bars a full 2px boundary and a real two-tone midpoint divider", () => {
+    const bar = css.match(/\.team-color-bar\s*\{([^}]+)\}/)![1];
+    const divider = css.match(/\.team-color-bar::after\s*\{([^}]+)\}/)![1];
+    expect(bar).toContain("border: 2px solid var(--foreground)");
+    expect(bar).not.toContain("box-shadow");
+    expect(divider).toContain("top: 50%");
+    expect(divider).toContain("height: 2px");
+    expect(divider).toContain("border-top: 1px solid var(--foreground)");
+    expect(divider).toContain("border-bottom: 1px solid var(--surface)");
+    const forcedColors = css.slice(css.indexOf("@media (forced-colors: active)"));
+    expect(forcedColors).toMatch(/\.team-color-bar\s*\{\s*border-color: CanvasText;/);
+    expect(forcedColors).toMatch(
+      /\.team-color-bar::after\s*\{\s*border-top-color: CanvasText;\s*border-bottom-color: Canvas;/,
+    );
+    expect(forcedColors).not.toContain("forced-color-adjust: none");
+  });
 
   it("uses system colors, real swatch borders, non-color selection and disabled states, and reduced motion", () => {
     expect(css).toContain("@media (forced-colors: active)");

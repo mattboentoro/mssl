@@ -14,7 +14,7 @@ import { MatchDisclosureHint, MatchKitColors, MatchScore } from "@/components/ma
 import { RescheduleProposalForm } from "@/components/reschedule-forms";
 import { ScrollableFilterSelect } from "@/components/scrollable-filter-select";
 import { SiteHeader } from "@/components/site-header";
-import { KitSwatch, TeamKitLegend } from "@/components/team-colors";
+import { KitSwatch, TeamColorBar, TeamKitLegend } from "@/components/team-colors";
 import { TeamLogo } from "@/components/team-logo";
 import { Alert, Badge, Button, Field, FormGuide } from "@/components/ui";
 import { UnsavedChangesGuard } from "@/components/unsaved-changes-guard";
@@ -375,6 +375,31 @@ describe("native dialog lifecycle and safe confirmation", () => {
 });
 
 describe("names, descriptions and non-text values", () => {
+  it("uses the stronger shared bar boundary without changing kit colors, compact sizes or decorative semantics", async () => {
+    for (const [primary, alternate] of [
+      ["#ffffff", "#f8fafc"],
+      ["#000000", "#111111"],
+    ]) {
+      for (const [size, dimensions] of [
+        ["sm", ["h-4", "w-1.5"]],
+        ["md", ["h-6", "w-2"]],
+        ["lg", ["h-9", "w-2.5"]],
+      ] as const) {
+        await render(
+          h(TeamColorBar, { team: { colorPrimary: primary, colorAlternate: alternate }, size }),
+        );
+        const bar = element(".team-color-bar");
+        expect(bar.getAttribute("aria-hidden")).toBe("true");
+        expect(bar.classList.contains("color-swatch")).toBe(false);
+        for (const dimension of dimensions) expect(bar.classList.contains(dimension)).toBe(true);
+        expect(bar.getAttribute("style")).toContain(
+          `${primary} 0%, ${primary} 50%, ${alternate} 50%, ${alternate} 100%`,
+        );
+        expect(bar.textContent).toBe("");
+      }
+    }
+  });
+
   it("preserves input identity and unsaved values when a hint appears or disappears", async () => {
     const field = (hint?: string) =>
       h(Field, {
