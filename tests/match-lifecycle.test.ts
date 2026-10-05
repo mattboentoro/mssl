@@ -708,6 +708,29 @@ describe("addDisciplinaryAction", () => {
 });
 
 describe("warning board", () => {
+  it("chooses a stable spelling for tied timestamps without preferring an older card", async () => {
+    const createdAt = new Date("2026-10-01T12:00:00Z");
+    await prisma.disciplinaryAction.createMany({
+      data: [
+        { id: "warning-z", playerName: "hugo diaz", createdAt },
+        { id: "warning-a", playerName: "Hugo Diaz", createdAt },
+        {
+          id: "warning-0",
+          playerName: "HUGO DIAZ",
+          createdAt: new Date("2026-09-01T12:00:00Z"),
+        },
+      ].map((card) => ({
+        ...card,
+        seasonId: fx.seasonId,
+        teamId: fx.homeTeamId,
+        type: "YELLOW",
+      })),
+    });
+    const board = await getWarningBoard(prisma, fx.seasonId, [fx.homeTeamId]);
+    expect(board).toHaveLength(1);
+    expect(board[0]).toMatchObject({ playerName: "Hugo Diaz", yellow: 3 });
+  });
+
   it("groups a player's cards, folds name casing, and floats league sanctions to the top", async () => {
     const actor = await claimedMatch(fx);
     await submitGameReport(prisma, {

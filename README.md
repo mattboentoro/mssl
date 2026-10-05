@@ -112,6 +112,18 @@ revalidate. Season/division changes and bulk imports invalidate all dependent
 public domains. Private workflow-only changes need no public invalidation until
 they alter published data.
 
+Database indexes complement these caches: season-scoped fixtures and discipline
+include the stable `id` ordering used by pagination, with additional division/team
+prefixes where those filters are used. Team fixture lookups, exact-status workflow
+queues, and entity-filtered audit history have matching composite indexes. Only
+subsumed season/status indexes are replaced; global date and other foreign-key
+indexes remain. These are portable Prisma indexes, not a Redis dependency.
+Team home/away `OR` queries can use both indexes but still sort the combined result.
+The forward-only `20261005220000_roster_invitation_update_cascade` migration
+also corrects a historical SQLite foreign-key mismatch: request ID updates
+cascade to roster invitations, while deleting a request retains its invitations
+with a null request link. Existing invitation rows and indexes are preserved.
+
 To exercise the privileged flows, go to **/signin** and use the dev bypass
 personas (enabled by `DEV_AUTH_BYPASS=true`, hard-disabled when
 `NODE_ENV=production`):
@@ -486,6 +498,18 @@ Checklist for any production environment:
 - `AUTH_URL` + `AUTH_TRUST_HOST=true` behind the Azure proxy.
 - Both redirect URIs registered in Entra.
 - Managed identity for PostgreSQL if you would rather not ship a password.
+- After creating the PostgreSQL migration baseline, run `EXPLAIN (ANALYZE, BUFFERS)`
+  on production-like historical seasons, paginated lists, team fixture lookups,
+  and workflow queues. SQLite query-plan tests demonstrate index use, not
+  PostgreSQL planner choices or production latency.
+- Verify deployed HTML, JS, CSS, authenticated CSV, and public/private ICS **GET**
+  responses with `Accept-Encoding: br, gzip`, checking `Content-Encoding`,
+  `Vary: Accept-Encoding`, and the existing cache/privacy headers through the actual
+  Azure proxy/CDN path. Next's production compression defaults to enabled and
+  `next.config.ts` leaves it enabled; Brotli availability and MIME/size thresholds
+  depend on the deployed stack. Do not assume every response is compressed, make
+  private responses publicly cacheable, or add application gzip/Brotli or image
+  recompression. Deployed negotiation must be checked before launch.
 
 ---
 

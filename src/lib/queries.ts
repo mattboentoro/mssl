@@ -507,7 +507,8 @@ export async function getWarningBoard(
 
   const rows = await db.disciplinaryAction.findMany({
     where: { seasonId, teamId: { in: teamIds } },
-    orderBy: { createdAt: "desc" },
+    // Keep the chosen name spelling stable when a report's cards share a timestamp.
+    orderBy: [{ createdAt: "desc" }, { id: "asc" }],
     include: { team: { select: { id: true, name: true } } },
   });
 

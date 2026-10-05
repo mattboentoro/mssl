@@ -161,6 +161,10 @@ describe("public Data Cache reads", () => {
       kickoffAt: { gte: filters.from, lt: filters.until },
       report: { is: null },
     });
+    expect(harness.db.match.findMany.mock.calls[0][0].orderBy).toEqual([
+      { kickoffAt: "asc" },
+      { id: "asc" },
+    ]);
   });
 
   it("shares upcoming minute windows without showing already-started fixtures", async () => {
@@ -190,6 +194,11 @@ describe("public Data Cache reads", () => {
     for (const count of [4, 6, 4]) await getPublicAnnouncements(count);
     expect(harness.db.team.findFirst).toHaveBeenCalledTimes(2);
     expect(harness.db.disciplinaryAction.findMany).toHaveBeenCalledTimes(3);
+    expect(harness.db.disciplinaryAction.findMany.mock.calls[2][0]).toMatchObject({
+      where: { seasonId: "s2", teamId: "a" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: 20,
+    });
     expect(harness.standings).toHaveBeenCalledTimes(2);
     expect(harness.db.announcement.findMany).toHaveBeenCalledTimes(2);
   });
