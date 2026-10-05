@@ -28,6 +28,8 @@ export function ScrollableFilterSelect({
   const selectedLabel = options.find((option) => option.value === selected)?.label ?? placeholder;
 
   useEffect(() => {
+    if (!open) return;
+
     function close(event: PointerEvent) {
       if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
     }
@@ -40,7 +42,7 @@ export function ScrollableFilterSelect({
       document.removeEventListener("pointerdown", close);
       document.removeEventListener("keydown", closeOnEscape);
     };
-  }, []);
+  }, [open]);
 
   return (
     <div className="text-sm">

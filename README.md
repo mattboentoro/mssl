@@ -506,6 +506,13 @@ Tests cover the standings calculator (every tiebreaker, forfeits, form guide,
 the unconfirmed-report flag) and the match lifecycle (race-safe claiming, claim
 ownership, report validation, immutability, admin discipline).
 
+Client interaction regressions in `tests/client-rendering.test.ts` use React's
+`act` and React DOM with a per-file jsdom environment; other suites stay in Node.
+They check that CSV field edits do not rebuild the preview, form actions retain
+their pending/confirmation behavior, and filter popovers release document
+listeners when closed or unmounted. Prefer local state boundaries over blanket
+memoization when adding interactive forms.
+
 > **Windows note:** `npm run build` fails with `EPERM` on the Prisma query-engine
 > DLL while a dev server holds it open. Stop `npm run dev` first.
 
