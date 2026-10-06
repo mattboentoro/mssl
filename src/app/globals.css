@@ -142,11 +142,19 @@ summary:focus-visible {
 }
 
 .team-color-bar {
-  border: 1.1px solid var(--kit-bar-border, #000000);
+  position: relative;
+  border: 1.1px solid #000000;
 }
 
-.team-color-bar[data-black-kit="true"] {
-  --kit-bar-border: #ffffff;
+.team-color-bar[data-black-kit="true"]::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: #ffffff;
+  transform: translateY(-50%);
 }
 
 .forced-colors-label {
@@ -179,6 +187,10 @@ summary:focus-visible {
 
   .team-color-bar {
     border-color: CanvasText;
+  }
+
+  .team-color-bar[data-black-kit="true"]::after {
+    background: CanvasText;
   }
 
   :is(.bg-brand, .bg-success, .bg-danger, .bg-accent) {

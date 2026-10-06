@@ -82,13 +82,17 @@ describe("theme contrast and high-contrast fallbacks", () => {
     });
   }
 
-  it("uses single borders without inset rings or capsule separators", () => {
+  it("keeps capsule borders black and adds a single white divider only for black kits", () => {
     const bar = css.match(/\.team-color-bar\s*\{([^}]+)\}/)![1];
     const swatch = css.match(/\.color-swatch\s*\{([^}]+)\}/)![1];
-    expect(bar).toContain("border: 1.1px solid var(--kit-bar-border, #000000)");
-    expect(css).toMatch(
-      /\.team-color-bar\[data-black-kit="true"\]\s*\{\s*--kit-bar-border: #ffffff;/,
-    );
+    expect(bar).toContain("border: 1.1px solid #000000");
+    expect(css).not.toContain("--kit-bar-border");
+    const divider = css.match(/\.team-color-bar\[data-black-kit="true"\]::after\s*\{([^}]+)\}/)![1];
+    expect(divider).toContain('content: ""');
+    expect(divider).toContain("top: 50%");
+    expect(divider).toContain("height: 1px");
+    expect(divider).toContain("background: #ffffff");
+    expect(divider).not.toContain("border");
     expect(swatch).toContain("border: 1px solid var(--foreground)");
     expect(swatch).not.toContain("box-shadow");
     expect(swatch).not.toContain("outline:");
@@ -97,6 +101,9 @@ describe("theme contrast and high-contrast fallbacks", () => {
     expect(css).not.toContain(".team-color-bar::after");
     const forcedColors = css.slice(css.indexOf("@media (forced-colors: active)"));
     expect(forcedColors).toMatch(/\.team-color-bar\s*\{\s*border-color: CanvasText;/);
+    expect(forcedColors).toMatch(
+      /\.team-color-bar\[data-black-kit="true"\]::after\s*\{\s*background: CanvasText;/,
+    );
     expect(forcedColors).not.toContain("forced-color-adjust: none");
   });
 

@@ -375,7 +375,7 @@ describe("native dialog lifecycle and safe confirmation", () => {
 });
 
 describe("names, descriptions and non-text values", () => {
-  it("selects a white capsule border only for black kits without changing colors, sizes or semantics", async () => {
+  it("marks black kits for a white divider without changing colors, sizes or semantics", async () => {
     for (const [primary, alternate, hasBlack] of [
       ["#ffffff", "#f8fafc", false],
       ["#000000", "#111111", true],
