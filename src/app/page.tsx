@@ -13,13 +13,12 @@ import {
 import { getCurrentUser } from "@/lib/authz";
 import { formatLongDate } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
+import { getRecentResults, getUpcomingMatches } from "@/lib/queries";
 import {
-  getActiveSeason,
-  getAnnouncements,
-  getRecentResults,
-  getStandingsForSeason,
-  getUpcomingMatches,
-} from "@/lib/queries";
+  resolvePublicSeason as getActiveSeason,
+  getPublicAnnouncements as getAnnouncements,
+  getPublicStandings as getStandingsForSeason,
+} from "@/lib/public-queries";
 
 export const dynamic = "force-dynamic";
 

@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useId, useRef, useState, useTransition } from "react";
+import { useCallback, useId, useState, useTransition } from "react";
 
 import { buttonClass, type ButtonVariant } from "@/components/ui";
+import { useModalDialog } from "@/components/use-modal-dialog";
 
 export interface ApiResult {
   ok?: boolean;
@@ -80,7 +81,7 @@ export function ActionButton({
   onDone?: (result: ApiResult) => void;
 }) {
   const router = useRouter();
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const { ref: dialogRef, open, restoreFocus, onKeyDown } = useModalDialog();
   const dialogTitleId = useId();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
@@ -109,13 +110,13 @@ export function ActionButton({
       }
       startTransition(() => router.refresh());
     }
-  }, [body, onDone, promptField, promptLabel, promptValue, router, successDelayMs, url]);
+  }, [body, dialogRef, onDone, promptField, promptLabel, promptValue, router, successDelayMs, url]);
 
   const isBusy = busy || pending;
   const succeeded = Boolean(result?.ok);
   const start = () => {
     setResult(null);
-    if (confirm || promptLabel) dialogRef.current?.showModal();
+    if (confirm || promptLabel) open();
     else void run();
   };
 
@@ -157,7 +158,14 @@ export function ActionButton({
       {confirm || promptLabel ? (
         <dialog
           ref={dialogRef}
+          tabIndex={-1}
+          onKeyDown={onKeyDown}
           aria-labelledby={dialogTitleId}
+          aria-describedby={`${dialogTitleId}-description`}
+          onClose={restoreFocus}
+          onCancel={(event) => {
+            if (isBusy) event.preventDefault();
+          }}
           onClick={(event) => {
             if (event.target === event.currentTarget && !isBusy) {
               dialogRef.current?.close();
@@ -183,7 +191,7 @@ export function ActionButton({
               <h3 id={dialogTitleId} className="mt-1 text-lg font-semibold">
                 {confirm ? confirmTitle : label}
               </h3>
-              <p className="text-muted mt-2 text-sm">
+              <p id={`${dialogTitleId}-description`} className="text-muted mt-2 text-sm">
                 {confirm ?? promptLabel}
                 {promptLabel ? (
                   <>
@@ -207,6 +215,7 @@ export function ActionButton({
                   onChange={(event) => setPromptValue(event.target.value)}
                   rows={3}
                   autoFocus
+                  data-dialog-initial-focus
                   required
                   aria-required="true"
                   className="bg-surface border-subtle w-full rounded-lg border px-3 py-2 text-sm shadow-sm"
@@ -223,6 +232,7 @@ export function ActionButton({
             <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <button
                 type="button"
+                data-dialog-initial-focus={!promptLabel || undefined}
                 onClick={() => dialogRef.current?.close()}
                 disabled={isBusy}
                 className={buttonClass("success")}
@@ -236,9 +246,7 @@ export function ActionButton({
                 aria-busy={isBusy}
                 className={buttonClass(confirm ? "danger" : "primary")}
               >
-                {isBusy
-                  ? (pendingLabel ?? "Working\u2026")
-                  : (confirmActionLabel ?? label)}
+                {isBusy ? (pendingLabel ?? "Working\u2026") : (confirmActionLabel ?? label)}
               </button>
             </div>
           </div>

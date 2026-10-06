@@ -39,7 +39,8 @@ describe("Admin RBAC operational controls", () => {
     expect(page).toContain(
       'className="text-muted absolute bottom-1 left-1/2 mt-0 -translate-x-1/2"',
     );
-    expect(page).toContain('label="Expand roster details"');
+    expect(page).not.toContain('label="Expand roster details"');
+    expect(page.indexOf("</summary>")).toBeLessThan(page.indexOf("Manage roster"));
     expect(page).toContain("Manage roster");
     expect(page).toContain("{ seasonId: null }");
     expect(page).toContain("Active players");

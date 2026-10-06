@@ -1,5 +1,11 @@
 import Link from "next/link";
-import { isValidElement, type ComponentPropsWithoutRef, type ReactNode } from "react";
+import {
+  Children,
+  cloneElement,
+  isValidElement,
+  type ComponentPropsWithoutRef,
+  type ReactNode,
+} from "react";
 
 import { cn } from "@/lib/cn";
 import {
@@ -75,13 +81,17 @@ export function Card({
   children,
   className,
   as: As = "div",
+  ...attributes
 }: {
   children: ReactNode;
   className?: string;
   as?: "div" | "section" | "article" | "li" | "details";
-}) {
+} & Pick<ComponentPropsWithoutRef<"div">, "tabIndex" | "role" | "aria-label">) {
   return (
-    <As className={cn("bg-surface border-subtle rounded-xl border shadow-sm", className)}>
+    <As
+      {...attributes}
+      className={cn("bg-surface border-subtle rounded-xl border shadow-sm", className)}
+    >
       {children}
     </As>
   );
@@ -104,7 +114,7 @@ export function SectionHeading({
       {children}
       {href ? (
         <Link href={href} className="text-accent text-sm font-medium hover:underline">
-          {linkLabel} &rarr;
+          {linkLabel} <span aria-hidden>&rarr;</span>
         </Link>
       ) : null}
     </div>
@@ -147,7 +157,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap",
+        "badge inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap",
         BADGE_TONES[tone],
         className,
       )}
@@ -180,15 +190,15 @@ export type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "suc
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   primary: "bg-brand text-brand-contrast hover:bg-brand-strong active:bg-brand-strong",
-  secondary: "bg-surface-muted border-subtle border hover:bg-brand/10 active:bg-brand/20",
-  outline: "bg-surface-muted border-subtle border-2 hover:bg-brand/10 active:bg-brand/20",
+  secondary: "bg-surface-muted border-control border hover:bg-brand/10 active:bg-brand/20",
+  outline: "bg-surface-muted border-control border-2 hover:bg-brand/10 active:bg-brand/20",
   ghost: "bg-surface-muted hover:bg-brand/10 active:bg-brand/20",
-  success: "bg-success text-white hover:brightness-95 active:brightness-90",
-  danger: "bg-danger text-white hover:brightness-95 active:brightness-90",
+  success: "bg-success text-status-contrast hover:brightness-95 active:brightness-90",
+  danger: "bg-danger text-status-contrast hover:brightness-95 active:brightness-90",
 };
 
 const BUTTON_BASE =
-  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold shadow-sm transition-[color,background-color,border-color,opacity,filter,transform] duration-150 active:translate-y-px active:brightness-90 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:translate-y-0 disabled:active:brightness-100";
+  "control inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold shadow-sm transition-[color,background-color,border-color,opacity,filter,transform] duration-150 active:translate-y-px active:brightness-90 disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-muted disabled:border disabled:border-dashed disabled:border-control disabled:active:translate-y-0 disabled:active:brightness-100";
 
 /**
  * The bare-outline control used for page-level secondary actions: no fill, just
@@ -196,7 +206,7 @@ const BUTTON_BASE =
  * dialog triggers stay identical.
  */
 export const outlineButtonClass =
-  "bg-surface-muted border-subtle hover:bg-brand/10 active:bg-brand/20 inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium shadow-sm transition-[color,background-color,border-color,filter,transform] duration-150 active:translate-y-px active:brightness-90";
+  "control bg-surface-muted border-control hover:bg-brand/10 active:bg-brand/20 inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium shadow-sm transition-[color,background-color,border-color,filter,transform] duration-150 active:translate-y-px active:brightness-90";
 
 export function buttonClass(variant: ButtonVariant = "primary", className?: string) {
   return cn(BUTTON_BASE, BUTTON_VARIANTS[variant], className);
@@ -229,7 +239,7 @@ export function ButtonLink({
 /* -------------------------------------------------------------------------- */
 
 export const inputClass =
-  "bg-surface border-subtle w-full rounded-lg border px-3 py-2 text-sm shadow-sm";
+  "bg-surface border-control w-full rounded-lg border px-3 py-2 text-sm shadow-sm";
 
 export const labelClass = "text-muted mb-1 block text-xs font-semibold uppercase tracking-wide";
 
@@ -238,21 +248,47 @@ export function Field({
   htmlFor,
   hint,
   required,
+  group = false,
   children,
 }: {
   label: string;
   htmlFor?: string;
   hint?: ReactNode;
   required?: boolean;
+  group?: boolean;
   children: ReactNode;
 }) {
   const isRequired =
     required ??
-    (isValidElement<{ required?: boolean }>(children) && children.props.required === true);
+    Children.toArray(children).some(
+      (child) => isValidElement<{ required?: boolean }>(child) && child.props.required === true,
+    );
+  const hintId = hint && htmlFor ? `${htmlFor}-hint` : undefined;
+  const Label = group ? "p" : "label";
+
+  function describeControls(nodes: ReactNode): ReactNode {
+    return Children.map(nodes, (child) => {
+      if (
+        !isValidElement<{ id?: string; children?: ReactNode; "aria-describedby"?: string }>(
+          child,
+        ) ||
+        typeof child.type !== "string"
+      )
+        return child;
+      if (child.props.id === htmlFor && hintId) {
+        return cloneElement(child, {
+          "aria-describedby": [child.props["aria-describedby"], hintId].filter(Boolean).join(" "),
+        });
+      }
+      return child.props.children
+        ? cloneElement(child, { children: describeControls(child.props.children) })
+        : child;
+    });
+  }
 
   return (
     <div>
-      <label className={labelClass} htmlFor={htmlFor}>
+      <Label className={labelClass} {...(group ? { id: htmlFor } : { htmlFor })}>
         {label}
         {isRequired ? (
           <>
@@ -262,9 +298,13 @@ export function Field({
             <span className="sr-only"> (required)</span>
           </>
         ) : null}
-      </label>
-      {children}
-      {hint ? <p className="text-muted mt-1 text-xs">{hint}</p> : null}
+      </Label>
+      {describeControls(children)}
+      {hint ? (
+        <p id={hintId} className="text-muted mt-1 text-xs">
+          {hint}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -289,7 +329,8 @@ export function Alert({
   } as const;
 
   // Only genuinely urgent tones get an assertive live region.
-  const role = tone === "danger" || tone === "warning" ? "alert" : undefined;
+  const role =
+    tone === "danger" || tone === "warning" ? "alert" : tone === "success" ? "status" : undefined;
 
   return (
     <div className={cn("rounded-lg border px-4 py-3 text-sm", tones[tone], className)} role={role}>
@@ -305,12 +346,17 @@ export function Alert({
 
 export function FormGuide({ form }: { form: ("W" | "D" | "L")[] }) {
   if (form.length === 0) {
-    return <span className="text-muted text-xs">&mdash;</span>;
+    return (
+      <span className="text-muted text-xs">
+        <span aria-hidden>&mdash;</span>
+        <span className="sr-only">No recent results</span>
+      </span>
+    );
   }
   const tone = {
-    W: "bg-success text-white",
-    D: "bg-muted/40 text-foreground",
-    L: "bg-danger text-white",
+    W: "bg-success text-status-contrast",
+    D: "bg-surface-muted text-foreground border border-control",
+    L: "bg-danger text-status-contrast",
   };
   return (
     <span className="inline-flex gap-1">
@@ -323,7 +369,8 @@ export function FormGuide({ form }: { form: ("W" | "D" | "L")[] }) {
           )}
           title={{ W: "Win", D: "Draw", L: "Loss" }[result]}
         >
-          {result}
+          <span aria-hidden>{result}</span>
+          <span className="sr-only">{{ W: "Win", D: "Draw", L: "Loss" }[result]}</span>
         </span>
       ))}
     </span>

@@ -5,21 +5,21 @@ import { AddToCalendarButton } from "@/components/add-to-calendar-button";
 import { CalendarViewToggle, FixtureCalendar, parseView } from "@/components/fixture-calendar";
 import { MatchList } from "@/components/match-display";
 import { TeamLogo } from "@/components/team-logo";
+import { TeamKitLegend } from "@/components/team-colors";
 import { BackLink, buttonClass, ButtonLink, Card, EmptyState, PageHeader } from "@/components/ui";
 import { getCurrentUser } from "@/lib/authz";
 import { CARD_LABELS, type CardType } from "@/lib/enums";
 import { formatDate, parseMonthValue, shiftMonth } from "@/lib/dates";
 import { zonedToUtc } from "@/lib/timezone";
-import { kitColorName, resolveKit } from "@/lib/kits";
 import { prisma } from "@/lib/prisma";
 import {
-  getActiveSeason,
-  getDisciplinaryRecords,
-  getStandingsForSeason,
-  getTeamDetail,
-  getTeamMatches,
-  splitTeamMatches,
-} from "@/lib/queries";
+  resolvePublicSeason as getActiveSeason,
+  getPublicTeamDiscipline,
+  getPublicStandings as getStandingsForSeason,
+  getPublicTeamDetail as getTeamDetail,
+  getPublicMatches,
+} from "@/lib/public-queries";
+import { splitTeamMatches } from "@/lib/queries";
 import { isRescheduleCutoffReached, OPEN_RESCHEDULE_STATUSES } from "@/lib/reschedules";
 
 export const dynamic = "force-dynamic";
@@ -58,9 +58,9 @@ export default async function TeamPage({
   );
 
   const [matches, standings, discipline] = await Promise.all([
-    getTeamMatches(team.id),
+    getPublicMatches({ team: team.id }),
     season ? getStandingsForSeason(season.id) : Promise.resolve([]),
-    season ? getDisciplinaryRecords(season.id) : Promise.resolve([]),
+    season ? getPublicTeamDiscipline(season.id, team.id) : Promise.resolve([]),
   ]);
 
   const row = standings
@@ -68,7 +68,7 @@ export default async function TeamPage({
     ?.rows.find((r) => r.teamId === team.id);
 
   const { played, upcoming } = splitTeamMatches(matches);
-  const teamCards = discipline.filter((d) => d.teamId === team.id);
+  const teamCards = discipline;
   const now = new Date();
   const [openReschedules, availableSlot] = captainContext
     ? await Promise.all([
@@ -204,12 +204,7 @@ export default async function TeamPage({
         <BackLink href="/teams">All teams</BackLink>
       </div>
       <div className="flex items-start gap-4">
-        <TeamLogo
-          teamId={team.id}
-          name={team.name}
-          hasLogo={Boolean(team.logoBlobName)}
-          size={72}
-        />
+        <TeamLogo teamId={team.id} name={team.name} hasLogo={team.hasLogo} size={72} decorative />
         <PageHeader
           eyebrow={team.division.name}
           title={team.name}
@@ -241,34 +236,7 @@ export default async function TeamPage({
       )}
 
       <div className="mb-8 flex flex-wrap items-center gap-4">
-        <dl className="flex flex-wrap gap-4 text-sm">
-          <div className="flex items-center gap-2">
-            <span
-              aria-hidden
-              className="inline-block h-5 w-5 rounded ring-1 ring-black/20 dark:ring-white/25"
-              style={{ backgroundColor: resolveKit(team, "PRIMARY") }}
-            />
-            <div>
-              <dt className="text-muted text-[10px] font-semibold tracking-wide uppercase">
-                Primary kit
-              </dt>
-              <dd className="text-xs">{kitColorName(resolveKit(team, "PRIMARY"))}</dd>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span
-              aria-hidden
-              className="inline-block h-5 w-5 rounded ring-1 ring-black/20 dark:ring-white/25"
-              style={{ backgroundColor: resolveKit(team, "ALTERNATE") }}
-            />
-            <div>
-              <dt className="text-muted text-[10px] font-semibold tracking-wide uppercase">
-                Alternate kit
-              </dt>
-              <dd className="text-xs">{kitColorName(resolveKit(team, "ALTERNATE"))}</dd>
-            </div>
-          </div>
-        </dl>
+        <TeamKitLegend team={team} />
       </div>
 
       {summary.length > 0 ? (

@@ -114,8 +114,7 @@ export default async function AdminRosterPage({
   const visible = summaries
     .filter(
       ({ entry }) =>
-        !query ||
-        `${entry.team.name} ${entry.team.shortName}`.toLowerCase().includes(query),
+        !query || `${entry.team.name} ${entry.team.shortName}`.toLowerCase().includes(query),
     )
     .filter(({ entry }) => !selectedTeamId || entry.teamId === selectedTeamId)
     .filter(({ activeCaptains, needsAttention }) => {
@@ -259,89 +258,94 @@ export default async function AdminRosterPage({
                           ? `${memberships.length} active player${memberships.length === 1 ? "" : "s"}`
                           : "No active players"}
                       </Badge>
-                      <Link
-                        href={`/captain/roster?seasonId=${entry.seasonId}&teamId=${entry.teamId}`}
-                        className={buttonClass("secondary", "px-2 py-1 text-xs")}
-                      >
-                        Manage roster
-                      </Link>
                     </div>
                   </div>
-                  <MatchDisclosureHint
-                    className="text-muted absolute bottom-1 left-1/2 mt-0 -translate-x-1/2"
-                    label="Expand roster details"
-                  />
+                  <MatchDisclosureHint className="text-muted absolute bottom-1 left-1/2 mt-0 -translate-x-1/2" />
                 </summary>
                 <div className="border-subtle grid gap-5 border-t p-4 xl:grid-cols-2">
-                  <div>
-                  <h3 className="text-sm font-semibold">Active players</h3>
-                  {memberships.length ? (
-                    <ul className="mt-2 grid gap-2">
-                      {memberships.map((membership) => (
-                        <li
-                          key={membership.id}
-                          className="bg-surface-muted border-subtle flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate font-semibold">{membership.user.displayName}</p>
-                            <p className="text-muted truncate text-sm">{membership.user.email}</p>
-                          </div>
-                          <Badge
-                            tone={activeCaptainUserIds.has(membership.userId) ? "brand" : "neutral"}
-                          >
-                            {activeCaptainUserIds.has(membership.userId) ? "Captain" : "Player"}
-                          </Badge>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-muted mt-2 text-sm">No active players in this season.</p>
-                  )}
+                  <div className="flex justify-end xl:col-span-2">
+                    <Link
+                      href={`/captain/roster?seasonId=${entry.seasonId}&teamId=${entry.teamId}`}
+                      className={buttonClass("secondary", "px-2 py-1 text-xs")}
+                    >
+                      Manage roster
+                    </Link>
                   </div>
                   <div>
-                  <h3 className="text-sm font-semibold">Registered Captains and team contacts</h3>
-                  {captains.length ? (
-                    <ul className="mt-2 grid gap-2">
-                      {captains.map((captain) => {
-                        const isActiveCaptain = activeCaptains.some(({ id }) => id === captain.id);
-                        return (
+                    <h3 className="text-sm font-semibold">Active players</h3>
+                    {memberships.length ? (
+                      <ul className="mt-2 grid gap-2">
+                        {memberships.map((membership) => (
                           <li
-                            key={captain.id}
+                            key={membership.id}
                             className="bg-surface-muted border-subtle flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3"
                           >
                             <div className="min-w-0">
                               <p className="truncate font-semibold">
-                                {captain.user?.displayName ?? captain.name}
+                                {membership.user.displayName}
                               </p>
-                              <p className="text-muted truncate text-sm">
-                                {captain.user?.email ?? captain.email ?? "No account e-mail"}
-                              </p>
+                              <p className="text-muted truncate text-sm">{membership.user.email}</p>
                             </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Badge tone={isActiveCaptain ? "brand" : "warning"}>
-                                {isActiveCaptain
-                                  ? "Captain"
-                                  : captain.seasonId
-                                    ? "Pending Captain"
-                                    : "Team contact"}
-                              </Badge>
-                              <Badge tone={captain.user?.entraObjectId ? "success" : "neutral"}>
-                                {captain.user?.entraObjectId
-                                  ? "Entra linked"
-                                  : captain.user?.status === "ACTIVE"
-                                    ? "Account active"
-                                    : "Awaiting sign-in"}
-                              </Badge>
-                            </div>
+                            <Badge
+                              tone={
+                                activeCaptainUserIds.has(membership.userId) ? "brand" : "neutral"
+                              }
+                            >
+                              {activeCaptainUserIds.has(membership.userId) ? "Captain" : "Player"}
+                            </Badge>
                           </li>
-                        );
-                      })}
-                    </ul>
-                  ) : (
-                    <p className="text-muted mt-2 text-sm">
-                      No Captain assignment or team contact is registered.
-                    </p>
-                  )}
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-muted mt-2 text-sm">No active players in this season.</p>
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold">Registered Captains and team contacts</h3>
+                    {captains.length ? (
+                      <ul className="mt-2 grid gap-2">
+                        {captains.map((captain) => {
+                          const isActiveCaptain = activeCaptains.some(
+                            ({ id }) => id === captain.id,
+                          );
+                          return (
+                            <li
+                              key={captain.id}
+                              className="bg-surface-muted border-subtle flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3"
+                            >
+                              <div className="min-w-0">
+                                <p className="truncate font-semibold">
+                                  {captain.user?.displayName ?? captain.name}
+                                </p>
+                                <p className="text-muted truncate text-sm">
+                                  {captain.user?.email ?? captain.email ?? "No account e-mail"}
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge tone={isActiveCaptain ? "brand" : "warning"}>
+                                  {isActiveCaptain
+                                    ? "Captain"
+                                    : captain.seasonId
+                                      ? "Pending Captain"
+                                      : "Team contact"}
+                                </Badge>
+                                <Badge tone={captain.user?.entraObjectId ? "success" : "neutral"}>
+                                  {captain.user?.entraObjectId
+                                    ? "Entra linked"
+                                    : captain.user?.status === "ACTIVE"
+                                      ? "Account active"
+                                      : "Awaiting sign-in"}
+                                </Badge>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <p className="text-muted mt-2 text-sm">
+                        No Captain assignment or team contact is registered.
+                      </p>
+                    )}
                   </div>
                 </div>
               </Card>

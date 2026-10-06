@@ -56,6 +56,7 @@ export function TeamProfileForm({
           </Field>
           <Field
             label="Primary colour"
+            group
             htmlFor="team-profile-primary-label"
             hint="Home / first-choice kit."
           >
@@ -68,6 +69,7 @@ export function TeamProfileForm({
           </Field>
           <Field
             label="Alternate colour"
+            group
             htmlFor="team-profile-alternate-label"
             hint="Worn when the kits would clash."
           >

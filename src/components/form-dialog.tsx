@@ -7,7 +7,6 @@ import {
   useEffect,
   useId,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -19,6 +18,7 @@ import {
   type ServerAction,
 } from "@/components/admin-forms";
 import { buttonClass, outlineButtonClass } from "@/components/ui";
+import { useModalDialog } from "@/components/use-modal-dialog";
 
 const DialogCloseContext = createContext<() => void>(() => {});
 
@@ -72,11 +72,11 @@ export function Dialog({
   widthClassName?: string;
   children: ReactNode;
 }) {
-  const ref = useRef<HTMLDialogElement>(null);
+  const { ref, open, restoreFocus, onKeyDown } = useModalDialog();
   const titleId = useId();
+  const descriptionId = useId();
   const [generation, setGeneration] = useState(0);
-  const close = useCallback(() => ref.current?.close(), []);
-  const open = useCallback(() => ref.current?.showModal(), []);
+  const close = useCallback(() => ref.current?.close(), [ref]);
   const closeValue = useMemo(() => close, [close]);
 
   return (
@@ -92,8 +92,15 @@ export function Dialog({
 
       <dialog
         ref={ref}
-        onClose={() => setGeneration((n) => n + 1)}
+        tabIndex={-1}
+        onKeyDown={onKeyDown}
+        onClose={(event) => {
+          if (event.target !== event.currentTarget) return;
+          restoreFocus();
+          setGeneration((n) => n + 1);
+        }}
         aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
         className={`bg-surface text-foreground border-subtle m-auto max-h-[calc(100vh-4rem)] ${widthClassName} rounded-xl border p-0 text-left shadow-xl backdrop:bg-black/60`}
       >
         <DialogCloseContext.Provider value={closeValue}>
@@ -102,7 +109,11 @@ export function Dialog({
               <h3 id={titleId} className="font-semibold">
                 {title}
               </h3>
-              {description ? <p className="text-muted mt-1 text-xs">{description}</p> : null}
+              {description ? (
+                <p id={descriptionId} className="text-muted mt-1 text-xs">
+                  {description}
+                </p>
+              ) : null}
             </div>
             <button
               type="button"

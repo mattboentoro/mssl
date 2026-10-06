@@ -17,13 +17,15 @@
   --foreground: #0f172a;
   --muted: #475569;
   --border: #e2e8f0;
+  --control-border: #64748b;
+  --status-contrast: #ffffff;
   --brand: #047857;
   --brand-strong: #065f46;
   --brand-contrast: #ffffff;
   --accent: #0369a1;
   --danger: #b91c1c;
-  --warning: #b45309;
-  --success: #15803d;
+  --warning: #92400e;
+  --success: #166534;
 }
 
 .dark {
@@ -33,6 +35,8 @@
   --foreground: #e2e8f0;
   --muted: #94a3b8;
   --border: #1e293b;
+  --control-border: #94a3b8;
+  --status-contrast: #0f172a;
   --brand: #10b981;
   --brand-strong: #34d399;
   --brand-contrast: #022c22;
@@ -49,6 +53,8 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-subtle: var(--border);
+  --color-control: var(--control-border);
+  --color-status-contrast: var(--status-contrast);
   --color-brand: var(--brand);
   --color-brand-strong: var(--brand-strong);
   --color-brand-contrast: var(--brand-contrast);
@@ -114,9 +120,130 @@ button:not(:disabled):active {
 
 /* Visible focus for keyboard users on every interactive element. */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
   border-radius: 0.25rem;
+}
+
+summary:focus-visible {
+  outline-offset: -3px;
+}
+
+#main {
+  scroll-margin-top: 7rem;
+}
+
+:where(input:not([type="hidden"]), select, textarea) {
+  border-color: var(--control-border);
+}
+
+.color-swatch {
+  border: 1px solid var(--foreground);
+}
+
+.team-color-bar {
+  position: relative;
+  border: 1.1px solid #000000;
+}
+
+.team-color-bar[data-black-kit="true"]::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: #ffffff;
+  transform: translateY(-50%);
+}
+
+.forced-colors-label {
+  display: none;
+}
+
+@media (forced-colors: active) {
+  :root,
+  .dark {
+    --background: Canvas;
+    --surface: Canvas;
+    --surface-muted: Canvas;
+    --foreground: CanvasText;
+    --muted: CanvasText;
+    --border: CanvasText;
+    --control-border: ButtonText;
+    --brand: LinkText;
+    --brand-strong: LinkText;
+    --brand-contrast: CanvasText;
+    --accent: LinkText;
+    --danger: CanvasText;
+    --warning: CanvasText;
+    --success: CanvasText;
+    --status-contrast: CanvasText;
+  }
+
+  :where(button, input, select, textarea, dialog, .control, .badge, .color-swatch) {
+    border: 1px solid ButtonText;
+  }
+
+  .team-color-bar {
+    border-color: CanvasText;
+  }
+
+  .team-color-bar[data-black-kit="true"]::after {
+    background: CanvasText;
+  }
+
+  :is(.bg-brand, .bg-success, .bg-danger, .bg-accent) {
+    color: CanvasText;
+    background-color: Canvas;
+    border: 1px solid CanvasText;
+  }
+
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline-color: Highlight;
+  }
+
+  :is([aria-current]:not([aria-current="false"]), [aria-selected="true"], [aria-checked="true"]) {
+    border-bottom: 3px solid Highlight;
+  }
+
+  :is(button:disabled, input:disabled, select:disabled, textarea:disabled, [aria-disabled="true"]) {
+    color: GrayText;
+    border-color: GrayText;
+    border-style: dashed;
+    opacity: 1;
+  }
+
+  .forced-colors-label {
+    display: inline;
+  }
+
+  .forced-colors-description {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+
+  .kit-choice {
+    width: auto;
+    height: auto;
+    min-height: 2rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .kit-colors {
+    max-width: 9rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  button:not(:disabled):active {
+    filter: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

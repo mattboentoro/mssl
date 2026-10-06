@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/cn";
@@ -35,6 +35,7 @@ const PUBLIC_LINKS: NavLink[] = [
 export function SiteHeader({ user }: { user: HeaderUser | null }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const menuTrigger = useRef<HTMLButtonElement>(null);
 
   // Close the mobile menu when the route changes. Adjusting state during render
   // (rather than in an effect) avoids a cascading re-render.
@@ -62,7 +63,16 @@ export function SiteHeader({ user }: { user: HeaderUser | null }) {
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <header className="bg-surface/90 border-subtle sticky top-0 z-40 border-b backdrop-blur">
+    <header
+      className="bg-surface/90 border-subtle sticky top-0 z-40 border-b backdrop-blur"
+      onKeyDown={(event) => {
+        if (open && event.key === "Escape") {
+          event.preventDefault();
+          setOpen(false);
+          menuTrigger.current?.focus();
+        }
+      }}
+    >
       <a
         href="#main"
         className="bg-brand text-brand-contrast sr-only rounded px-3 py-2 focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50"
@@ -104,8 +114,9 @@ export function SiteHeader({ user }: { user: HeaderUser | null }) {
           <ThemeToggle />
           <AccountChip user={user} />
           <button
+            ref={menuTrigger}
             type="button"
-            className="bg-surface-muted border-subtle hover:bg-brand/10 active:bg-brand/20 inline-flex h-9 w-9 items-center justify-center rounded-lg border shadow-sm lg:hidden"
+            className="bg-surface-muted border-control hover:bg-brand/10 active:bg-brand/20 inline-flex h-9 w-9 items-center justify-center rounded-lg border shadow-sm lg:hidden"
             aria-expanded={open}
             aria-controls="mobile-nav"
             aria-label="Toggle navigation"
@@ -176,6 +187,7 @@ function AccountChip({ user }: { user: HeaderUser | null }) {
   return (
     <Link
       href="/account"
+      aria-label={`Account: ${user.name ?? user.email ?? "signed-in user"} — ${role}${user.unreadNotifications ? `, ${user.unreadNotifications} unread notifications` : ""}`}
       className="border-subtle hover:bg-surface-muted flex items-center gap-2 rounded-lg border py-1 pr-3 pl-1"
       title={`${user.name ?? user.email ?? "Account"} — ${role}`}
     >
@@ -193,8 +205,8 @@ function AccountChip({ user }: { user: HeaderUser | null }) {
       </span>
       {user.unreadNotifications ? (
         <span
-          className="bg-accent inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white"
-          aria-label={`${user.unreadNotifications} unread notification${user.unreadNotifications === 1 ? "" : "s"}`}
+          className="bg-accent text-status-contrast inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold"
+          aria-hidden
         >
           {user.unreadNotifications > 99 ? "99+" : user.unreadNotifications}
         </span>

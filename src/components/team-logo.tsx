@@ -5,18 +5,20 @@ export function TeamLogo({
   name,
   hasLogo,
   size = 56,
+  decorative = false,
 }: {
   teamId: string;
   name: string;
   hasLogo: boolean;
   size?: number;
+  decorative?: boolean;
 }) {
   const className = "border-subtle bg-surface shrink-0 rounded-xl border object-contain";
   if (hasLogo) {
     return (
       <Image
         src={`/teams/${teamId}/logo`}
-        alt={`${name} logo`}
+        alt={decorative ? "" : `${name} logo`}
         width={size}
         height={size}
         className={className}
@@ -27,7 +29,9 @@ export function TeamLogo({
 
   return (
     <span
-      aria-label={`${name} has no logo`}
+      role={decorative ? undefined : "img"}
+      aria-hidden={decorative || undefined}
+      aria-label={decorative ? undefined : `${name} has no logo`}
       className={`${className} text-muted inline-flex items-center justify-center text-sm font-bold`}
       style={{ width: size, height: size }}
     >

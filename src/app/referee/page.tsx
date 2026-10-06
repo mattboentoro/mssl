@@ -468,7 +468,11 @@ export default async function RefereePage({
                         {MATCH_STATUS_LABELS[match.status as MatchStatus]}
                       </Badge>
                     }
-                    location={<>&#128205; {match.venueName ?? "TBD"}</>}
+                    location={
+                      <>
+                        <span aria-hidden>&#128205;</span> {match.venueName ?? "TBD"}
+                      </>
+                    }
                   />
                 </Link>
               );

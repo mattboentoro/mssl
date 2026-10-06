@@ -239,8 +239,8 @@ describe("Captain reschedule request UI", () => {
     expect(forms).toContain("disabled={!ready}");
     expect(forms).toContain("revisedReason.trim() !== reason.trim()");
     expect(matchDisplay).toContain("absolute inset-x-3 top-3 bottom-0");
-    expect(matchDisplay).toContain('label = "Expand match details"');
-    expect(matchDisplay).toContain("aria-label={label}");
+    expect(matchDisplay).not.toContain('label = "Expand match details"');
+    expect(matchDisplay).toContain("<svg aria-hidden");
     expect(matchDisplay).toContain("h-5 w-5");
     expect(matchDisplay).not.toContain("View details");
     expect(matchDisplay).not.toContain("&#8964;");

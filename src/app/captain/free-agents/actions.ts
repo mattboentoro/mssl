@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { invalidatePublicData } from "@/lib/public-cache";
 
 import type { RosterActionState } from "@/app/roster/actions";
 import { AuthzError, requireCaptain } from "@/lib/authz";
@@ -22,6 +23,7 @@ export async function placeFreeAgentAction(
       seasonId: value(form, "seasonId"),
       teamId: value(form, "teamId"),
     });
+    invalidatePublicData("freeAgents", "teams");
     revalidatePath("/captain/free-agents");
     revalidatePath("/admin/free-agents");
     revalidatePath("/captain/roster");

@@ -1,4 +1,4 @@
-import { actorFrom, handleApi, parseJson } from "@/lib/api";
+import { actorFrom, handleMatchMutation, parseJson } from "@/lib/api";
 import { requireReferee } from "@/lib/authz";
 import { unassignReferee } from "@/lib/matches";
 import { prisma } from "@/lib/prisma";
@@ -11,7 +11,7 @@ export const runtime = "nodejs";
  * game report is filed; once a report exists only an admin can reverse it.
  */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  return handleApi(async () => {
+  return handleMatchMutation(async () => {
     const { id } = await context.params;
     const { user, referee } = await requireReferee();
     const body = await parseJson(request, unassignSchema);

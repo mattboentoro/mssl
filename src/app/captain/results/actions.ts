@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { invalidatePublicData } from "@/lib/public-cache";
 
 import { AuthzError, requireAdmin, requireParticipantCaptain } from "@/lib/authz";
 import {
@@ -26,6 +27,7 @@ function resultError(error: unknown): CaptainResultActionState {
 }
 
 function refresh(matchId: string) {
+  invalidatePublicData("matches");
   revalidatePath("/captain");
   revalidatePath("/captain/results");
   revalidatePath(`/captain/results/${matchId}`);

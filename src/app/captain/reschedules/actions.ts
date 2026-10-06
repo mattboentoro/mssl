@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { invalidatePublicData } from "@/lib/public-cache";
 
 import { AuthzError, requireCaptain } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
@@ -18,6 +19,7 @@ export interface RescheduleActionState {
 }
 
 function refreshReschedules() {
+  invalidatePublicData("matches");
   revalidatePath("/captain/reschedules");
   revalidatePath("/schedule");
   revalidatePath("/teams/[id]", "page");

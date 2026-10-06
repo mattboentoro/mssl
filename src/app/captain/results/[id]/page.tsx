@@ -78,7 +78,11 @@ export default async function CaptainResultPage({ params }: { params: Promise<{ 
           topRight={`MW ${match.matchweek}`}
           time={formatDateTime(match.kickoffAt)}
           status={proposal ? <Badge>{proposal.status.replaceAll("_", " ")}</Badge> : undefined}
-          location={<>&#128205; {match.venueName ?? "TBD"}</>}
+          location={
+            <>
+              <span aria-hidden>&#128205;</span> {match.venueName ?? "TBD"}
+            </>
+          }
         />
         {proposal ? (
           <>

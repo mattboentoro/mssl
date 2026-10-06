@@ -71,6 +71,59 @@ not update the site automatically. To revise individual fixtures, use
 season from **Match Control → Download CSV**, edit the exported file, and import
 it again.
 
+Admin Matches (list view) and the Disciplinary register use URL-based pages of
+100 records, with Previous/Next links preserving the current query parameters.
+Out-of-range pages resolve to the nearest available page. The fixture calendar
+still loads the complete selected month; discipline review queues and suspension
+calculations remain season-wide.
+
+Schedule, Account, and the Matches, Users, Rosters, and Reviews admin routes
+show accessible loading placeholders (without animation when reduced motion is
+requested). The admin overview streams league totals, pending reports, workflow
+queues, and recent activity independently.
+
+### Public data caching
+
+Public schedule, standings, team profiles, team discipline, announcements, season
+and division reference data use tagged Next.js Data Cache reads. Live data
+revalidates after 60 seconds; reference data and announcements after 300 seconds.
+Rules PDF availability revalidates after 60 seconds. TTL revalidation is
+on-demand and may serve one stale read while refreshing; explicit mutation
+invalidation expires entries immediately. Cached DTOs contain only public fields and JSON
+values; dates are explicitly serialized and restored. Schedule keys include all
+database filters and time bounds; upcoming reads share a minute-sized window
+but still apply the exact current cutoff on every request.
+
+Pages remain dynamic. Auth, permissions, team contexts, roster membership,
+free-agent requests/contact history, admin/captain/account data, notifications,
+and private calendar reads never use these caches. Free Agents caches only its
+public division choices, not player information. Public calendar feeds retain
+their existing HTTP policies (up to five minutes); personal feeds and Admin CSV
+remain no-store. Mutation API responses are explicitly private/no-store. Logos
+revalidate their ETag on every request so replacements do not remain in browsers
+for an hour.
+
+Successful mutation boundaries call `invalidatePublicData` after committing.
+Centralized domain dependencies expire affected tags immediately (including
+results, reschedules, appeals, roster/captain changes, profiles/logos, content,
+and free-agent updates). New mutation entry points must call this helper too;
+direct database maintenance must expire the relevant tags or allow the TTL to
+revalidate. Season/division changes and bulk imports invalidate all dependent
+public domains. Private workflow-only changes need no public invalidation until
+they alter published data.
+
+Database indexes complement these caches: season-scoped fixtures and discipline
+include the stable `id` ordering used by pagination, with additional division/team
+prefixes where those filters are used. Team fixture lookups, exact-status workflow
+queues, and entity-filtered audit history have matching composite indexes. Only
+subsumed season/status indexes are replaced; global date and other foreign-key
+indexes remain. These are portable Prisma indexes, not a Redis dependency.
+Team home/away `OR` queries can use both indexes but still sort the combined result.
+The forward-only `20261005220000_roster_invitation_update_cascade` migration
+also corrects a historical SQLite foreign-key mismatch: request ID updates
+cascade to roster invitations, while deleting a request retains its invitations
+with a null request link. Existing invitation rows and indexes are preserved.
+
 To exercise the privileged flows, go to **/signin** and use the dev bypass
 personas (enabled by `DEV_AUTH_BYPASS=true`, hard-disabled when
 `NODE_ENV=production`):
@@ -445,6 +498,18 @@ Checklist for any production environment:
 - `AUTH_URL` + `AUTH_TRUST_HOST=true` behind the Azure proxy.
 - Both redirect URIs registered in Entra.
 - Managed identity for PostgreSQL if you would rather not ship a password.
+- After creating the PostgreSQL migration baseline, run `EXPLAIN (ANALYZE, BUFFERS)`
+  on production-like historical seasons, paginated lists, team fixture lookups,
+  and workflow queues. SQLite query-plan tests demonstrate index use, not
+  PostgreSQL planner choices or production latency.
+- Verify deployed HTML, JS, CSS, authenticated CSV, and public/private ICS **GET**
+  responses with `Accept-Encoding: br, gzip`, checking `Content-Encoding`,
+  `Vary: Accept-Encoding`, and the existing cache/privacy headers through the actual
+  Azure proxy/CDN path. Next's production compression defaults to enabled and
+  `next.config.ts` leaves it enabled; Brotli availability and MIME/size thresholds
+  depend on the deployed stack. Do not assume every response is compressed, make
+  private responses publicly cacheable, or add application gzip/Brotli or image
+  recompression. Deployed negotiation must be checked before launch.
 
 ---
 
@@ -464,6 +529,28 @@ npm run db:studio      # prisma studio
 Tests cover the standings calculator (every tiebreaker, forfeits, form guide,
 the unconfirmed-report flag) and the match lifecycle (race-safe claiming, claim
 ownership, report validation, immutability, admin discipline).
+
+Client interaction regressions in `tests/client-rendering.test.ts` use React's
+`act` and React DOM with a per-file jsdom environment; other suites stay in Node.
+They check that CSV field edits do not rebuild the preview, form actions retain
+their pending/confirmation behavior, and filter popovers release document
+listeners when closed or unmounted. Prefer local state boundaries over blanket
+memoization when adding interactive forms.
+
+Accessibility regressions in `tests/accessibility.test.ts` exercise the custom
+combobox/radio keyboard patterns, native-dialog lifecycle and focus restoration,
+safe pending confirmations, field descriptions/errors, mobile navigation, and
+concise non-text names with React DOM and dev-only axe-core. The style suite checks
+WCAG contrast ratios for both themes and every kit-palette checkmark, plus
+forced-colors and reduced-motion contracts. Kit colors remain unchanged data:
+real outlines and high-contrast text alternatives carry their meaning when color
+is unavailable. Native dialogs supply modal focus containment; jsdom lifecycle
+stubs do not prove browser inertness, rendering, or screen-reader behavior. A
+shared modal hook explicitly wraps Tab at either end and restores the invoker.
+Before release, check public/Admin/Captain workflows with a keyboard and screen
+reader, both themes, Windows forced-colors, and zoom/reflow in the target browsers.
+Keep the five-row filter list keyboard-operable without automatic submission, and
+retain native controls/links and the `#main` skip target when extending the UI.
 
 > **Windows note:** `npm run build` fails with `EPERM` on the Prisma query-engine
 > DLL while a dev server holds it open. Stop `npm run dev` first.

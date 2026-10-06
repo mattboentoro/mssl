@@ -104,6 +104,7 @@ export function TeamEditor({
 
           <Field
             label="Primary colour"
+            group
             htmlFor={`team-${team.id}-primary-label`}
             hint="Home / first-choice kit."
           >
@@ -117,6 +118,7 @@ export function TeamEditor({
 
           <Field
             label="Alternate colour"
+            group
             htmlFor={`team-${team.id}-alternate-label`}
             hint="Worn when the kits would clash."
           >

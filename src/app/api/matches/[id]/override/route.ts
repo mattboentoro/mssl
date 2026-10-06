@@ -1,4 +1,4 @@
-import { actorFrom, handleApi, parseJson } from "@/lib/api";
+import { actorFrom, handleMatchMutation, parseJson } from "@/lib/api";
 import { requireAdmin } from "@/lib/authz";
 import { overrideGameReport } from "@/lib/matches";
 import { prisma } from "@/lib/prisma";
@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 
 /** Admin result override. The reason is mandatory and is written to the audit log. */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  return handleApi(async () => {
+  return handleMatchMutation(async () => {
     const { id } = await context.params;
     const user = await requireAdmin();
     const body = await parseJson(request, overrideSchema);

@@ -122,11 +122,8 @@ export default async function CaptainReschedulesPage({
                 request.match.homeTeamId === request.requestingTeamId
                   ? request.match.awayTeamId
                   : request.match.homeTeamId;
-              const isOpponentCaptain = contextKeys.has(
-                `${request.match.seasonId}:${opponentId}`,
-              );
-              const canRespond =
-                request.status === "PENDING_OPPONENT" && isOpponentCaptain;
+              const isOpponentCaptain = contextKeys.has(`${request.match.seasonId}:${opponentId}`);
+              const canRespond = request.status === "PENDING_OPPONENT" && isOpponentCaptain;
               const status = (
                 <Badge
                   tone={
@@ -141,8 +138,8 @@ export default async function CaptainReschedulesPage({
                     ? "Pending my team"
                     : request.status === "REJECTED_OPPONENT" && isOpponentCaptain
                       ? "Rejected by my team"
-                    : (RESCHEDULE_STATUS_LABELS[request.status as RescheduleStatus] ??
-                      request.status)}
+                      : (RESCHEDULE_STATUS_LABELS[request.status as RescheduleStatus] ??
+                        request.status)}
                 </Badge>
               );
               return (
@@ -167,7 +164,12 @@ export default async function CaptainReschedulesPage({
                             request.originalKickoffAt ?? request.match.kickoffAt,
                           )}
                           status={status}
-                          location={<>&#128205; {request.originalVenueName ?? "TBD"}</>}
+                          location={
+                            <>
+                              <span aria-hidden>&#128205;</span>{" "}
+                              {request.originalVenueName ?? "TBD"}
+                            </>
+                          }
                         />
                         <MatchDisclosureHint />
                       </summary>

@@ -63,7 +63,11 @@ export default async function CaptainAppealsPage() {
                       topRight={`MW ${match.matchweek}`}
                       time={formatDateTime(match.kickoffAt)}
                       status={<Badge tone="success">Official</Badge>}
-                      location={<>&#128205; {match.venueName ?? "TBD"}</>}
+                      location={
+                        <>
+                          <span aria-hidden>&#128205;</span> {match.venueName ?? "TBD"}
+                        </>
+                      }
                     />
                     <MatchDisclosureHint />
                   </summary>
@@ -124,7 +128,11 @@ export default async function CaptainAppealsPage() {
                         {appeal.status.replaceAll("_", " ")}
                       </Badge>
                     }
-                    location={<>&#128205; {appeal.match.venueName ?? "TBD"}</>}
+                    location={
+                      <>
+                        <span aria-hidden>&#128205;</span> {appeal.match.venueName ?? "TBD"}
+                      </>
+                    }
                   />
                   <MatchDisclosureHint />
                 </summary>

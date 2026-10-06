@@ -1,5 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { revalidateTag } from "next/cache";
+import { PUBLIC_CACHE_TAGS } from "@/lib/public-cache";
 
 import { auth } from "@/auth";
 import { updateTeamProfileAction } from "@/app/captain/teams/[id]/profile/actions";
@@ -7,10 +9,11 @@ import { updateTeamProfileAction } from "@/app/captain/teams/[id]/profile/action
 const prisma = new PrismaClient();
 
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
 vi.mock("server-only", () => ({}));
 
 async function resetDatabase() {
+  vi.mocked(revalidateTag).mockClear();
   await prisma.teamCaptain.deleteMany();
   await prisma.globalRoleAssignment.deleteMany();
   await prisma.auditLog.deleteMany();
@@ -115,6 +118,10 @@ describe("team profile authorization", () => {
         name: "Renamed Club",
       },
     );
+    for (const domain of ["teams", "matches", "standings", "discipline"] as const) {
+      expect(revalidateTag).toHaveBeenCalledWith(PUBLIC_CACHE_TAGS[domain], { expire: 0 });
+    }
+    expect(revalidateTag).toHaveBeenCalledTimes(4);
   });
 
   it("allows an Admin to update any team without changing its slug", async () => {
@@ -158,5 +165,6 @@ describe("team profile authorization", () => {
     await expect(updateTeamProfileAction({}, form(first.id))).resolves.toMatchObject({
       error: "Captain access is required.",
     });
+    expect(revalidateTag).not.toHaveBeenCalled();
   });
 });

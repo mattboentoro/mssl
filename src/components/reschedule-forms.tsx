@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useId, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import {
@@ -98,14 +98,15 @@ function RescheduleFields({
   onSlotChange?: (value: string) => void;
   onReasonChange?: (value: string) => void;
 }) {
+  const id = useId();
   return (
     <>
       <div>
-        <label className={labelClass} htmlFor={`reschedule-slot-${selectedSlotId ?? "new"}`}>
+        <label className={labelClass} htmlFor={`${id}-slot`}>
           Available date, time, and venue (required)
         </label>
         <select
-          id={`reschedule-slot-${selectedSlotId ?? "new"}`}
+          id={`${id}-slot`}
           name="slotId"
           {...(onSlotChange
             ? {
@@ -128,11 +129,11 @@ function RescheduleFields({
         </select>
       </div>
       <div>
-        <label className={labelClass} htmlFor={`reschedule-reason-${selectedSlotId ?? "new"}`}>
+        <label className={labelClass} htmlFor={`${id}-reason`}>
           Rationale (required)
         </label>
         <textarea
-          id={`reschedule-reason-${selectedSlotId ?? "new"}`}
+          id={`${id}-reason`}
           name="reason"
           {...(onReasonChange
             ? {

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { invalidatePublicData } from "@/lib/public-cache";
 
 import { requireAdmin, AuthzError } from "@/lib/authz";
 import { CaptainResultError, reviewCaptainResult } from "@/lib/captain-results";
@@ -26,6 +27,7 @@ function decision(form: FormData): "approve" | "reject" {
 }
 
 function refresh(matchId: string) {
+  invalidatePublicData("matches");
   revalidatePath("/admin");
   revalidatePath("/admin/workflows");
   revalidatePath("/admin/matches");
