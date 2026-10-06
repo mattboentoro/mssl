@@ -144,7 +144,7 @@ summary:focus-visible {
 
 .team-color-bar {
   position: relative;
-  border: 1.2px solid var(--foreground);
+  border: 1.1px solid var(--foreground);
 }
 
 /* A two-tone divider remains visible even when both kits are very light or dark. */
