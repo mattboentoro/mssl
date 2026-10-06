@@ -89,10 +89,10 @@ describe("theme contrast and high-contrast fallbacks", () => {
     });
   }
 
-  it("gives compact two-color bars a 2px boundary without an extra outer outline", () => {
+  it("gives compact two-color bars a 1.2px boundary without an extra outer outline", () => {
     const bar = css.match(/\.team-color-bar\s*\{([^}]+)\}/)![1];
     const divider = css.match(/\.team-color-bar::after\s*\{([^}]+)\}/)![1];
-    expect(bar).toContain("border: 2px solid var(--foreground)");
+    expect(bar).toContain("border: 1.2px solid var(--foreground)");
     expect(bar).not.toContain("outline:");
     expect(bar).not.toContain("box-shadow");
     expect(divider).toContain("top: 50%");
