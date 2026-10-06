@@ -375,11 +375,15 @@ describe("native dialog lifecycle and safe confirmation", () => {
 });
 
 describe("names, descriptions and non-text values", () => {
-  it("uses the stronger shared bar boundary without changing kit colors, compact sizes or decorative semantics", async () => {
-    for (const [primary, alternate] of [
-      ["#ffffff", "#f8fafc"],
-      ["#000000", "#111111"],
-    ]) {
+  it("selects a white capsule border only for black kits without changing colors, sizes or semantics", async () => {
+    for (const [primary, alternate, hasBlack] of [
+      ["#ffffff", "#f8fafc", false],
+      ["#000000", "#111111", true],
+      ["#1d4ed8", "#111111", true],
+      ["#000", "#ffffff", true],
+      ["#ffffff", " #111 ", true],
+      ["#1e293b", "#c8102e", false],
+    ] as const) {
       for (const [size, dimensions] of [
         ["sm", ["h-4", "w-1.5"]],
         ["md", ["h-6", "w-2"]],
@@ -391,9 +395,10 @@ describe("names, descriptions and non-text values", () => {
         const bar = element(".team-color-bar");
         expect(bar.getAttribute("aria-hidden")).toBe("true");
         expect(bar.classList.contains("color-swatch")).toBe(false);
+        expect(bar.getAttribute("data-black-kit")).toBe(String(hasBlack));
         for (const dimension of dimensions) expect(bar.classList.contains(dimension)).toBe(true);
         expect(bar.getAttribute("style")).toContain(
-          `${primary} 0%, ${primary} 50%, ${alternate} 50%, ${alternate} 100%`,
+          `${primary.trim()} 0%, ${primary.trim()} 50%, ${alternate.trim()} 50%, ${alternate.trim()} 100%`,
         );
         expect(bar.textContent).toBe("");
       }

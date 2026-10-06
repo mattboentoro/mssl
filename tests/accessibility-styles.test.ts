@@ -67,12 +67,11 @@ describe("theme contrast and high-contrast fallbacks", () => {
       expect(contrast(tokens.brand, tokens["brand-contrast"])).toBeGreaterThanOrEqual(4.5);
     });
 
-    it(`${theme} keeps the bar boundary and split visible for white, near-white, black and near-black kits`, () => {
+    it(`${theme} keeps single swatch boundaries visible against light and dark kits`, () => {
       const block = css.slice(css.indexOf(`${theme} {`)).split("}")[0];
       const rgb = (hex: string) =>
         hex.match(/[\da-f]{2}/gi)!.map((channel) => parseInt(channel, 16));
       const foreground = rgb(block.match(/--foreground: (#[\da-f]{6});/)![1]);
-      const surface = rgb(block.match(/--surface: (#[\da-f]{6});/)![1]);
       const edgeCases = theme === ":root" ? ["#ffffff", "#f8fafc"] : ["#000000", "#111111"];
       for (const color of edgeCases) {
         expect(
@@ -80,30 +79,24 @@ describe("theme contrast and high-contrast fallbacks", () => {
           `outer boundary against ${color}`,
         ).toBeGreaterThanOrEqual(3);
       }
-      for (const color of ["#ffffff", "#f8fafc", "#000000", "#111111"]) {
-        expect(
-          Math.max(contrast(foreground, rgb(color)), contrast(surface, rgb(color))),
-          `two-tone divider against ${color}`,
-        ).toBeGreaterThanOrEqual(3);
-      }
     });
   }
 
-  it("gives compact two-color bars a 1.1px boundary without an extra outer outline", () => {
+  it("uses single borders without inset rings or capsule separators", () => {
     const bar = css.match(/\.team-color-bar\s*\{([^}]+)\}/)![1];
-    const divider = css.match(/\.team-color-bar::after\s*\{([^}]+)\}/)![1];
-    expect(bar).toContain("border: 1.1px solid var(--foreground)");
+    const swatch = css.match(/\.color-swatch\s*\{([^}]+)\}/)![1];
+    expect(bar).toContain("border: 1.1px solid var(--kit-bar-border, #000000)");
+    expect(css).toMatch(
+      /\.team-color-bar\[data-black-kit="true"\]\s*\{\s*--kit-bar-border: #ffffff;/,
+    );
+    expect(swatch).toContain("border: 1px solid var(--foreground)");
+    expect(swatch).not.toContain("box-shadow");
+    expect(swatch).not.toContain("outline:");
     expect(bar).not.toContain("outline:");
     expect(bar).not.toContain("box-shadow");
-    expect(divider).toContain("top: 50%");
-    expect(divider).toContain("height: 2px");
-    expect(divider).toContain("border-top: 1px solid var(--foreground)");
-    expect(divider).toContain("border-bottom: 1px solid var(--surface)");
+    expect(css).not.toContain(".team-color-bar::after");
     const forcedColors = css.slice(css.indexOf("@media (forced-colors: active)"));
     expect(forcedColors).toMatch(/\.team-color-bar\s*\{\s*border-color: CanvasText;/);
-    expect(forcedColors).toMatch(
-      /\.team-color-bar::after\s*\{\s*border-top-color: CanvasText;\s*border-bottom-color: Canvas;/,
-    );
     expect(forcedColors).not.toContain("forced-color-adjust: none");
   });
 

@@ -139,25 +139,14 @@ summary:focus-visible {
 
 .color-swatch {
   border: 1px solid var(--foreground);
-  box-shadow: inset 0 0 0 1px var(--surface);
 }
 
 .team-color-bar {
-  position: relative;
-  border: 1.1px solid var(--foreground);
+  border: 1.1px solid var(--kit-bar-border, #000000);
 }
 
-/* A two-tone divider remains visible even when both kits are very light or dark. */
-.team-color-bar::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: 0;
-  left: 0;
-  height: 2px;
-  border-top: 1px solid var(--foreground);
-  border-bottom: 1px solid var(--surface);
-  transform: translateY(-50%);
+.team-color-bar[data-black-kit="true"] {
+  --kit-bar-border: #ffffff;
 }
 
 .forced-colors-label {
@@ -190,11 +179,6 @@ summary:focus-visible {
 
   .team-color-bar {
     border-color: CanvasText;
-  }
-
-  .team-color-bar::after {
-    border-top-color: CanvasText;
-    border-bottom-color: Canvas;
   }
 
   :is(.bg-brand, .bg-success, .bg-danger, .bg-accent) {
