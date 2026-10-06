@@ -145,6 +145,9 @@ summary:focus-visible {
 .team-color-bar {
   position: relative;
   border: 2px solid var(--foreground);
+  /* Strengthen the edge without consuming the narrow colored interior. */
+  outline: 1px solid var(--foreground);
+  outline-offset: 0;
 }
 
 /* A two-tone divider remains visible even when both kits are very light or dark. */
@@ -190,6 +193,7 @@ summary:focus-visible {
 
   .team-color-bar {
     border-color: CanvasText;
+    outline-color: CanvasText;
   }
 
   .team-color-bar::after {

@@ -89,17 +89,21 @@ describe("theme contrast and high-contrast fallbacks", () => {
     });
   }
 
-  it("gives compact two-color bars a full 2px boundary and a real two-tone midpoint divider", () => {
+  it("gives compact two-color bars a 3px visible boundary without shrinking their colored interior", () => {
     const bar = css.match(/\.team-color-bar\s*\{([^}]+)\}/)![1];
     const divider = css.match(/\.team-color-bar::after\s*\{([^}]+)\}/)![1];
     expect(bar).toContain("border: 2px solid var(--foreground)");
+    expect(bar).toContain("outline: 1px solid var(--foreground)");
+    expect(bar).toContain("outline-offset: 0");
     expect(bar).not.toContain("box-shadow");
     expect(divider).toContain("top: 50%");
     expect(divider).toContain("height: 2px");
     expect(divider).toContain("border-top: 1px solid var(--foreground)");
     expect(divider).toContain("border-bottom: 1px solid var(--surface)");
     const forcedColors = css.slice(css.indexOf("@media (forced-colors: active)"));
-    expect(forcedColors).toMatch(/\.team-color-bar\s*\{\s*border-color: CanvasText;/);
+    expect(forcedColors).toMatch(
+      /\.team-color-bar\s*\{\s*border-color: CanvasText;\s*outline-color: CanvasText;/,
+    );
     expect(forcedColors).toMatch(
       /\.team-color-bar::after\s*\{\s*border-top-color: CanvasText;\s*border-bottom-color: Canvas;/,
     );
